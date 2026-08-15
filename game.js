@@ -741,8 +741,6 @@ function loadSavedGame() {
     .then(res => res.json())
     .then(savedState => {
       migrateSavedState(savedState);
-      if (typeof renderHotbar === 'function') renderHotbar();
-      if (typeof renderInventoryGrid === 'function') renderInventoryGrid();
     })
     .catch(() => {
       const local = localStorage.getItem('miners_haven_save');
@@ -750,10 +748,12 @@ function loadSavedGame() {
         try {
           const savedState = JSON.parse(local);
           migrateSavedState(savedState);
-          if (typeof renderHotbar === 'function') renderHotbar();
-          if (typeof renderInventoryGrid === 'function') renderInventoryGrid();
         } catch(e) {}
       }
+    })
+    .finally(() => {
+      if (typeof renderHotbar === 'function') renderHotbar();
+      if (typeof renderInventoryGrid === 'function') renderInventoryGrid();
     });
 }
 

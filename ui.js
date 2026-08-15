@@ -4,7 +4,7 @@
 
 let activeContextBuilding = null;
 let currentMainTab = 'shop'; // 'shop' | 'inventory' | 'relics' | 'meta'
-let currentCategory = 'all';
+currentCategory = 'all';
 
 // Context Menu Card
 function openContextMenu(building, screenX, screenY) {
