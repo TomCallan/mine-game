@@ -1,27 +1,38 @@
-# 🏭 Miner's Haven Clone
+# 🏭 Miner's Haven Clone — Major Progression & Metagame Overhaul
 
-A high-performance, real-time 2D factory building game built with HTML5 Canvas, Vanilla CSS, and Modular JavaScript. Inspired by *Miner's Haven*, players build automated production lines using **Droppers (Mines)**, **Conveyors**, **Upgraders**, **Decontaminators/Coolers**, and **Smelters/Furnaces**.
+A high-performance, real-time 2D factory building game built with HTML5 Canvas, Vanilla CSS, and Modular JavaScript. Inspired by *Miner's Haven*, players build automated production lines using **Extractors (Mines)**, **Conveyors**, **Upgraders**, **Decontaminators/Coolers**, **Crates**, **Relics**, and **Sellers/Smelters**.
 
 ---
 
 ## 🚀 Key Features
 
-* **Interactive Machine & Object Creator**: Integrated 12x12 pixel art sprite editor and data configurator to design, paint, and register your own custom Extractors, Belts, Upgraders, and Sellers directly in-game.
-* **Ore Status Effects & Hazards**:
-  * **🔥 Flaming**: Magma/blast furnace ores burn up and explode after 4 seconds unless doused.
-  * **💧 Wet**: Freon cooling spray extinguishes fire and grants 6s Fire Immunity.
-  * **☢️ Radioactive**: Uranium ores generate high profits ($150) but require Lead Shielding.
-  * **✨ Sparkling**: Stellar Prisms grant glittering sparkles that boost all downstream upgraders by +0.5x.
-* **Fuel Extractor Mechanics**: Thermal Mines take **Coal Fuel Ores** into input ports and mine **Super Diamond Ores** ($300 base value) for 8 seconds per Coal consumed.
-* **Loot Box Crate Shop**: Unbox Regular ($250), Golden ($1,000), and Exotic ($5,000) Crates via an animated CS-GO style roulette wheel to unlock rare and exotic machines.
-* **Mobile-First Touch & Gestures**: Single-finger camera panning, pinch-to-zoom, double-tap context cards, and responsive mobile HUD/Hotbar overlays.
-* **Live Disk Save Engine**: Asynchronously saves game state to `savegame.json` on disk and `localStorage` every 5 seconds and on every build action.
+* **3 Progression Layers**: Explicit separation of **Run State** (cash, placed buildings, ores), **Inventory** (purchased stock & permanent crate unlocks), and **Meta Progression** (Prestige Points, Prestige Keys, Blueprints, Relics, Shards, Dust).
+* **Shop vs. Inventory Separation**: Buy items from the shop with cash to store in inventory. Placing on the canvas consumes inventory stock; demolishing returns items to inventory.
+* **Prestige Metagame Engine**: Prestige at $\ge \$10\text{B}$ lifetime earnings to earn permanent **Prestige Points** and **Prestige Keys**.
+  - $\text{Prestige Points} = \lfloor (\frac{\text{Lifetime Earnings}}{10^{10}})^{0.5} \rfloor$
+  - $\text{Prestige Keys} = \max(1, 1 + \lfloor \log_{10}(\frac{\text{Lifetime Earnings}}{10^{10}}) \rfloor)$
+* **4-Tiered Crate Unboxing**: Unbox **Regular** ($250), **Golden** ($1,000), **Exotic** ($5,000), and **Prestige** (1 Key) Crates via an animated roulette wheel.
+  - Duplicate standard blueprints convert to **Shards**.
+  - Duplicate prestige rewards convert to **Prestige Dust**.
+* **20 New Objects & Status Mechanics**:
+  - **Ore Statuses**: `flaming`, `wet`, `radioactive`, `sparkling`, `lucky` (2x next upgrade multiplier), `crystalline` (+0.75x upgrader buff), `nullified` (cleanses hazards), `duplicated` (anti-infinite duplication loop flag), `timeAged` (travel time scaling).
+  - **New Extractors**: Crystal Geode Driller, Antimatter Siphon, Temporal Flux Borer, Bioluminescent Algae Vat, Void Fragment Harvester.
+  - **New Logistics**: MagLev Rail, Phase-Shift Conveyor, Gravity Inverter Belt, Cryo-Storage Conveyor, Quantum Entanglement Link.
+  - **New Upgraders & Sellers**: Ore Crystallizer, Probability Amplifier, Entropy Stabilizer, Resonance Harmonizer, Matter Replicator, Ore Transmuter, Shard of Life, Dimensional Vault, Catalytic Converter, Soul Forge.
+* **Passive Relic System**: Collect account-wide passive relics (`warehouseCharter`, `starterBelts`, `sellerPermit`, `crateMagnet`, `salvageToolkit`, `insuranceSeal`, `exoticPermit`, `vaultArchivist`) displayed in a dedicated UI tab.
+* **Mobile-First Touch Architecture**:
+  - **48x48 CSS px** minimum touch targets with `touch-action: manipulation`.
+  - **Full-Screen Mobile Panels & Tall Bottom Sheets** (`overscroll-behavior: contain`) preventing nested scrolling conflicts.
+  - **Tap-to-Select & Tap-to-Place** placement model with on-screen mobile toolbar controls (Rotate, Inspect, Zoom, Cancel).
+  - Bottom-heavy thumb-friendly HUD.
+* **Interactive Custom Object Creator**: Integrated 12x12 pixel art sprite editor and configurator to create custom Extractors, Belts, Upgraders, and Sellers directly in-game.
+* **Live Save & Migration Engine**: Saves game state asynchronously to `savegame.json` on disk and `localStorage`. Includes backward-compatibility migration for older save formats (`STATE.world.*`).
 
 ---
 
 ## 🧠 Data Structure Architecture
 
-Everything in the simulation is managed inside a single, JSON-serializable `STATE` object defined in [`game.js`](file:///C:/Users/TomCa/Documents/mine-game/game.js).
+Everything in the simulation is managed inside a central, JSON-serializable `STATE` object defined in [`game.js`](file:///home/administrator/mine-game/game.js):
 
 ```js
 const STATE = {
@@ -30,166 +41,98 @@ const STATE = {
     maxOres: 300,
     beltAcceleration: 3,
     groundFriction: 2.5,
-    oreGroundLifespan: 3
+    oreGroundLifespan: 3,
+    prestigeThresholdLifetime: 1e10,
+    prestigeKeyLogBase: 10,
+    inventoryBaseCapacity: 40
   },
 
-  timeScale: 1.0,
-  isPaused: false,
+  run: {
+    money: 1000,
+    lifetimeEarnings: 0,
+    buildings: [],
+    ores: [],
+    timeScale: 1.0,
+    isPaused: false
+  },
 
-  unlockedBuildingIds: ['extractor', 'belt', 'fastBelt', 'halfBelt', 'upgrader1x1', 'seller', 'coalExtractor'],
+  shop: { stock: {}, dynamicPriceLevel: {} },
 
-  itemDefs: { /* Ore definitions */ },
-  buildingDefs: { /* Machine definitions */ },
+  inventory: {
+    capacity: 40,
+    items: {},
+    permanentItems: {},
+    consumables: {}
+  },
 
-  world: {
-    buildings: [
-      { id: 'bldg_1', defId: 'extractor', col: 4, row: 2, rot: 0, fuelTimer: 0, lastProduced: 12450.2 }
-    ],
-    ores: [
-      { id: 'ore_1', itemType: 'ore', x: 288, y: 160, vx: 40, vy: 0, size: 14, color: '#ffb03b', value: 25, status: { flaming: false } }
-    ],
-    money: 1000
-  }
+  meta: {
+    prestigePoints: 0,
+    prestigeKeys: 0,
+    blueprintUnlocks: {},
+    relics: {},
+    shards: 0,
+    prestigeDust: 0,
+    collection: {}
+  },
+
+  defs: { itemDefs: {}, buildingDefs: {}, relicDefs: {}, crateDefs: {} }
 };
 ```
 
 ---
 
-## 🏷️ The Attribute & Metadata System
+## 📦 Objects & Machines Catalog
 
-Every building definition in `STATE.buildingDefs` adheres to an extensible schema designed for easy expansion and moddability.
-
-### Building Definition Schema
-
-```typescript
-interface BuildingDefinition {
-  id: string;                 // Unique identifier (e.g. 'volcanoDropper')
-  name: string;               // Display name (e.g. 'Volcano Mine')
-  category: 'extractor' | 'belt' | 'upgrader' | 'seller';
-  rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'exotic';
-  cost: number;               // Purchase cost in dollars ($)
-  size: { w: number, h: number }; // Tile footprint (supports fractional sizes like 0.5)
-  layer: 'machine' | 'belt';  // Determines if belts can overlap under machines
-  color: string;              // Base swatch / renderer fill color
-  speed?: number;             // Conveyor transport speed (px/sec)
-
-  // Status & Mechanics Flags
-  multiplier?: number;        // Value multiplier (e.g. 2.0x)
-  flatAdd?: number;           // Flat value addition (e.g. +$50)
-  energyCost?: number;        // Energy/Heat added to ore (explodes if > 100)
-  cooldownEnergy?: number;    // Energy/Heat removed from ore
-  extinguishes?: boolean;     // Removes flaming status & resets energy
-  appliesWet?: number;        // Seconds of wet/fire immunity granted
-  appliesFlaming?: boolean;   // Sets ore on fire
-  removesRadioactive?: boolean; // Cleanses radiation hazard
-  appliesSparkling?: boolean;// Grants sparkling status (+0.5x upgrader buff)
-  consumes?: boolean;         // Marks building as a Seller / Furnace
-  sellerBonus?: number;       // Sale multiplier bonus (e.g. 2.0x)
-  requiresFuel?: boolean;     // Indicates machine requires fuel input
-
-  // Extensible Tags & Attributes
-  tags: string[];             // Classifiers (e.g. ['dropper', 'flaming', 'heavy_machinery'])
-  attributes: Record<string, any>; // Dynamic key-value dictionary for future mechanics
-  
-  ports: PortDefinition[];    // Input, Output, and Through ports
-  produces?: { item: string, rate: number }; // Ore output definition
-}
-```
-
----
-
-## ➕ How to Add New Attributes & Custom Objects
-
-### 1. Adding a New Attribute to Existing Objects
-
-To add a new attribute (such as `conductivity`, `magnetic`, `temperatureTolerance`, or `decayRate`), simply add it to the `attributes` dictionary or root definition in [`game.js`](file:///C:/Users/TomCa/Documents/mine-game/game.js):
-
-```js
-STATE.buildingDefs.magneticConveyor = {
-  id: 'magneticConveyor',
-  name: 'Magnetic Belt',
-  category: 'belt',
-  rarity: 'epic',
-  cost: 450,
-  size: { w: 1, h: 1 },
-  layer: 'belt',
-  color: '#6366f1',
-  speed: 250,
-  tags: ['transport', 'magnetic'],
-  attributes: {
-    magneticPullStrength: 150,
-    conductivity: 2.5
-  },
-  ports: [{ dx: 0, dy: 0, kind: 'through', color: '#818cf8', dropSide: 0 }]
-};
-```
-
-### 2. Consuming Attributes in the Simulation Loop
-
-In [`game.js`](file:///C:/Users/TomCa/Documents/mine-game/game.js), check your custom attribute inside `updateOrePhysics(dt)` or `updateProduction(dt)`:
-
-```js
-if (def.attributes && def.attributes.magneticPullStrength) {
-  const pull = def.attributes.magneticPullStrength;
-  ore.vx += pull * dt;
-}
-```
-
-### 3. Adding Custom Machines In-Game
-
-You can also use the in-game **🎨 Object Creator**:
-1. Open the Inventory (`E` key or `📦 Inventory`).
-2. Click **🎨 Object Creator**.
-3. Paint your 12x12 pixel art sprite.
-4. Select Category (`Extractor`, `Belt`, `Upgrader`, `Seller`), cost, dimensions, and stats.
-5. Click **✨ Save & Register New Item**. The item is automatically assigned to `STATE.buildingDefs` and saved to disk.
+| Object Name | Category | Rarity | Size | Cost | Growth Rate | Mechanics & Attributes |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Standard Extractor** | Extractor | ⚪ Common | 3x1 | $100 | 1.10x | Mines Standard Ore ($5 base value) |
+| **Coal Mine** | Extractor | ⚪ Common | 3x1 | $450 | 1.10x | Mines Coal Fuel Ore |
+| **2x2 Mega Extractor** | Extractor | 🔵 Rare | 2x2 | $4,500 | 1.12x | Mines Mega Ore ($25 base value) |
+| **Volcano Mine** | Extractor | 🟣 Epic | 3x1 | $18,000 | 1.13x | Mines Magma Ore (drops **🔥 Flaming**) |
+| **Crystal Geode Driller** | Extractor | 🔵 Rare | 3x2 | $9,000 | 1.12x | Crate-only; mines Crystal Ore |
+| **Fueled Thermal Mine** | Extractor | 🟣 Epic | 3x2 | $85,000 | 1.14x | Consumes Coal to mine Super Diamond Ore ($300 value) |
+| **Bioluminescent Algae Vat** | Extractor | 🟣 Epic | 2x1 | $65,000 | 1.13x | Crate-only; produces Glow Algae Ore |
+| **Uranium Centrifuge** | Extractor | 🟡 Exotic | 2x2 | $350,000 | 1.15x | Prestige Crate; mines Uranium Ore (**☢️ Radioactive**) |
+| **Temporal Flux Borer** | Extractor | 🟡 Exotic | 3x3 | $1,400,000 | 1.14x | Prestige Crate; produces Time Crystal Ore (**⏳ Time-Aged**) |
+| **Antimatter Siphon** | Extractor | 🔴 Legendary | 2x2 | $2,500,000 | 1.15x | Prestige Crate; produces Antimatter Pellets |
+| **Void Fragment Harvester** | Extractor | 🔮 Mythic | 4x2 | $25,000,000 | 1.16x | Prestige Crate; produces Void Shard Ore |
+| **Conveyor Belt** | Conveyor | ⚪ Common | 1x1 | $15 | 1.08x | 90 px/s standard transport speed |
+| **Half-Width Belt** | Conveyor | 🟢 Uncommon | 0.5x1 | $35 | 1.09x | 90 px/s half-tile conveyor |
+| **Fast Conveyor** | Conveyor | 🟢 Uncommon | 1x1 | $120 | 1.10x | 180 px/s high-speed conveyor |
+| **Gravity Inverter Belt** | Conveyor | 🔵 Rare | 1x1 | $4,500 | 1.11x | Crate-only; inverts ore exit direction |
+| **Cryo-Storage Conveyor** | Conveyor | 🔵 Rare | 1x1 | $7,500 | 1.11x | Crate-only; buffers/freezes ores |
+| **Belt Splitter / Merger** | Routing | 🔵 Rare | 1x1 | $1,100 | 1.11x | Alternates / merges ore paths |
+| **Ultra Conveyor** | Conveyor | 🟣 Epic | 1x1 | $8,000 | 1.12x | 320 px/s ultra-fast conveyor |
+| **Magnetic Levitation Rail**| Conveyor | 🟣 Epic | 1x1 | $30,000 | 1.12x | 450 px/s maglev conveyor |
+| **Phase-Shift Conveyor** | Conveyor | 🟡 Exotic | 1x1 | $220,000 | 1.13x | Prestige Crate; ores pass through intangibly |
+| **Quantum Entanglement Link**| Utility | 🔴 Legendary | 1x1 | $1,800,000 | 1.14x | Prestige Crate; teleport link pair system |
+| **1x1 Upgrader** | Upgrader | ⚪ Common | 1x1 | $300 | 1.10x | 2.0x multiplier (+10 energy) |
+| **Half Upgrader** | Upgrader | 🟢 Uncommon | 0.5x1 | $550 | 1.11x | 1.5x multiplier (+5 energy) |
+| **Freon Cooling Sprayer** | Upgrader | 🟢 Uncommon | 1x1 | $2,200 | 1.11x | Extinguishes fire, grants **💧 Wet** |
+| **2x1 Wide Upgrader** | Upgrader | 🔵 Rare | 2x1 | $8,500 | 1.12x | 3.0x multiplier (+20 energy) |
+| **Pyro Blast Furnace** | Upgrader | 🔵 Rare | 1x1 | $14,000 | 1.12x | 3.5x multiplier, sets ore **🔥 Flaming** |
+| **Ore Crystallizer** | Upgrader | 🔵 Rare | 1x1 | $22,000 | 1.12x | 2.2x multiplier, grants **💎 Crystalline** |
+| **Lead Decontaminator** | Upgrader | 🟣 Epic | 1x1 | $40,000 | 1.13x | Cleanses **☢️ Radioactive** status, 2.5x multiplier |
+| **Entropy Stabilizer** | Upgrader | 🟣 Epic | 1x1 | $110,000 | 1.13x | Cleanses bad statuses, 3.0x multiplier |
+| **Ore Transmuter** | Upgrader | 🟣 Epic | 1x1 | $250,000 | 1.13x | Transmutes ore types, 2.5x multiplier |
+| **Probability Amplifier** | Upgrader | 🟡 Exotic | 1x1 | $750,000 | 1.13x | 1.8x multiplier, grants **🍀 Lucky** (2x next upgrade) |
+| **Stellar Prism** | Upgrader | 🟡 Exotic | 1x1 | $750,000 | 1.13x | Grants **✨ Sparkling** status (+0.5x upgrader buff) |
+| **Plasma Supercharger** | Upgrader | 🟣 Epic | 1x1 | $800,000 | 1.14x | +$500 flat value boost |
+| **Resonance Harmonizer** | Upgrader | 🔴 Legendary | 1x1 | $1,600,000 | 1.14x | 4.5x multiplier with Sparkling synergy |
+| **Matter Replicator** | Upgrader | 🔮 Mythic | 2x1 | $12,000,000 | 1.15x | Duplicates ores safely (**👯 Duplicated** flag) |
+| **Shard of Life** | Upgrader | 🔮 Mythic | 2x2 | $40,000,000 | 1.16x | 6.0x multiplier aura support upgrader |
+| **Seller** | Seller | ⚪ Common | 1x1 | $0 | 1.00x | Standard selling furnace |
+| **Catalytic Converter** | Seller | 🔵 Rare | 2x1 | $95,000 | 1.12x | 2.5x bonus (4.0x on Radioactive ores) |
+| **Blast Smelter** | Seller | 🟡 Exotic | 2x2 | $275,000 | 1.14x | Heavy smelter with 2.0x sale bonus |
+| **Dimensional Vault** | Seller | 🟡 Exotic | 2x2 | $1,400,000 | 1.14x | Batch seller (3.5x bonus after batch threshold) |
+| **Soul Forge** | Seller | 🔴 Legendary | 3x2 | $6,500,000 | 1.15x | 8.0x sale bonus with high risk of ore loss |
 
 ---
 
-## 📦 Inventory Catalog of Included Objects
-
-| Object Name | Category | Rarity | Size | Cost | Special Attributes & Mechanics |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Standard Extractor** | Extractor | ⚪ Common | 3x1 | $100 | Mines Standard Ore ($5 base value, 1000ms rate) |
-| **Coal Mine** | Extractor | ⚪ Common | 3x1 | $300 | Mines Coal Fuel Ore (used to fuel Thermal Mines) |
-| **2x2 Mega Extractor** | Extractor | 🔵 Rare | 2x2 | $500 | Mines Mega Ore ($25 base value, 1500ms rate) |
-| **Volcano Mine** | Extractor | 🟣 Epic | 3x1 | $600 | Mines Magma Ore ($50 base value, drops **🔥 Flaming**) |
-| **Fueled Thermal Mine** | Extractor | 🔵 Rare | 3x2 | $1,200 | Takes Coal input to mine Super Diamond Ores ($300 value) |
-| **Uranium Centrifuge** | Extractor | 🟡 Exotic | 2x2 | $2,000 | Mines Uranium Ore ($150 base value, drops **☢️ Radioactive**) |
-| **Conveyor Belt** | Conveyor | ⚪ Common | 1x1 | $10 | 90 px/s standard transport speed |
-| **Half-Width Belt** | Conveyor | 🟢 Uncommon | 0.5x1 | $15 | 90 px/s half-tile narrow conveyor |
-| **Fast Conveyor** | Conveyor | 🟢 Uncommon | 1x1 | $30 | 180 px/s high-speed conveyor |
-| **Belt Splitter (1→2)** | Conveyor | 🔵 Rare | 1x1 | $40 | Alternates ores left and right |
-| **Belt Merger (3→1)** | Conveyor | 🔵 Rare | 1x1 | $40 | Merges 3 input paths into 1 output direction |
-| **Ultra Conveyor** | Conveyor | 🟣 Epic | 1x1 | $100 | 320 px/s ultra-fast conveyor |
-| **1x1 Upgrader** | Upgrader | ⚪ Common | 1x1 | $150 | 2.0x value multiplier (+10 energy) |
-| **Half Upgrader** | Upgrader | 🟢 Uncommon | 0.5x1 | $100 | 1.5x value multiplier (+5 energy, 0.5 tile width) |
-| **Freon Cooling Sprayer** | Upgrader | 🟢 Uncommon | 1x1 | $250 | Extinguishes fire, grants **💧 Wet** (6s Fire Immunity) |
-| **2x1 Wide Upgrader** | Upgrader | 🔵 Rare | 2x1 | $400 | 3.0x value multiplier (+20 energy) |
-| **Pyro Blast Furnace** | Upgrader | 🔵 Rare | 1x1 | $400 | 3.5x value multiplier, sets ore on **🔥 Flaming** status |
-| **Lead Decontaminator** | Upgrader | 🟣 Epic | 1x1 | $500 | Cleanses **☢️ Radioactive** status while multiplying value 2.5x |
-| **Stellar Prism** | Upgrader | 🟡 Exotic | 1x1 | $750 | Applies **✨ Sparkling** status (+0.5x upgrader multiplier buff) |
-| **Plasma Supercharger** | Upgrader | 🟣 Epic | 1x1 | $800 | +$50 flat value boost (+35 energy) |
-| **Quantum Vault** | Upgrader | 🟡 Exotic | 1x1 | $1,500 | 4.0x value multiplier (15% risk of ore destruction) |
-| **Seller** | Seller | ⚪ Common | 1x1 | $0 | Standard ore selling furnace |
-| **Blast Smelter** | Seller | 🟡 Exotic | 2x2 | $1,500 | 2x2 heavy smelter granting **2.0x sale bonus** |
-
----
-
-## 🛠️ Local Development & Deployment
-
-### Running Locally
+## 🛠️ Local Development & Server Setup
 
 ```bash
-# Start Node hot-reloading dev server
+# Start dev server
 node server.js
 ```
 Open **`http://localhost:8080`** in your browser.
-
-### GitHub Repository & Deployment
-
-```bash
-git remote add origin git@github.com:TomCallan/mine-game.git
-git branch -M main
-git push -u origin main
-```

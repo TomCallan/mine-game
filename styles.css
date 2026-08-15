@@ -750,16 +750,30 @@ canvas.mode-inspecting { cursor: help; }
 }
 .relic-card-title { font-size: 13px; font-weight: 800; color: #38bdf8; }
 .relic-card-desc { font-size: 11px; color: #cbd5e1; line-height: 1.4; }
-/* Mobile Touch Action Toolbar */
+/* Mobile Touch Action Toolbar & Mobile-First Controls */
 #mobileControls {
   position: fixed;
   right: 12px;
-  bottom: 84px;
+  bottom: 88px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   z-index: 85;
   pointer-events: auto;
+}
+
+.mobile-action-btn,
+.inventory-btn,
+.inv-tab,
+.inv-main-tab,
+.ctx-btn,
+.crate-buy-btn,
+.inv-card-place-btn,
+.prestige-confirm-btn {
+  min-height: 48px;
+  min-width: 48px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .mobile-action-btn {
@@ -773,13 +787,10 @@ canvas.mode-inspecting { cursor: help; }
   font-weight: 800;
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
-  min-height: 44px;
-  min-width: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  touch-action: manipulation;
   transition: transform 0.1s, background 0.15s;
 }
 .mobile-action-btn:active {
@@ -795,16 +806,53 @@ canvas.mode-inspecting { cursor: help; }
   border-color: #60a5fa;
 }
 
+/* Modal Overscroll Containment */
+#inventoryModal, #customCreatorModal, #crateModal, #prestigeModal, .inv-window, .inv-grid, .crate-body, .prestige-body {
+  overscroll-behavior: contain;
+}
+
+/* Full-Screen Mobile Panels & Responsive reflow */
 @media (max-width: 768px) {
   #mobileControls {
-    bottom: 90px;
+    bottom: 94px;
     right: 8px;
-    gap: 6px;
+    gap: 8px;
   }
   .mobile-action-btn {
-    padding: 8px 10px;
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+  .inv-wrapper, .crate-window, .prestige-window {
+    width: 100vw;
+    height: 100vh;
+    max-width: 100vw;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+  .inv-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+  }
+  .meta-status-bar {
+    font-size: 11px;
+    padding: 6px 10px;
+    gap: 6px;
+  }
+  .meta-chip {
+    padding: 4px 8px;
     font-size: 11px;
   }
+  #hotbarContainer {
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    transform: none;
+    max-width: none;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+  }
 }
+
 
 
