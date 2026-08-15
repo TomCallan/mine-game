@@ -596,6 +596,87 @@ window.addEventListener('mouseup', (e) => {
   canvas.classList.remove('dragging');
 });
 
+// Touch Event Handling for Mobile Devices
+let touchStartDist = 0;
+let lastTouchPos = { x: 0, y: 0 };
+let lastTapTime = 0;
+
+canvas.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 1) {
+    const t = e.touches[0];
+    lastTouchPos = { x: t.clientX, y: t.clientY };
+    mouseScreen = { x: t.clientX, y: t.clientY };
+
+    const now = performance.now();
+    if (now - lastTapTime < 300) {
+      const world = screenToWorld(t.clientX, t.clientY);
+      const cell = worldToCell(world.x, world.y);
+      const b = findBuildingAtCell(cell.col, cell.row);
+      if (b && typeof openContextMenu === 'function') {
+        openContextMenu(b, t.clientX, t.clientY);
+      }
+    }
+    lastTapTime = now;
+
+    if (mode === 'placing' && placingState) {
+      const world = screenToWorld(t.clientX, t.clientY);
+      const cell = worldToCell(world.x, world.y);
+      const def = STATE.buildingDefs[placingState.defId];
+      if (def && def.layer === 'belt') {
+        isBeltDragging = true;
+        beltDragStart = cell;
+      }
+    }
+    isDragging = true;
+    dragMoved = false;
+  } else if (e.touches.length === 2) {
+    const t1 = e.touches[0], t2 = e.touches[1];
+    touchStartDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+  }
+}, { passive: true });
+
+canvas.addEventListener('touchmove', (e) => {
+  if (e.touches.length === 1 && isDragging) {
+    const t = e.touches[0];
+    mouseScreen = { x: t.clientX, y: t.clientY };
+    const dx = t.clientX - lastTouchPos.x;
+    const dy = t.clientY - lastTouchPos.y;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragMoved = true;
+
+    if (mode !== 'placing') {
+      STATE.camera.x -= dx / STATE.camera.zoom;
+      STATE.camera.y -= dy / STATE.camera.zoom;
+      clampCamera();
+    }
+    lastTouchPos = { x: t.clientX, y: t.clientY };
+  } else if (e.touches.length === 2 && touchStartDist > 0) {
+    const t1 = e.touches[0], t2 = e.touches[1];
+    const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+    const zoomRatio = currentDist / touchStartDist;
+    STATE.camera.zoom = Math.min(STATE.camera.maxZoom, Math.max(STATE.camera.minZoom, STATE.camera.zoom * (1 + (zoomRatio - 1) * 0.1)));
+    touchStartDist = currentDist;
+    clampCamera();
+  }
+}, { passive: true });
+
+canvas.addEventListener('touchend', (e) => {
+  if (e.touches.length === 0) {
+    if (mode === 'placing' && placingState) {
+      if (isBeltDragging && beltDragStart) {
+        const world = screenToWorld(lastTouchPos.x, lastTouchPos.y);
+        const endCell = worldToCell(world.x, world.y);
+        const line = getBeltDragPath(beltDragStart, endCell);
+        line.cells.forEach(c => { tryPlaceBuilding(placingState.defId, c.col, c.row, line.rot); });
+      } else {
+        handleClickAction(lastTouchPos.x, lastTouchPos.y);
+      }
+    } else if (isDragging && !dragMoved) {
+      handleClickAction(lastTouchPos.x, lastTouchPos.y);
+    }
+    isBeltDragging = false; beltDragStart = null; isDragging = false; touchStartDist = 0;
+  }
+}, { passive: true });
+
 // Selection Logic
 function selectEntityAt(wx, wy) {
   const cell = worldToCell(wx, wy);
