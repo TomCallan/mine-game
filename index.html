@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Miner's Haven Clone</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<canvas id="game"></canvas>
+<div id="hud"></div>
+
+<!-- Building Context Menu Card -->
+<div id="contextMenu">
+  <div class="ctx-header">
+    <div class="ctx-title-box">
+      <div class="ctx-swatch" id="ctxSwatch"></div>
+      <div>
+        <div class="ctx-title" id="ctxTitle">Building Name</div>
+        <div class="ctx-sub" id="ctxSub">Category • 1x1 Tile</div>
+      </div>
+    </div>
+    <button class="ctx-close" id="closeCtxBtn">×</button>
+  </div>
+  <div class="ctx-body">
+    <div class="ctx-stats" id="ctxStats"></div>
+    <div class="ctx-actions">
+      <button class="ctx-btn" id="ctxBtnRotate">🔄 Rotate [R]</button>
+      <button class="ctx-btn" id="ctxBtnMove">🚚 Move Building</button>
+      <button class="ctx-btn danger" id="ctxBtnDelete">🗑️ Delete</button>
+    </div>
+    <div class="ctx-walls-section" id="ctxWallsSection" style="display: none;">
+      <div class="ctx-walls-title">🧱 Conveyor Side Walls</div>
+      <div class="ctx-walls-grid">
+        <button class="ctx-wall-btn" id="ctxWall0">Right Wall</button>
+        <button class="ctx-wall-btn" id="ctxWall1">Bottom Wall</button>
+        <button class="ctx-wall-btn" id="ctxWall2">Left Wall</button>
+        <button class="ctx-wall-btn" id="ctxWall3">Top Wall</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Reactive Hotbar UI -->
+<div id="hotbarContainer">
+  <div id="hotbarSlots" style="display: flex; gap: 8px;"></div>
+  <button class="inventory-btn" id="openInvBtn">📦 Inventory [E]</button>
+  <button class="inventory-btn crate-shop-btn" id="openCrateBtn">🎁 Crate Shop</button>
+</div>
+
+<!-- Minecraft-Style Inventory Folder Dialog -->
+<div id="inventoryModal">
+  <div class="inv-wrapper">
+    <div class="inv-tabs-header">
+      <div class="inv-tabs" id="invTabs">
+        <button class="inv-tab active" data-category="all">🌟 All Items</button>
+        <button class="inv-tab" data-category="extractor">⛏️ Extractors</button>
+        <button class="inv-tab" data-category="belt">🛤️ Conveyors</button>
+        <button class="inv-tab" data-category="upgrader">⚡ Upgraders</button>
+        <button class="inv-tab" data-category="seller">💰 Sellers</button>
+      </div>
+      <div class="inv-search-box">
+        <button class="inventory-btn" id="openCreatorBtn" style="height: 36px; padding: 0 10px; font-size: 11px; background: #10b981; border-color: #34d399;">🎨 Object Creator</button>
+        <input type="text" class="inv-search-input" id="invSearchInput" placeholder="🔍 Search items...">
+        <button class="inv-close" id="closeInvBtn">×</button>
+      </div>
+    </div>
+    <div class="inv-window">
+      <div class="inv-grid" id="invGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Crate Loot Box Shop Modal -->
+<div id="crateModal">
+  <div class="crate-window">
+    <div class="crate-header">
+      <div class="crate-title">🎁 Crate Shop & Item Unboxing</div>
+      <button class="creator-close" id="closeCrateBtn">×</button>
+    </div>
+    <div class="crate-body">
+      <div class="crate-cards">
+        <div class="crate-card">
+          <div class="crate-icon">📦</div>
+          <div class="crate-name">Regular Crate</div>
+          <div class="crate-cost">$250</div>
+          <div class="crate-desc">Unlocks Common (60%), Uncommon (30%), or Rare (10%) machines!</div>
+          <button class="crate-buy-btn" data-crate="regular">Open Crate ($250)</button>
+        </div>
+        <div class="crate-card">
+          <div class="crate-icon">👑</div>
+          <div class="crate-name">Golden Crate</div>
+          <div class="crate-cost">$1,000</div>
+          <div class="crate-desc">Unlocks Uncommon (40%), Rare (40%), or Epic (20%) machines!</div>
+          <button class="crate-buy-btn" data-crate="gold">Open Crate ($1,000)</button>
+        </div>
+        <div class="crate-card">
+          <div class="crate-icon">🌌</div>
+          <div class="crate-name">Exotic Crate</div>
+          <div class="crate-cost">$5,000</div>
+          <div class="crate-desc">Unlocks Rare (20%), Epic (50%), or Exotic (30%) machines!</div>
+          <button class="crate-buy-btn" data-crate="exotic">Open Crate ($5,000)</button>
+        </div>
+      </div>
+
+      <!-- Unboxing Roulette Animation -->
+      <div class="unboxing-overlay" id="unboxingOverlay">
+        <div class="creator-section-title">🎰 Unboxing Rewards...</div>
+        <div class="roulette-container">
+          <div class="roulette-pointer"></div>
+          <div class="roulette-track" id="rouletteTrack"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Interactive Object Creator Modal -->
+<div id="customCreatorModal">
+  <div class="creator-window">
+    <div class="creator-header">
+      <div class="creator-title">🎨 Interactive Object & Machine Creator</div>
+      <button class="creator-close" id="closeCreatorBtn">×</button>
+    </div>
+    <div class="creator-body">
+      <div class="creator-left">
+        <div class="creator-section-title">Pixel Art Sprite Editor (12x12)</div>
+        <canvas id="pixelCanvas" width="192" height="192"></canvas>
+        <div class="palette-row" id="paletteRow"></div>
+        <div class="creator-tool-row">
+          <button class="creator-tool-btn active" id="toolPencil">✏️ Pencil</button>
+          <button class="creator-tool-btn" id="toolEraser">🧹 Eraser</button>
+          <button class="creator-tool-btn" id="toolClear">❌ Clear</button>
+        </div>
+      </div>
+      <div class="creator-right">
+        <div class="creator-section-title">Item Data Configuration</div>
+        <div class="creator-field">
+          <label>Item Name</label>
+          <input type="text" id="custName" value="Custom Machine" placeholder="Name your machine...">
+        </div>
+        <div class="creator-field-row">
+          <div class="creator-field">
+            <label>Category</label>
+            <select id="custCategory">
+              <option value="extractor">⛏️ Extractor / Miner</option>
+              <option value="belt">🛤️ Conveyor Belt</option>
+              <option value="upgrader">⚡ Upgrader</option>
+              <option value="seller">💰 Seller</option>
+            </select>
+          </div>
+          <div class="creator-field">
+            <label>Cost ($)</label>
+            <input type="number" id="custCost" value="200" min="0">
+          </div>
+        </div>
+        <div class="creator-field-row">
+          <div class="creator-field">
+            <label>Width (Tiles)</label>
+            <select id="custWidth">
+              <option value="1">1 Tile</option>
+              <option value="0.5">0.5 Half-Tile</option>
+              <option value="2">2 Tiles</option>
+              <option value="3">3 Tiles</option>
+            </select>
+          </div>
+          <div class="creator-field">
+            <label>Height (Tiles)</label>
+            <select id="custHeight">
+              <option value="1">1 Tile</option>
+              <option value="2">2 Tiles</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Dynamic Category Specific Panels -->
+        <div id="custSettingsExtractor" class="cust-cat-panel">
+          <div class="creator-section-title" style="margin-top:6px;">Mining & Ore Settings</div>
+          <div class="creator-field-row">
+            <div class="creator-field">
+              <label>Ore Name</label>
+              <input type="text" id="custOreName" value="Ruby Ore">
+            </div>
+            <div class="creator-field">
+              <label>Ore Shape</label>
+              <select id="custOreShape">
+                <option value="circle">● Circle</option>
+                <option value="diamond">◆ Diamond</option>
+                <option value="square">■ Square</option>
+              </select>
+            </div>
+          </div>
+          <div class="creator-field-row">
+            <div class="creator-field">
+              <label>Ore Base Value ($)</label>
+              <input type="number" id="custOreValue" value="25" min="1">
+            </div>
+            <div class="creator-field">
+              <label>Spawn Interval (ms)</label>
+              <input type="number" id="custSpawnRate" value="1000" min="200" step="100">
+            </div>
+          </div>
+        </div>
+
+        <div id="custSettingsBelt" class="cust-cat-panel" style="display: none;">
+          <div class="creator-section-title" style="margin-top:6px;">Conveyor Settings</div>
+          <div class="creator-field">
+            <label>Conveyor Speed (px/s)</label>
+            <input type="number" id="custSpeed" value="180" min="20" max="500">
+          </div>
+        </div>
+
+        <div id="custSettingsUpgrader" class="cust-cat-panel" style="display: none;">
+          <div class="creator-section-title" style="margin-top:6px;">Upgrader Stats</div>
+          <div class="creator-field-row">
+            <div class="creator-field">
+              <label>Value Multiplier (x)</label>
+              <input type="number" id="custMulti" value="2.5" step="0.5" min="1">
+            </div>
+            <div class="creator-field">
+              <label>Flat Boost (+$)</label>
+              <input type="number" id="custFlat" value="50" min="0">
+            </div>
+          </div>
+          <div class="creator-field">
+            <label>Heat / Energy Cost</label>
+            <input type="number" id="custEnergy" value="15" min="0">
+          </div>
+        </div>
+
+        <div id="custSettingsSeller" class="cust-cat-panel" style="display: none;">
+          <div class="creator-section-title" style="margin-top:6px;">Seller Settings</div>
+          <div class="creator-field">
+            <label>Sale Bonus Multiplier</label>
+            <input type="number" id="custSellerMulti" value="1.0" step="0.1" min="0.5">
+          </div>
+        </div>
+
+        <button class="creator-save-btn" id="btnSaveCustomItem">✨ Save & Register New Item</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="inspectorPanel">
+  <div class="panel-header">
+    <span id="inspectorTitle">—</span>
+    <button id="inspectorClose">×</button>
+  </div>
+  <pre id="inspectorBody"></pre>
+</div>
+
+<script src="game.js"></script>
+<script src="ui.js"></script>
+</body>
+</html>

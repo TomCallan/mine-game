@@ -1,0 +1,845 @@
+{
+  "config": {
+    "grid": {
+      "cols": 24,
+      "rows": 24,
+      "cellSize": 64
+    },
+    "maxOres": 300,
+    "beltAcceleration": 3,
+    "groundFriction": 2.5,
+    "oreGroundLifespan": 3
+  },
+  "timeScale": 1,
+  "isPaused": false,
+  "itemDefs": {
+    "ore": {
+      "id": "ore",
+      "name": "Standard Ore",
+      "color": "#ffb03b",
+      "size": 14,
+      "baseValue": 5,
+      "shape": "circle"
+    },
+    "megaOre": {
+      "id": "megaOre",
+      "name": "Mega Ore",
+      "color": "#ff4757",
+      "size": 22,
+      "baseValue": 25,
+      "shape": "diamond"
+    },
+    "magmaOre": {
+      "id": "magmaOre",
+      "name": "Magma Ore",
+      "color": "#ff4757",
+      "size": 18,
+      "baseValue": 50,
+      "shape": "diamond",
+      "defaultStatus": {
+        "flaming": true
+      }
+    },
+    "uraniumOre": {
+      "id": "uraniumOre",
+      "name": "Uranium Ore",
+      "color": "#2ecc71",
+      "size": 16,
+      "baseValue": 150,
+      "shape": "circle",
+      "defaultStatus": {
+        "radioactive": true
+      }
+    }
+  },
+  "buildingDefs": {
+    "extractor": {
+      "id": "extractor",
+      "name": "Standard Extractor",
+      "category": "extractor",
+      "cost": 100,
+      "size": {
+        "w": 3,
+        "h": 1
+      },
+      "layer": "machine",
+      "color": "#3d6a8f",
+      "speed": 40,
+      "ports": [
+        {
+          "dx": 3,
+          "dy": 0,
+          "kind": "output",
+          "color": "#ffcf5c",
+          "accept": [],
+          "dropSide": null
+        }
+      ],
+      "produces": {
+        "item": "ore",
+        "rate": 1000
+      }
+    },
+    "megaExtractor": {
+      "id": "megaExtractor",
+      "name": "2x2 Mega Extractor",
+      "category": "extractor",
+      "cost": 500,
+      "size": {
+        "w": 2,
+        "h": 2
+      },
+      "layer": "machine",
+      "color": "#2b7873",
+      "speed": 40,
+      "ports": [
+        {
+          "dx": 2,
+          "dy": 0.5,
+          "kind": "output",
+          "color": "#ff4757",
+          "accept": [],
+          "dropSide": null
+        }
+      ],
+      "produces": {
+        "item": "megaOre",
+        "rate": 1500
+      }
+    },
+    "volcanoDropper": {
+      "id": "volcanoDropper",
+      "name": "Volcano Mine (Flaming)",
+      "category": "extractor",
+      "cost": 600,
+      "size": {
+        "w": 3,
+        "h": 1
+      },
+      "layer": "machine",
+      "color": "#881337",
+      "speed": 40,
+      "ports": [
+        {
+          "dx": 3,
+          "dy": 0,
+          "kind": "output",
+          "color": "#ff4757",
+          "accept": [],
+          "dropSide": null
+        }
+      ],
+      "produces": {
+        "item": "magmaOre",
+        "rate": 1200
+      }
+    },
+    "uraniumMine": {
+      "id": "uraniumMine",
+      "name": "Uranium Centrifuge (Radioactive)",
+      "category": "extractor",
+      "cost": 1200,
+      "size": {
+        "w": 2,
+        "h": 2
+      },
+      "layer": "machine",
+      "color": "#14532d",
+      "speed": 40,
+      "ports": [
+        {
+          "dx": 2,
+          "dy": 0.5,
+          "kind": "output",
+          "color": "#2ecc71",
+          "accept": [],
+          "dropSide": null
+        }
+      ],
+      "produces": {
+        "item": "uraniumOre",
+        "rate": 1600
+      }
+    },
+    "belt": {
+      "id": "belt",
+      "name": "Conveyor Belt",
+      "category": "belt",
+      "cost": 10,
+      "size": {
+        "w": 1,
+        "h": 1
+      },
+      "layer": "belt",
+      "color": "#4b4f58",
+      "speed": 90,
+      "ports": [
+        {
+          "dx": 0,
+          "dy": 0,
+          "kind": "through",
+          "color": "#ffcf5c",
+          "dropSide": 0
+        }
+      ]
+    },
+    "fastBelt": {
+      "id": "fastBelt",
+      "name": "Fast Conveyor",
+      "category": "belt",
+      "cost": 30,
+      "size": {
+        "w": 1,
+        "h": 1
+      },
+      "layer": "belt",
+      "color": "#3a7ca5",
+      "speed": 180,
+      "ports": [
+        {
+          "dx": 0,
+          "dy": 0,
+          "kind": "through",
+          "color": "#7fd0ff",
+          "dropSide": 0
+        }
+      ]
+    },
+    "ultraBelt": {
+      "id": "ultraBelt",
+      "name": "Ultra Conveyor",
+      "category": "belt",
+      "cost": 100,
+      "size": {
+        "w": 1,
+        "h": 1
+      },
+      "layer": "belt",
+      "color": "#d97706",
+      "speed": 320,
+      "ports": [
+        {
+          "dx": 0,
+          "dy": 0,
+          "kind": "through",
+          "color": "#fbbf24",
+          "dropSide": 0
+        }
+      ]
+    },
+    "halfBelt": {
+      "id": "halfBelt",
+      "name": "Half-Width Belt",
+      "category": "belt",
+      "cost": 15,
+      "size": {
+        "w": 0.5,
+        "h": 1
+      },
+      "layer": "belt",
+      "color": "#334155",
+      "isHalfBelt": true,
+      "speed": 90,
+      "ports": [
+        {
+          "dx": 0,
+          "dy": 0,
+          "kind": "through",
+          "color": "#94a3b8",
+          "dropSide": 0
+        }
+      ]
+    },
+    "splitter": {
+      "id": "splitter",
+      "name": "Belt Splitter (1→2)",
+      "category": "belt",
+      "cost": 40,
+      "size": {
+        "w": 1,
+        "h": 1
+      },
+      "layer": "belt",
+      "color": "#e67e22",
+      "isSplitter": true,
+      "speed": 100,
+      "ports": [
+        {
+          "dx": 0,
+          "dy": 0,
+          "kind": "through",
+          "color": "#f39c12",
+          "dropSide": 0
+        }
+      ]
+    },
+    "merger": {
+      "id": "merger",
+      "name": "Belt Merger (3→1)",
+      "category": "belt",
+      "cost": 40,
+      "size": {
+        "w": 1,
+        "h": 1
+      },
+      "layer": "belt",
+      "color": "#27ae60",
+      "isMerger": true,
+      "speed": 100,
+      "ports": [
+        {
+          "dx": 0,
+          "dy": 0,
+          "kind": "through",
+          "color": "#2ecc71",
+          "dropSide": 0
+        }
+      ]
+    },
+    "upgrader1x1": {
+      "id": "upgrader1x1",
+      "name": "1x1 Upgrader",
+      "category": "upgrader",
+      "cost": 150,
+      "size": {
+        "w": 1,
+        "h": 1
+      },
+      "layer": "belt",
+      "color": "#d35400",
+      "multiplier": 2,
+      "energyCost": 10,
+      "speed": 90,
+      "ports": [
+        {
+          "dx": 0,
+          "dy": 0,
+          "kind": "through",
+          "color": "#e67e22",
+          "dropSide": 0
+        }
+      ]
+    },
+    "upgrader2x1": {
+      "id": "upgrader2x1",
+      "name": "2x1 Wide Upgrader",
+      "category": "upgrader",
+      "cost": 400,
+      "size": {
+        "w": 2,
+        "h": 1
+      },
+      "layer": "belt",
+      "color": "#c0392b",
+      "multiplier": 3,
+      "energyCost": 20,
+      "speed": 90,
+      "ports": [
+        {
+          "dx": 0,
+          "dy": 0,
+          "kind": "through",
+          "color": "#e74c3c",
+          "dropSide": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0,
+          "kind": "through",
+          "color": "#e74c3c",
+          "dropSide": 0
+        }
+      ]
+    },
+    "upgraderHalf": {
+      "id": "upgraderHalf",
+      "name": "Half Upgrader",
+      "category": "upgrader",
+      "cost": 100,
+      "size": {
+        "w": 0.5,
+        "h": 1
+      },
+      "layer": "belt",
+      "color": "#8e44ad",
+      "multiplier": 1.5,
+      "energyCost": 5,
+      "isHalf": true,
+      "speed": 90,
+      "ports": [
+        {
+          "dx": 0,
+          "dy": 0,
+          "kind": "through",
+          "color": "#9b59b6",
+          "dropSide": 0
+        }
+      ]
+    },
+    "freonSprayer": {
+      "id": "freonSprayer",
+      "name": "Freon Cooling Sprayer",
+      "category": "upgrader",
+      "cost": 250,
+      "size": {
+        "w": 1,
+        "h": 1
+      },
+      "layer": "belt",
+      "color": "#0284c7",
+      "extinguishes": true,
+      "appliesWet": 6,
+      "cooldownEnergy": 50,
+      "speed": 90,
+      "ports": [
+        {
+          "dx": 0,
+          "dy": 0,
+          "kind": "through",
+          "color": "#38bdf8",
+          "dropSide": 0
+        }
+      ]
+    },
+    "pyroRefiner": {
+      "id": "pyroRefiner",
+      "name": "Pyro Blast Furnace (3.5x)",
+      "category": "upgrader",
+      "cost": 400,
+      "size": {
+        "w": 1,
+        "h": 1
+      },
+      "layer": "belt",
+      "color": "#b91c1c",
+      "multiplier": 3.5,
+      "appliesFlaming": true,
+      "speed": 90,
+      "ports": [
+        {
+          "dx": 0,
+          "dy": 0,
+          "kind": "through",
+          "color": "#f87171",
+          "dropSide": 0
+        }
+      ]
+    },
+    "leadDecontaminator": {
+      "id": "leadDecontaminator",
+      "name": "Lead Decontaminator (2.5x)",
+      "category": "upgrader",
+      "cost": 500,
+      "size": {
+        "w": 1,
+        "h": 1
+      },
+      "layer": "belt",
+      "color": "#475569",
+      "removesRadioactive": true,
+      "multiplier": 2.5,
+      "speed": 90,
+      "ports": [
+        {
+          "dx": 0,
+          "dy": 0,
+          "kind": "through",
+          "color": "#94a3b8",
+          "dropSide": 0
+        }
+      ]
+    },
+    "stellarSparkler": {
+      "id": "stellarSparkler",
+      "name": "Stellar Prism (Sparkles)",
+      "category": "upgrader",
+      "cost": 750,
+      "size": {
+        "w": 1,
+        "h": 1
+      },
+      "layer": "belt",
+      "color": "#eab308",
+      "appliesSparkling": true,
+      "speed": 90,
+      "ports": [
+        {
+          "dx": 0,
+          "dy": 0,
+          "kind": "through",
+          "color": "#fde047",
+          "dropSide": 0
+        }
+      ]
+    },
+    "upgraderPlasma": {
+      "id": "upgraderPlasma",
+      "name": "Plasma Supercharger",
+      "category": "upgrader",
+      "cost": 800,
+      "size": {
+        "w": 1,
+        "h": 1
+      },
+      "layer": "belt",
+      "color": "#ff0055",
+      "flatAdd": 50,
+      "energyCost": 35,
+      "speed": 100,
+      "ports": [
+        {
+          "dx": 0,
+          "dy": 0,
+          "kind": "through",
+          "color": "#ff0055",
+          "dropSide": 0
+        }
+      ]
+    },
+    "upgraderStabilizer": {
+      "id": "upgraderStabilizer",
+      "name": "Cooling Stabilizer",
+      "category": "upgrader",
+      "cost": 600,
+      "size": {
+        "w": 1,
+        "h": 1
+      },
+      "layer": "belt",
+      "color": "#00d2d3",
+      "cooldownEnergy": 40,
+      "speed": 90,
+      "ports": [
+        {
+          "dx": 0,
+          "dy": 0,
+          "kind": "through",
+          "color": "#54a0ff",
+          "dropSide": 0
+        }
+      ]
+    },
+    "upgraderQuantum": {
+      "id": "upgraderQuantum",
+      "name": "Quantum Vault",
+      "category": "upgrader",
+      "cost": 1500,
+      "size": {
+        "w": 1,
+        "h": 1
+      },
+      "layer": "belt",
+      "color": "#5f27cd",
+      "multiplier": 4,
+      "riskChance": 0.15,
+      "speed": 90,
+      "ports": [
+        {
+          "dx": 0,
+          "dy": 0,
+          "kind": "through",
+          "color": "#341f97",
+          "dropSide": 0
+        }
+      ]
+    },
+    "upgraderDiminishing": {
+      "id": "upgraderDiminishing",
+      "name": "Diminishing Reactor",
+      "category": "upgrader",
+      "cost": 1000,
+      "size": {
+        "w": 1,
+        "h": 1
+      },
+      "layer": "belt",
+      "color": "#10ac84",
+      "isDiminishing": true,
+      "speed": 90,
+      "ports": [
+        {
+          "dx": 0,
+          "dy": 0,
+          "kind": "through",
+          "color": "#1dd1a1",
+          "dropSide": 0
+        }
+      ]
+    },
+    "seller": {
+      "id": "seller",
+      "name": "Seller",
+      "category": "seller",
+      "cost": 0,
+      "size": {
+        "w": 1,
+        "h": 1
+      },
+      "layer": "machine",
+      "color": "#7a4fa0",
+      "consumes": true,
+      "ports": [
+        {
+          "dx": 0,
+          "dy": 0,
+          "kind": "input",
+          "color": "#9ad1ff",
+          "dropSide": null
+        }
+      ]
+    },
+    "blastSmelter": {
+      "id": "blastSmelter",
+      "name": "Blast Smelter (2x Bonus)",
+      "category": "seller",
+      "cost": 1500,
+      "size": {
+        "w": 2,
+        "h": 2
+      },
+      "layer": "machine",
+      "color": "#581c87",
+      "consumes": true,
+      "sellerBonus": 2,
+      "ports": [
+        {
+          "dx": 0,
+          "dy": 0.5,
+          "kind": "input",
+          "color": "#a855f7",
+          "dropSide": null
+        }
+      ]
+    },
+    "custom_1786805652597": {
+      "id": "custom_1786805652597",
+      "name": "Custom Machine",
+      "category": "seller",
+      "cost": 100,
+      "size": {
+        "w": 0.5,
+        "h": 1
+      },
+      "layer": "machine",
+      "color": "#8e44ad",
+      "speed": 150,
+      "multiplier": 2,
+      "flatAdd": 25,
+      "isCustom": true,
+      "ports": [
+        {
+          "dx": 0,
+          "dy": 0,
+          "kind": "input",
+          "color": "#8e44ad",
+          "dropSide": null
+        }
+      ]
+    }
+  },
+  "camera": {
+    "x": 768,
+    "y": 768,
+    "zoom": 0.625,
+    "minZoom": 0.25,
+    "maxZoom": 4
+  },
+  "world": {
+    "buildings": [
+      {
+        "id": "bldg_1",
+        "defId": "extractor",
+        "col": 12,
+        "row": 10,
+        "rot": 0,
+        "y": 0,
+        "lastProduced": 4942.799999982119,
+        "prodTimer": 490.199999999993
+      },
+      {
+        "id": "bldg_6",
+        "defId": "fastBelt",
+        "col": 15,
+        "row": 10,
+        "rot": 0,
+        "y": 0,
+        "lastProduced": 5274.0999999940395
+      },
+      {
+        "id": "bldg_7",
+        "defId": "fastBelt",
+        "col": 16,
+        "row": 10,
+        "rot": 0,
+        "y": 0,
+        "lastProduced": 5935.699999988079
+      },
+      {
+        "id": "bldg_13",
+        "defId": "fastBelt",
+        "col": 17,
+        "row": 10,
+        "rot": 1,
+        "y": 0,
+        "lastProduced": 10889.300000011921,
+        "walls": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "id": "bldg_14",
+        "defId": "fastBelt",
+        "col": 17,
+        "row": 11,
+        "rot": 1,
+        "y": 0,
+        "lastProduced": 10891.40000000596
+      },
+      {
+        "id": "bldg_15",
+        "defId": "fastBelt",
+        "col": 17,
+        "row": 12,
+        "rot": 1,
+        "y": 0,
+        "lastProduced": 10893
+      },
+      {
+        "id": "bldg_16",
+        "defId": "fastBelt",
+        "col": 17,
+        "row": 13,
+        "rot": 1,
+        "y": 0,
+        "lastProduced": 10894.699999988079,
+        "walls": [
+          false,
+          false,
+          false,
+          false
+        ]
+      }
+    ],
+    "ores": [
+      {
+        "id": "ore_1",
+        "itemType": "ore",
+        "x": 1142.3185794859087,
+        "y": 970.9211420180263,
+        "vx": 0.00777547103455088,
+        "vy": 0.9285588800892854,
+        "size": 14,
+        "color": "#ffb03b",
+        "shape": "circle",
+        "value": 4,
+        "energy": 0,
+        "maxEnergy": 100,
+        "status": {},
+        "upgradersPassed": [
+          "bldg_6",
+          "bldg_7",
+          "bldg_13",
+          "bldg_14",
+          "bldg_15",
+          "bldg_16"
+        ],
+        "groundTime": 2.1031999999999997
+      },
+      {
+        "id": "ore_2",
+        "itemType": "ore",
+        "x": 1142.3147548747363,
+        "y": 956.9211425404425,
+        "vx": 0.09505961079463396,
+        "vy": 11.354694258640786,
+        "size": 14,
+        "color": "#ffb03b",
+        "shape": "circle",
+        "value": 5,
+        "energy": 0,
+        "maxEnergy": 100,
+        "status": {},
+        "upgradersPassed": [
+          "bldg_6",
+          "bldg_7",
+          "bldg_13",
+          "bldg_14",
+          "bldg_15",
+          "bldg_16"
+        ],
+        "groundTime": 1.1016999999999997
+      },
+      {
+        "id": "ore_3",
+        "itemType": "ore",
+        "x": 1141.73247912852,
+        "y": 913.0626769235889,
+        "vx": 1.1614642195960163,
+        "vy": 138.8138718207723,
+        "size": 14,
+        "color": "#ffb03b",
+        "shape": "circle",
+        "value": 4,
+        "energy": 0,
+        "maxEnergy": 100,
+        "status": {},
+        "upgradersPassed": [
+          "bldg_6",
+          "bldg_7",
+          "bldg_13",
+          "bldg_14",
+          "bldg_15",
+          "bldg_16"
+        ],
+        "groundTime": 0.1003000000000002
+      },
+      {
+        "id": "ore_4",
+        "itemType": "ore",
+        "x": 1135.1592084312265,
+        "y": 742.8198720309362,
+        "vx": 22.305772058300477,
+        "vy": 155.7077625966492,
+        "size": 14,
+        "color": "#ffb03b",
+        "shape": "circle",
+        "value": 5,
+        "energy": 0,
+        "maxEnergy": 100,
+        "status": {},
+        "upgradersPassed": [
+          "bldg_6",
+          "bldg_7",
+          "bldg_13",
+          "bldg_14"
+        ],
+        "groundTime": 0
+      },
+      {
+        "id": "ore_5",
+        "itemType": "ore",
+        "x": 1037.8116958207272,
+        "y": 672,
+        "vx": 139.944866167084,
+        "vy": 0,
+        "size": 14,
+        "color": "#ffb03b",
+        "shape": "circle",
+        "value": 5,
+        "energy": 0,
+        "maxEnergy": 100,
+        "status": {},
+        "upgradersPassed": [
+          "bldg_6",
+          "bldg_7"
+        ],
+        "groundTime": 0
+      }
+    ],
+    "money": 3482
+  },
+  "nextId": 6
+}
