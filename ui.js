@@ -1,14 +1,16 @@
 // ===========================================================
-// MINER'S HAVEN - UI INTERACTION, CRATE SHOP & CREATOR ENGINE
+// MINER'S HAVEN - UI INTERACTION, SHOP, CRATES & METAGAME ENGINE
 // ===========================================================
 
 let activeContextBuilding = null;
+let currentMainTab = 'shop'; // 'shop' | 'inventory' | 'relics' | 'meta'
+let currentCategory = 'all';
 
 // Context Menu Card
 function openContextMenu(building, screenX, screenY) {
   activeContextBuilding = building;
   selectedEntity = { type: 'building', id: building.id };
-  const def = STATE.buildingDefs[building.defId];
+  const def = STATE.defs.buildingDefs[building.defId];
   if (!def) return;
   const fp = getFootprint(def, building.rot);
 
@@ -19,7 +21,7 @@ function openContextMenu(building, screenX, screenY) {
   document.getElementById('ctxSub').textContent = `${def.category.toUpperCase()} • ${fp.w}x${fp.h} Tile • ${def.rarity ? def.rarity.toUpperCase() : 'COMMON'}`;
   document.getElementById('ctxSwatch').style.background = def.color;
 
-  let stats = `Cost: $${def.cost || 0} | Speed: ${def.speed || 'N/A'}`;
+  let stats = `Speed: ${def.speed || 'N/A'}`;
   if (def.multiplier) stats += ` | ${def.multiplier}x Multiplier`;
   if (def.flatAdd) stats += ` | +$${def.flatAdd} Flat`;
   if (def.category === 'upgrader') stats += ` | Integrated Guide Walls`;
@@ -105,7 +107,32 @@ canvas.addEventListener('contextmenu', (e) => {
   else openInventoryModal();
 });
 
-// Hotbar & Inventory Catalog
+// Mode Placers
+function enterPlacingMode(defId) {
+  if (!STATE.defs.buildingDefs[defId]) return;
+  placingState = { defId, rot: 0 };
+  setMode('placing');
+}
+function enterMovingMode(building) {
+  movingState = { buildingId: building.id, rot: building.rot };
+  setMode('moving');
+}
+
+// Meta Currency Header Updating
+function updateMetaStatusBar() {
+  const c = document.getElementById('metaCash');
+  const p = document.getElementById('metaPoints');
+  const k = document.getElementById('metaKeys');
+  const s = document.getElementById('metaShards');
+  const d = document.getElementById('metaDust');
+  if (c) c.textContent = `$${(STATE.run.money || 0).toLocaleString()}`;
+  if (p) p.textContent = STATE.meta.prestigePoints;
+  if (k) k.textContent = STATE.meta.prestigeKeys;
+  if (s) s.textContent = STATE.meta.shards;
+  if (d) d.textContent = STATE.meta.prestigeDust;
+}
+
+// Hotbar Rendering
 function renderHotbar() {
   const container = document.getElementById('hotbarSlots');
   if (!container) return;
@@ -123,8 +150,10 @@ function renderHotbar() {
     keySpan.textContent = idx + 1;
     slot.appendChild(keySpan);
 
-    if (defId && STATE.buildingDefs[defId]) {
-      const def = STATE.buildingDefs[defId];
+    if (defId && STATE.defs.buildingDefs[defId]) {
+      const def = STATE.defs.buildingDefs[defId];
+      const qty = getInventoryQty(defId);
+
       const swatch = document.createElement('div');
       swatch.className = 'hotbar-swatch';
       swatch.style.background = def.color;
@@ -132,7 +161,7 @@ function renderHotbar() {
 
       const label = document.createElement('div');
       label.className = 'hotbar-label';
-      label.textContent = def.name;
+      label.textContent = `${def.name} (${qty})`;
       slot.appendChild(label);
     } else {
       const label = document.createElement('div');
@@ -142,7 +171,7 @@ function renderHotbar() {
     }
 
     slot.addEventListener('click', () => {
-      if (defId && STATE.buildingDefs[defId]) {
+      if (defId && STATE.defs.buildingDefs[defId]) {
         enterPlacingMode(defId);
         renderHotbar();
       }
@@ -150,84 +179,154 @@ function renderHotbar() {
 
     container.appendChild(slot);
   });
+
+  updateMetaStatusBar();
 }
 
+// Main Window Renderer (Shop, Inventory, Relics, Meta)
 function renderInventoryGrid() {
+  updateMetaStatusBar();
   const grid = document.getElementById('invGrid');
   const searchInput = document.getElementById('invSearchInput');
+  const subHeader = document.getElementById('invSubHeader');
   const search = searchInput ? searchInput.value.toLowerCase() : '';
   if (!grid) return;
   grid.innerHTML = '';
 
-  Object.values(STATE.buildingDefs).forEach(def => {
-    if (currentCategory !== 'all' && def.category !== currentCategory) return;
-    if (search && !def.name.toLowerCase().includes(search) && !def.id.toLowerCase().includes(search)) return;
+  if (subHeader) {
+    subHeader.style.display = (currentMainTab === 'shop' || currentMainTab === 'inventory') ? 'flex' : 'none';
+  }
 
-    const isUnlocked = STATE.unlockedBuildingIds.includes(def.id);
-    const rarity = def.rarity || 'common';
+  // --- TAB 1: SHOP TAB ---
+  if (currentMainTab === 'shop') {
+    Object.values(STATE.defs.buildingDefs).forEach(def => {
+      if (def.crateOnly) return; // Crate-exclusive items do not sell in shop directly
+      if (currentCategory !== 'all' && def.category !== currentCategory) return;
+      if (search && !def.name.toLowerCase().includes(search) && !def.id.toLowerCase().includes(search)) return;
 
-    const card = document.createElement('div');
-    card.className = `inv-card rarity-${rarity} ${isUnlocked ? '' : 'locked'}`;
+      const isUnlocked = !!STATE.meta.blueprintUnlocks[def.id];
+      const price = getShopItemPrice(def.id);
+      const ownedQty = getInventoryQty(def.id);
+      const rarity = def.rarity || 'common';
 
-    const top = document.createElement('div');
-    top.className = 'inv-card-top';
+      const card = document.createElement('div');
+      card.className = `inv-card rarity-${rarity} ${isUnlocked ? '' : 'locked'}`;
 
-    const swatch = document.createElement('div');
-    swatch.className = 'inv-card-swatch';
-    swatch.style.background = def.color;
-    top.appendChild(swatch);
+      const top = document.createElement('div');
+      top.className = 'inv-card-top';
 
-    const titleBox = document.createElement('div');
-    const title = document.createElement('div');
-    title.className = 'inv-card-title';
-    title.textContent = isUnlocked ? def.name : `Locked: ${def.name}`;
-    titleBox.appendChild(title);
+      const swatch = document.createElement('div');
+      swatch.className = 'inv-card-swatch';
+      swatch.style.background = def.color;
+      top.appendChild(swatch);
 
-    const badge = document.createElement('span');
-    badge.className = `inv-card-badge rarity-badge-${rarity}`;
-    badge.textContent = `${rarity.toUpperCase()} • ${def.size.w}x${def.size.h} • $${def.cost || 0}`;
-    titleBox.appendChild(badge);
+      const titleBox = document.createElement('div');
+      const title = document.createElement('div');
+      title.className = 'inv-card-title';
+      title.textContent = isUnlocked ? def.name : `Locked Blueprint: ${def.name}`;
+      titleBox.appendChild(title);
 
-    top.appendChild(titleBox);
-    card.appendChild(top);
+      const badge = document.createElement('span');
+      badge.className = `inv-card-badge rarity-badge-${rarity}`;
+      badge.textContent = `${rarity.toUpperCase()} • ${def.size.w}x${def.size.h}`;
+      titleBox.appendChild(badge);
 
-    const desc = document.createElement('div');
-    desc.className = 'inv-card-desc';
-    let stats = `Cost: $${def.cost || 0} | Speed: ${def.speed || 'N/A'}`;
-    if (def.multiplier) stats += ` | ${def.multiplier}x Multiplier`;
-    if (def.flatAdd) stats += ` | +$${def.flatAdd} Flat`;
-    if (def.consumes) stats = 'Sells ores for cash bonus';
-    if (def.produces) stats = `Produces ${def.produces.item} every ${def.produces.rate}ms`;
-    if (!isUnlocked) stats = 'Locked: Open Crates in the Crate Shop to unlock.';
-    desc.textContent = stats;
-    card.appendChild(desc);
+      top.appendChild(titleBox);
+      card.appendChild(top);
 
-    const actions = document.createElement('div');
-    actions.className = 'inv-card-actions';
+      const desc = document.createElement('div');
+      desc.className = 'inv-card-desc';
+      let stats = `Owned in Stock: ${ownedQty}`;
+      if (def.multiplier) stats += ` | ${def.multiplier}x Multiplier`;
+      if (def.produces) stats += ` | Produces ${def.produces.item}`;
+      desc.textContent = stats;
+      card.appendChild(desc);
 
-    const placeBtn = document.createElement('button');
-    placeBtn.className = `inv-card-place-btn ${isUnlocked ? '' : 'locked-btn'}`;
-    placeBtn.textContent = isUnlocked ? `Place ($${def.cost || 0})` : 'Locked';
-    placeBtn.addEventListener('click', () => {
-      if (!isUnlocked) {
-        showToast('Open Crates to unlock this item!');
-        return;
-      }
-      closeInventoryModal();
-      enterPlacingMode(def.id);
-      renderHotbar();
+      const priceTag = document.createElement('div');
+      priceTag.className = 'inv-card-price';
+      priceTag.textContent = `Cost: $${price.toLocaleString()}`;
+      card.appendChild(priceTag);
+
+      const buyBtn = document.createElement('button');
+      buyBtn.className = `inv-card-place-btn ${isUnlocked ? '' : 'locked-btn'}`;
+      buyBtn.textContent = isUnlocked ? `Buy 1x ($${price.toLocaleString()})` : 'Blueprint Locked';
+      buyBtn.disabled = !isUnlocked || STATE.run.money < price;
+
+      buyBtn.addEventListener('click', () => {
+        if (buyShopItem(def.id, 1)) {
+          renderInventoryGrid();
+          renderHotbar();
+        }
+      });
+      card.appendChild(buyBtn);
+      grid.appendChild(card);
     });
-    actions.appendChild(placeBtn);
+  }
+  // --- TAB 2: INVENTORY TAB ---
+  else if (currentMainTab === 'inventory') {
+    Object.values(STATE.defs.buildingDefs).forEach(def => {
+      const standardQty = STATE.inventory.items[def.id]?.qty || 0;
+      const permQty = STATE.inventory.permanentItems[def.id]?.qty || 0;
+      const totalQty = standardQty + permQty;
 
-    if (isUnlocked) {
+      if (totalQty <= 0) return; // Only show owned items
+      if (currentCategory !== 'all' && def.category !== currentCategory) return;
+      if (search && !def.name.toLowerCase().includes(search)) return;
+
+      const rarity = def.rarity || 'common';
+      const card = document.createElement('div');
+      card.className = `inv-card rarity-${rarity}`;
+      card.style.position = 'relative';
+
+      if (permQty > 0) {
+        const permBadge = document.createElement('div');
+        permBadge.className = 'inv-card-perm-badge';
+        permBadge.textContent = 'Permanent ⭐';
+        card.appendChild(permBadge);
+      }
+
+      const stockBadge = document.createElement('div');
+      stockBadge.className = 'inv-card-stock';
+      stockBadge.textContent = `x${totalQty}`;
+      card.appendChild(stockBadge);
+
+      const top = document.createElement('div');
+      top.className = 'inv-card-top';
+
+      const swatch = document.createElement('div');
+      swatch.className = 'inv-card-swatch';
+      swatch.style.background = def.color;
+      top.appendChild(swatch);
+
+      const titleBox = document.createElement('div');
+      const title = document.createElement('div');
+      title.className = 'inv-card-title';
+      title.textContent = def.name;
+      titleBox.appendChild(title);
+
+      const badge = document.createElement('span');
+      badge.className = `inv-card-badge rarity-badge-${rarity}`;
+      badge.textContent = `${rarity.toUpperCase()} • ${def.size.w}x${def.size.h}`;
+      titleBox.appendChild(badge);
+
+      top.appendChild(titleBox);
+      card.appendChild(top);
+
+      const actions = document.createElement('div');
+      actions.className = 'inv-card-actions';
+
+      const placeBtn = document.createElement('button');
+      placeBtn.className = 'inv-card-place-btn';
+      placeBtn.textContent = 'Place Machine';
+      placeBtn.addEventListener('click', () => {
+        closeInventoryModal();
+        enterPlacingMode(def.id);
+        renderHotbar();
+      });
+      actions.appendChild(placeBtn);
+
       const slotBox = document.createElement('div');
       slotBox.className = 'inv-slot-selector';
-
-      const slotLabel = document.createElement('span');
-      slotLabel.className = 'inv-slot-label';
-      slotLabel.textContent = 'Slot:';
-      slotBox.appendChild(slotLabel);
-
       const slotBtns = document.createElement('div');
       slotBtns.className = 'inv-slot-btns';
 
@@ -236,7 +335,7 @@ function renderInventoryGrid() {
         sBtn.className = 'inv-slot-btn';
         if (hotbarItems[sIdx] === def.id) sBtn.classList.add('equipped');
         sBtn.textContent = sIdx + 1;
-        sBtn.title = `Equip ${def.name} to Hotbar Slot ${sIdx + 1}`;
+        sBtn.title = `Equip to Hotbar Slot ${sIdx + 1}`;
         sBtn.addEventListener('click', () => {
           hotbarItems[sIdx] = def.id;
           renderHotbar();
@@ -244,14 +343,70 @@ function renderInventoryGrid() {
         });
         slotBtns.appendChild(sBtn);
       }
-
       slotBox.appendChild(slotBtns);
       actions.appendChild(slotBox);
-    }
 
-    card.appendChild(actions);
-    grid.appendChild(card);
-  });
+      card.appendChild(actions);
+      grid.appendChild(card);
+    });
+  }
+  // --- TAB 3: RELICS TAB ---
+  else if (currentMainTab === 'relics') {
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(240px, 1fr))';
+
+    Object.values(STATE.defs.relicDefs).forEach(relic => {
+      const isUnlocked = !!STATE.meta.relics[relic.id];
+      const card = document.createElement('div');
+      card.className = 'relic-card';
+      if (!isUnlocked) card.style.opacity = '0.45';
+
+      const title = document.createElement('div');
+      title.className = 'relic-card-title';
+      title.textContent = isUnlocked ? `🗿 ${relic.name}` : `🔒 ${relic.name}`;
+      card.appendChild(title);
+
+      const desc = document.createElement('div');
+      desc.className = 'relic-card-desc';
+      desc.textContent = relic.desc;
+      card.appendChild(desc);
+
+      if (isUnlocked) {
+        const activeTag = document.createElement('div');
+        activeTag.className = 'relic-active-tag';
+        activeTag.textContent = 'ACTIVE PASSIVE';
+        card.appendChild(activeTag);
+      }
+      grid.appendChild(card);
+    });
+  }
+  // --- TAB 4: META / PRESTIGE TAB ---
+  else if (currentMainTab === 'meta') {
+    const metaContainer = document.createElement('div');
+    metaContainer.style.cssText = 'padding: 20px; color: #fff; display: flex; flex-direction: column; gap: 20px;';
+
+    const payout = calculatePrestigePayout(STATE.run.lifetimeEarnings);
+    metaContainer.innerHTML = `
+      <div style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: 12px; border: 1px solid rgba(168,85,247,0.3);">
+        <h3 style="margin: 0 0 10px 0; color: #e9d5ff;">🌟 Prestige Meta Progression</h3>
+        <p style="font-size: 13px; color: #cbd5e1; margin-bottom: 12px;">Reset your factory run to earn permanent Prestige Points & Prestige Keys.</p>
+        <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+          <div>Current Lifetime Earnings: <strong style="color:#fde047;">$${(STATE.run.lifetimeEarnings || 0).toLocaleString()}</strong></div>
+          <div>Requirement: <strong style="color:#f472b6;">$10,000,000,000 ($10B)</strong></div>
+        </div>
+        <div style="margin-top: 14px; display: flex; gap: 16px;">
+          <div>Pending Points: <strong style="color:#c084fc;">+${payout.pointsGained}</strong></div>
+          <div>Pending Keys: <strong style="color:#fbbf24;">+${payout.keysGained}</strong></div>
+        </div>
+        <button id="tabPrestigeTriggerBtn" class="prestige-confirm-btn" style="margin-top: 16px;" ${payout.canPrestige ? '' : 'disabled'}>
+          ${payout.canPrestige ? 'Prestige Factory Now 🌟' : 'Lifetime Earnings Below $10B Threshold'}
+        </button>
+      </div>
+    `;
+    grid.appendChild(metaContainer);
+
+    document.getElementById('tabPrestigeTriggerBtn')?.addEventListener('click', openPrestigeModal);
+  }
 }
 
 function openInventoryModal() {
@@ -263,22 +418,32 @@ function closeInventoryModal() {
   document.getElementById('inventoryModal')?.classList.remove('open');
 }
 
-// Crate Loot Box & Unboxing System
-const CRATE_TYPES = {
-  regular: {
-    id: 'regular', name: 'Regular Crate', cost: 250, icon: '📦',
-    rarities: { common: 0.6, uncommon: 0.3, rare: 0.1 }
-  },
-  gold: {
-    id: 'gold', name: 'Golden Crate', cost: 1000, icon: '👑',
-    rarities: { uncommon: 0.4, rare: 0.4, epic: 0.2 }
-  },
-  exotic: {
-    id: 'exotic', name: 'Exotic Crate', cost: 5000, icon: '🌌',
-    rarities: { rare: 0.2, epic: 0.5, exotic: 0.3 }
-  }
-};
+// Prestige Modal Logic
+function openPrestigeModal() {
+  const modal = document.getElementById('prestigeModal');
+  if (!modal) return;
 
+  const earnings = STATE.run.lifetimeEarnings || 0;
+  const payout = calculatePrestigePayout(earnings);
+
+  document.getElementById('pModalEarnings').textContent = `$${earnings.toLocaleString()}`;
+  document.getElementById('pModalPoints').textContent = `+${payout.pointsGained}`;
+  document.getElementById('pModalKeys').textContent = `+${payout.keysGained}`;
+
+  const confirmBtn = document.getElementById('btnConfirmPrestige');
+  if (confirmBtn) {
+    confirmBtn.disabled = !payout.canPrestige;
+  }
+
+  modal.style.display = 'flex';
+}
+
+function closePrestigeModal() {
+  const modal = document.getElementById('prestigeModal');
+  if (modal) modal.style.display = 'none';
+}
+
+// Crate Shop Modal & Roulette Animation
 function openCrateModal() {
   closeInventoryModal();
   document.getElementById('crateModal')?.classList.add('open');
@@ -288,56 +453,29 @@ function closeCrateModal() {
   document.getElementById('crateModal')?.classList.remove('open');
 }
 
-function buyAndOpenCrate(crateTypeKey) {
-  const crate = CRATE_TYPES[crateTypeKey];
-  if (!crate) return;
+function buyAndOpenCrate(crateTier) {
+  const reward = openCrate(crateTier);
+  if (!reward) return;
 
-  if (STATE.world.money < crate.cost) {
-    showToast(`Need $${crate.cost} to open ${crate.name}!`);
-    return;
-  }
-
-  STATE.world.money -= crate.cost;
-  triggerSaveState();
-
-  // Determine unlocked item based on crate rarity weights
-  const rand = Math.random();
-  let selectedRarity = 'common';
-  let cumulative = 0;
-
-  for (const [rarity, weight] of Object.entries(crate.rarities)) {
-    cumulative += weight;
-    if (rand <= cumulative) {
-      selectedRarity = rarity;
-      break;
-    }
-  }
-
-  // Pick an item of selected rarity
-  const candidates = Object.values(STATE.buildingDefs).filter(def => (def.rarity || 'common') === selectedRarity);
-  const pickedDef = candidates.length ? candidates[Math.floor(Math.random() * candidates.length)] : STATE.buildingDefs['belt'];
-
-  if (!STATE.unlockedBuildingIds.includes(pickedDef.id)) {
-    STATE.unlockedBuildingIds.push(pickedDef.id);
-  }
-
-  triggerSaveState();
-  startUnboxingAnimation(pickedDef);
+  renderInventoryGrid();
+  renderHotbar();
+  startUnboxingAnimation(reward);
 }
 
-function startUnboxingAnimation(rewardDef) {
+function startUnboxingAnimation(reward) {
   const overlay = document.getElementById('unboxingOverlay');
   const track = document.getElementById('rouletteTrack');
+  const title = document.getElementById('rouletteTitle');
   if (!overlay || !track) return;
 
+  if (title) title.textContent = `Unboxing Reward: ${reward.label}`;
   track.innerHTML = '';
   track.style.transition = 'none';
   track.style.left = '0px';
 
-  const allItems = Object.values(STATE.buildingDefs);
-  const itemsCount = 30;
-  for (let i = 0; i < itemsCount; i++) {
-    const item = (i === 24) ? rewardDef : allItems[Math.floor(Math.random() * allItems.length)];
+  const allItems = Object.values(STATE.defs.buildingDefs);
+  for (let i = 0; i < 30; i++) {
+    const item = (i === 24 && reward.id) ? (STATE.defs.buildingDefs[reward.id] || allItems[0]) : allItems[Math.floor(Math.random() * allItems.length)];
     const el = document.createElement('div');
     el.className = `roulette-item rarity-${item.rarity || 'common'}`;
 
@@ -363,14 +501,13 @@ function startUnboxingAnimation(rewardDef) {
   }, 50);
 
   setTimeout(() => {
-    showToast(`Unlocked: ${rewardDef.name} (${(rewardDef.rarity || 'common').toUpperCase()})`);
-    hotbarItems[0] = rewardDef.id;
+    showToast(`Reward Granted: ${reward.label}`);
     renderHotbar();
     renderInventoryGrid();
   }, 3800);
 }
 
-// Interactive Object Creator
+// Object Creator Logic
 function initCustomObjectCreator() {
   const canvasEl = document.getElementById('pixelCanvas');
   if (!canvasEl) return;
@@ -480,6 +617,8 @@ function initCustomObjectCreator() {
       category,
       rarity: 'epic',
       cost,
+      priceGrowth: 1.12,
+      unlockMethod: 'shop',
       size: { w, h },
       layer: category === 'extractor' || category === 'seller' ? 'machine' : 'belt',
       color: activeColor,
@@ -495,7 +634,7 @@ function initCustomObjectCreator() {
       const spawnRate = parseInt(document.getElementById('custSpawnRate').value, 10) || 1000;
       const customOreKey = `ore_${customId}`;
 
-      STATE.itemDefs[customOreKey] = {
+      STATE.defs.itemDefs[customOreKey] = {
         id: customOreKey, name: oreName, color: activeColor, size: 14 + (w > 1 ? 4 : 0), baseValue: oreVal, shape: oreShape
       };
       newDef.speed = 40;
@@ -519,15 +658,16 @@ function initCustomObjectCreator() {
       newDef.ports = [{ dx: 0, dy: 0, kind: 'input', color: activeColor, dropSide: null }];
     }
 
-    STATE.buildingDefs[customId] = newDef;
-    if (!STATE.unlockedBuildingIds.includes(customId)) STATE.unlockedBuildingIds.push(customId);
+    STATE.defs.buildingDefs[customId] = newDef;
+    STATE.meta.blueprintUnlocks[customId] = true;
+    addToInventory(customId, 1, false, 'creator');
     hotbarItems[0] = customId;
     renderHotbar();
     renderInventoryGrid();
     triggerSaveState();
 
     document.getElementById('customCreatorModal')?.classList.remove('open');
-    showToast(`Created custom ${name} (Equipped to Hotbar Slot 1)`);
+    showToast(`Created custom ${name} (Added to Inventory)`);
   });
 }
 
@@ -537,10 +677,30 @@ function initHotbarAndInventory() {
   initCustomObjectCreator();
   loadSavedGame();
 
+  // Tab Listeners for Main Tabs
+  document.querySelectorAll('#invMainTabs .inv-main-tab').forEach(tabBtn => {
+    tabBtn.addEventListener('click', (e) => {
+      document.querySelectorAll('#invMainTabs .inv-main-tab').forEach(t => t.classList.remove('active'));
+      e.target.classList.add('active');
+      currentMainTab = e.target.getAttribute('data-tab');
+      renderInventoryGrid();
+    });
+  });
+
   document.getElementById('openInvBtn')?.addEventListener('click', openInventoryModal);
   document.getElementById('closeInvBtn')?.addEventListener('click', closeInventoryModal);
   document.getElementById('openCrateBtn')?.addEventListener('click', openCrateModal);
   document.getElementById('closeCrateBtn')?.addEventListener('click', closeCrateModal);
+  document.getElementById('openPrestigeBtn')?.addEventListener('click', openPrestigeModal);
+  document.getElementById('closePrestigeBtn')?.addEventListener('click', closePrestigeModal);
+
+  document.getElementById('btnConfirmPrestige')?.addEventListener('click', () => {
+    if (executePrestigeReset()) {
+      closePrestigeModal();
+      renderHotbar();
+      renderInventoryGrid();
+    }
+  });
 
   document.querySelectorAll('.crate-buy-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -561,7 +721,7 @@ function initHotbarAndInventory() {
   });
 }
 
-// Hotkey Listeners
+// Global Key Listeners
 window.addEventListener('keydown', (e) => {
   const activeTag = document.activeElement ? document.activeElement.tagName : '';
   if (activeTag === 'INPUT' || activeTag === 'TEXTAREA') {
@@ -569,6 +729,7 @@ window.addEventListener('keydown', (e) => {
       document.activeElement.blur();
       closeInventoryModal();
       closeCrateModal();
+      closePrestigeModal();
     }
     return;
   }
@@ -577,6 +738,7 @@ window.addEventListener('keydown', (e) => {
     closeContextMenu();
     closeInventoryModal();
     closeCrateModal();
+    closePrestigeModal();
     cancelMode();
     renderHotbar();
   } else if (e.key === 'e' || e.key === 'E') {
@@ -586,7 +748,7 @@ window.addEventListener('keydown', (e) => {
   } else if (e.key >= '1' && e.key <= '6') {
     const slotIdx = parseInt(e.key, 10) - 1;
     const itemDefId = hotbarItems[slotIdx];
-    if (itemDefId && STATE.buildingDefs[itemDefId]) {
+    if (itemDefId && STATE.defs.buildingDefs[itemDefId]) {
       enterPlacingMode(itemDefId);
       renderHotbar();
     }
@@ -599,5 +761,5 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-// Initialize UI
+// Initialize UI Engine
 initHotbarAndInventory();

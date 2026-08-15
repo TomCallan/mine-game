@@ -1,5 +1,5 @@
 // ===========================================================
-// MINER'S HAVEN - GAME SIMULATION ENGINE & RENDERER
+// MINER'S HAVEN - GAME SIMULATION ENGINE & RENDERER (V2 OVERHAUL)
 // ===========================================================
 
 const canvas = document.getElementById('game');
@@ -12,192 +12,427 @@ function resizeCanvas() {
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
-// Extensible State Schema
+// ===========================================================
+// STATE SCHEMA & ARCHITECTURE
+// ===========================================================
+
 const STATE = {
   config: {
     grid: { cols: 24, rows: 24, cellSize: 64 },
     maxOres: 300,
     beltAcceleration: 3,
     groundFriction: 2.5,
-    oreGroundLifespan: 3
-  },
+    oreGroundLifespan: 3,
 
-  timeScale: 1.0,
-  isPaused: false,
+    prestigeThresholdLifetime: 1e10, // $10 Billion
+    prestigeKeyLogBase: 10,
+    inventoryBaseCapacity: 40,
 
-  unlockedBuildingIds: ['extractor', 'belt', 'fastBelt', 'halfBelt', 'upgrader1x1', 'upgraderHalf', 'seller', 'coalExtractor'],
-
-  itemDefs: {
-    ore: { id: 'ore', name: 'Standard Ore', color: '#ffb03b', size: 14, baseValue: 5, shape: 'circle' },
-    megaOre: { id: 'megaOre', name: 'Mega Ore', color: '#ff4757', size: 22, baseValue: 25, shape: 'diamond' },
-    magmaOre: { id: 'magmaOre', name: 'Magma Ore', color: '#ff4757', size: 18, baseValue: 50, shape: 'diamond', defaultStatus: { flaming: true } },
-    uraniumOre: { id: 'uraniumOre', name: 'Uranium Ore', color: '#2ecc71', size: 16, baseValue: 150, shape: 'circle', defaultStatus: { radioactive: true } },
-    coalOre: { id: 'coalOre', name: 'Coal Fuel Ore', color: '#334155', size: 16, baseValue: 15, shape: 'square', isFuel: true },
-    superDiamondOre: { id: 'superDiamondOre', name: 'Super Diamond Ore', color: '#38bdf8', size: 24, baseValue: 300, shape: 'diamond', defaultStatus: { sparkling: true } }
-  },
-
-  buildingDefs: {
-    extractor: {
-      id: 'extractor', name: 'Standard Extractor', category: 'extractor', rarity: 'common', cost: 100,
-      size: { w: 3, h: 1 }, layer: 'machine', color: '#3d6a8f', speed: 40,
-      tags: ['dropper', 'starter'], attributes: { spawnRateMs: 1000 },
-      ports: [{ dx: 3, dy: 0, kind: 'output', color: '#ffcf5c', dropSide: null }],
-      produces: { item: 'ore', rate: 1000 }
-    },
-    coalExtractor: {
-      id: 'coalExtractor', name: 'Coal Mine (Fuel)', category: 'extractor', rarity: 'common', cost: 300,
-      size: { w: 3, h: 1 }, layer: 'machine', color: '#1e293b', speed: 40,
-      tags: ['dropper', 'fuel_provider'], attributes: { fuelType: 'coal' },
-      ports: [{ dx: 3, dy: 0, kind: 'output', color: '#475569', dropSide: null }],
-      produces: { item: 'coalOre', rate: 1200 }
-    },
-    megaExtractor: {
-      id: 'megaExtractor', name: '2x2 Mega Extractor', category: 'extractor', rarity: 'rare', cost: 500,
-      size: { w: 2, h: 2 }, layer: 'machine', color: '#2b7873', speed: 40,
-      tags: ['dropper', 'heavy_machinery'], attributes: { spawnRateMs: 1500 },
-      ports: [{ dx: 2, dy: 0.5, kind: 'output', color: '#ff4757', dropSide: null }],
-      produces: { item: 'megaOre', rate: 1500 }
-    },
-    volcanoDropper: {
-      id: 'volcanoDropper', name: 'Volcano Mine (Flaming)', category: 'extractor', rarity: 'epic', cost: 600,
-      size: { w: 3, h: 1 }, layer: 'machine', color: '#881337', speed: 40,
-      tags: ['dropper', 'flaming'], attributes: { temperature: 1200 },
-      ports: [{ dx: 3, dy: 0, kind: 'output', color: '#ff4757', dropSide: null }],
-      produces: { item: 'magmaOre', rate: 1200 }
-    },
-    thermalExtractor: {
-      id: 'thermalExtractor', name: 'Fueled Thermal Mine', category: 'extractor', rarity: 'rare', cost: 1200,
-      size: { w: 3, h: 2 }, layer: 'machine', color: '#c2410c', speed: 40,
-      tags: ['dropper', 'fuel_consuming'], attributes: { fuelRequired: 'coal', runDurationSec: 8 },
-      requiresFuel: true,
-      ports: [
-        { dx: 0, dy: 0.5, kind: 'input', color: '#334155', dropSide: null },
-        { dx: 3, dy: 0.5, kind: 'output', color: '#38bdf8', dropSide: null }
-      ],
-      produces: { item: 'superDiamondOre', rate: 800 }
-    },
-    uraniumMine: {
-      id: 'uraniumMine', name: 'Uranium Centrifuge', category: 'extractor', rarity: 'exotic', cost: 2000,
-      size: { w: 2, h: 2 }, layer: 'machine', color: '#14532d', speed: 40,
-      tags: ['dropper', 'radioactive'], attributes: { radiationSv: 50 },
-      ports: [{ dx: 2, dy: 0.5, kind: 'output', color: '#2ecc71', dropSide: null }],
-      produces: { item: 'uraniumOre', rate: 1600 }
-    },
-    belt: {
-      id: 'belt', name: 'Conveyor Belt', category: 'belt', rarity: 'common', cost: 10,
-      size: { w: 1, h: 1 }, layer: 'belt', color: '#4b4f58', speed: 90,
-      tags: ['transport'], attributes: {},
-      ports: [{ dx: 0, dy: 0, kind: 'through', color: '#ffcf5c', dropSide: 0 }]
-    },
-    fastBelt: {
-      id: 'fastBelt', name: 'Fast Conveyor', category: 'belt', rarity: 'uncommon', cost: 30,
-      size: { w: 1, h: 1 }, layer: 'belt', color: '#3a7ca5', speed: 180,
-      tags: ['transport'], attributes: {},
-      ports: [{ dx: 0, dy: 0, kind: 'through', color: '#7fd0ff', dropSide: 0 }]
-    },
-    ultraBelt: {
-      id: 'ultraBelt', name: 'Ultra Conveyor', category: 'belt', rarity: 'epic', cost: 100,
-      size: { w: 1, h: 1 }, layer: 'belt', color: '#d97706', speed: 320,
-      tags: ['transport'], attributes: {},
-      ports: [{ dx: 0, dy: 0, kind: 'through', color: '#fbbf24', dropSide: 0 }]
-    },
-    halfBelt: {
-      id: 'halfBelt', name: 'Half-Width Belt', category: 'belt', rarity: 'uncommon', cost: 15,
-      size: { w: 0.5, h: 1 }, layer: 'belt', color: '#334155', isHalfBelt: true, speed: 90,
-      tags: ['transport', 'narrow'], attributes: {},
-      ports: [{ dx: 0, dy: 0, kind: 'through', color: '#94a3b8', dropSide: 0 }]
-    },
-    splitter: {
-      id: 'splitter', name: 'Belt Splitter (1→2)', category: 'belt', rarity: 'rare', cost: 40,
-      size: { w: 1, h: 1 }, layer: 'belt', color: '#e67e22', isSplitter: true, speed: 100,
-      tags: ['routing'], attributes: {},
-      ports: [{ dx: 0, dy: 0, kind: 'through', color: '#f39c12', dropSide: 0 }]
-    },
-    merger: {
-      id: 'merger', name: 'Belt Merger (3→1)', category: 'belt', rarity: 'rare', cost: 40,
-      size: { w: 1, h: 1 }, layer: 'belt', color: '#27ae60', isMerger: true, speed: 100,
-      tags: ['routing'], attributes: {},
-      ports: [{ dx: 0, dy: 0, kind: 'through', color: '#2ecc71', dropSide: 0 }]
-    },
-    upgrader1x1: {
-      id: 'upgrader1x1', name: '1x1 Upgrader', category: 'upgrader', rarity: 'common', cost: 150,
-      size: { w: 1, h: 1 }, layer: 'belt', color: '#d35400', multiplier: 2.0, energyCost: 10, speed: 90,
-      tags: ['multiplier'], attributes: {},
-      ports: [{ dx: 0, dy: 0, kind: 'through', color: '#e67e22', dropSide: 0 }]
-    },
-    upgrader2x1: {
-      id: 'upgrader2x1', name: '2x1 Wide Upgrader', category: 'upgrader', rarity: 'rare', cost: 400,
-      size: { w: 2, h: 1 }, layer: 'belt', color: '#c0392b', multiplier: 3.0, energyCost: 20, speed: 90,
-      tags: ['multiplier'], attributes: {},
-      ports: [
-        { dx: 0, dy: 0, kind: 'through', color: '#e74c3c', dropSide: 0 },
-        { dx: 1, dy: 0, kind: 'through', color: '#e74c3c', dropSide: 0 }
-      ]
-    },
-    upgraderHalf: {
-      id: 'upgraderHalf', name: 'Half Upgrader', category: 'upgrader', rarity: 'uncommon', cost: 100,
-      size: { w: 0.5, h: 1 }, layer: 'belt', color: '#8e44ad', multiplier: 1.5, energyCost: 5, isHalf: true, speed: 90,
-      tags: ['multiplier', 'narrow'], attributes: {},
-      ports: [{ dx: 0, dy: 0, kind: 'through', color: '#9b59b6', dropSide: 0 }]
-    },
-    freonSprayer: {
-      id: 'freonSprayer', name: 'Freon Cooling Sprayer', category: 'upgrader', rarity: 'uncommon', cost: 250,
-      size: { w: 1, h: 1 }, layer: 'belt', color: '#0284c7', extinguishes: true, appliesWet: 6, cooldownEnergy: 50, speed: 90,
-      tags: ['cooling', 'extinguisher'], attributes: {},
-      ports: [{ dx: 0, dy: 0, kind: 'through', color: '#38bdf8', dropSide: 0 }]
-    },
-    pyroRefiner: {
-      id: 'pyroRefiner', name: 'Pyro Blast Furnace (3.5x)', category: 'upgrader', rarity: 'rare', cost: 400,
-      size: { w: 1, h: 1 }, layer: 'belt', color: '#b91c1c', multiplier: 3.5, appliesFlaming: true, speed: 90,
-      tags: ['multiplier', 'flaming'], attributes: {},
-      ports: [{ dx: 0, dy: 0, kind: 'through', color: '#f87171', dropSide: 0 }]
-    },
-    leadDecontaminator: {
-      id: 'leadDecontaminator', name: 'Lead Decontaminator (2.5x)', category: 'upgrader', rarity: 'epic', cost: 500,
-      size: { w: 1, h: 1 }, layer: 'belt', color: '#475569', removesRadioactive: true, multiplier: 2.5, speed: 90,
-      tags: ['decontaminator', 'multiplier'], attributes: {},
-      ports: [{ dx: 0, dy: 0, kind: 'through', color: '#94a3b8', dropSide: 0 }]
-    },
-    stellarSparkler: {
-      id: 'stellarSparkler', name: 'Stellar Prism (Sparkles)', category: 'upgrader', rarity: 'exotic', cost: 750,
-      size: { w: 1, h: 1 }, layer: 'belt', color: '#eab308', appliesSparkling: true, speed: 90,
-      tags: ['sparkles', 'buff'], attributes: {},
-      ports: [{ dx: 0, dy: 0, kind: 'through', color: '#fde047', dropSide: 0 }]
-    },
-    upgraderPlasma: {
-      id: 'upgraderPlasma', name: 'Plasma Supercharger', category: 'upgrader', rarity: 'epic', cost: 800,
-      size: { w: 1, h: 1 }, layer: 'belt', color: '#ff0055', flatAdd: 50, energyCost: 35, speed: 100,
-      tags: ['flat_boost', 'plasma'], attributes: {},
-      ports: [{ dx: 0, dy: 0, kind: 'through', color: '#ff0055', dropSide: 0 }]
-    },
-    upgraderQuantum: {
-      id: 'upgraderQuantum', name: 'Quantum Vault (4.0x)', category: 'upgrader', rarity: 'exotic', cost: 1500,
-      size: { w: 1, h: 1 }, layer: 'belt', color: '#5f27cd', multiplier: 4.0, riskChance: 0.15, speed: 90,
-      tags: ['multiplier', 'risky'], attributes: {},
-      ports: [{ dx: 0, dy: 0, kind: 'through', color: '#341f97', dropSide: 0 }]
-    },
-    seller: {
-      id: 'seller', name: 'Seller', category: 'seller', rarity: 'common', cost: 0,
-      size: { w: 1, h: 1 }, layer: 'machine', color: '#7a4fa0', consumes: true,
-      tags: ['furnace', 'starter'], attributes: {},
-      ports: [{ dx: 0, dy: 0, kind: 'input', color: '#9ad1ff', dropSide: null }]
-    },
-    blastSmelter: {
-      id: 'blastSmelter', name: 'Blast Smelter (2x Bonus)', category: 'seller', rarity: 'exotic', cost: 1500,
-      size: { w: 2, h: 2 }, layer: 'machine', color: '#581c87', consumes: true, sellerBonus: 2.0,
-      tags: ['furnace', 'heavy_machinery'], attributes: {},
-      ports: [{ dx: 0, dy: 0.5, kind: 'input', color: '#a855f7', dropSide: null }]
+    crateDuplicateShardValue: {
+      regular: 1,
+      golden: 4,
+      exotic: 15,
+      prestige: 50
     }
   },
 
-  camera: { x: 0, y: 0, zoom: 1, minZoom: 0.25, maxZoom: 4 },
-
-  world: {
+  run: {
+    money: 1000,
+    lifetimeEarnings: 0,
     buildings: [],
     ores: [],
-    money: 1000
+    timeScale: 1.0,
+    isPaused: false
   },
 
+  shop: {
+    stock: {},
+    dynamicPriceLevel: {}
+  },
+
+  inventory: {
+    capacity: 40,
+    items: {
+      extractor: { qty: 2, permanent: false, source: 'starter' },
+      belt: { qty: 10, permanent: false, source: 'starter' },
+      upgrader1x1: { qty: 1, permanent: false, source: 'starter' },
+      seller: { qty: 1, permanent: false, source: 'starter' }
+    },
+    permanentItems: {},
+    consumables: {}
+  },
+
+  meta: {
+    prestigePoints: 0,
+    prestigeKeys: 0,
+    blueprintUnlocks: {
+      extractor: true,
+      belt: true,
+      fastBelt: true,
+      halfBelt: true,
+      upgrader1x1: true,
+      upgraderHalf: true,
+      seller: true,
+      coalExtractor: true
+    },
+    relics: {},
+    shards: 0,
+    prestigeDust: 0,
+    collection: {}
+  },
+
+  defs: {
+    itemDefs: {
+      ore: { id: 'ore', name: 'Standard Ore', color: '#ffb03b', size: 14, baseValue: 5, shape: 'circle' },
+      megaOre: { id: 'megaOre', name: 'Mega Ore', color: '#ff4757', size: 22, baseValue: 25, shape: 'diamond' },
+      magmaOre: { id: 'magmaOre', name: 'Magma Ore', color: '#ff4757', size: 18, baseValue: 50, shape: 'diamond', defaultStatus: { flaming: true } },
+      uraniumOre: { id: 'uraniumOre', name: 'Uranium Ore', color: '#2ecc71', size: 16, baseValue: 150, shape: 'circle', defaultStatus: { radioactive: true } },
+      coalOre: { id: 'coalOre', name: 'Coal Fuel Ore', color: '#334155', size: 16, baseValue: 15, shape: 'square', isFuel: true },
+      superDiamondOre: { id: 'superDiamondOre', name: 'Super Diamond Ore', color: '#38bdf8', size: 24, baseValue: 300, shape: 'diamond', defaultStatus: { sparkling: true } },
+      
+      // New Ore Types
+      crystalOre: { id: 'crystalOre', name: 'Crystal Ore', color: '#a855f7', size: 16, baseValue: 200, shape: 'diamond', defaultStatus: { sparkling: true, crystalline: true } },
+      antimatterPellet: { id: 'antimatterPellet', name: 'Antimatter Pellet', color: '#ec4899', size: 20, baseValue: 1500, shape: 'diamond' },
+      timeCrystalOre: { id: 'timeCrystalOre', name: 'Time Crystal Ore', color: '#06b6d4', size: 18, baseValue: 800, shape: 'diamond', defaultStatus: { timeAged: true } },
+      glowAlgaeOre: { id: 'glowAlgaeOre', name: 'Glow Algae Ore', color: '#10b981', size: 14, baseValue: 120, shape: 'circle', defaultStatus: { wet: 10 } },
+      voidShardOre: { id: 'voidShardOre', name: 'Void Shard Ore', color: '#312e81', size: 22, baseValue: 12000, shape: 'diamond', defaultStatus: { nullified: true } }
+    },
+
+    buildingDefs: {
+      // --- CORE EXTRACTORS ---
+      extractor: {
+        id: 'extractor', name: 'Standard Extractor', category: 'extractor', rarity: 'common', cost: 100, priceGrowth: 1.10,
+        unlockMethod: 'shop', size: { w: 3, h: 1 }, layer: 'machine', color: '#3d6a8f', speed: 40,
+        tags: ['dropper', 'starter'], attributes: { spawnRateMs: 1000 },
+        ports: [{ dx: 3, dy: 0, kind: 'output', color: '#ffcf5c', dropSide: null }],
+        produces: { item: 'ore', rate: 1000 }
+      },
+      coalExtractor: {
+        id: 'coalExtractor', name: 'Coal Mine (Fuel)', category: 'extractor', rarity: 'common', cost: 450, priceGrowth: 1.10,
+        unlockMethod: 'shop', size: { w: 3, h: 1 }, layer: 'machine', color: '#1e293b', speed: 40,
+        tags: ['dropper', 'fuel_provider'], attributes: { fuelType: 'coal' },
+        ports: [{ dx: 3, dy: 0, kind: 'output', color: '#475569', dropSide: null }],
+        produces: { item: 'coalOre', rate: 1200 }
+      },
+      megaExtractor: {
+        id: 'megaExtractor', name: '2x2 Mega Extractor', category: 'extractor', rarity: 'rare', cost: 4500, priceGrowth: 1.12,
+        unlockMethod: 'shop', size: { w: 2, h: 2 }, layer: 'machine', color: '#2b7873', speed: 40,
+        tags: ['dropper', 'heavy_machinery'], attributes: { spawnRateMs: 1500 },
+        ports: [{ dx: 2, dy: 0.5, kind: 'output', color: '#ff4757', dropSide: null }],
+        produces: { item: 'megaOre', rate: 1500 }
+      },
+      volcanoDropper: {
+        id: 'volcanoDropper', name: 'Volcano Mine', category: 'extractor', rarity: 'epic', cost: 18000, priceGrowth: 1.13,
+        unlockMethod: 'shop', size: { w: 3, h: 1 }, layer: 'machine', color: '#881337', speed: 40,
+        tags: ['dropper', 'flaming'], attributes: { temperature: 1200 },
+        ports: [{ dx: 3, dy: 0, kind: 'output', color: '#ff4757', dropSide: null }],
+        produces: { item: 'magmaOre', rate: 1200 }
+      },
+      thermalExtractor: {
+        id: 'thermalExtractor', name: 'Fueled Thermal Mine', category: 'extractor', rarity: 'epic', cost: 85000, priceGrowth: 1.14,
+        unlockMethod: 'shop', size: { w: 3, h: 2 }, layer: 'machine', color: '#c2410c', speed: 40,
+        tags: ['dropper', 'fuel_consuming'], attributes: { fuelRequired: 'coal', runDurationSec: 8 },
+        requiresFuel: true,
+        ports: [
+          { dx: 0, dy: 0.5, kind: 'input', color: '#334155', dropSide: null },
+          { dx: 3, dy: 0.5, kind: 'output', color: '#38bdf8', dropSide: null }
+        ],
+        produces: { item: 'superDiamondOre', rate: 800 }
+      },
+      uraniumMine: {
+        id: 'uraniumMine', name: 'Uranium Centrifuge', category: 'extractor', rarity: 'exotic', cost: 350000, priceGrowth: 1.15,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 2, h: 2 }, layer: 'machine', color: '#14532d', speed: 40,
+        tags: ['dropper', 'radioactive'], attributes: { radiationSv: 50 },
+        ports: [{ dx: 2, dy: 0.5, kind: 'output', color: '#2ecc71', dropSide: null }],
+        produces: { item: 'uraniumOre', rate: 1600 }
+      },
+
+      // --- NEW EXTRACTORS ---
+      geodeDriller: {
+        id: 'geodeDriller', name: 'Crystal Geode Driller', category: 'extractor', rarity: 'rare', cost: 9000, priceGrowth: 1.12,
+        unlockMethod: 'goldenCrate', crateOnly: true, size: { w: 3, h: 2 }, layer: 'machine', color: '#a855f7', speed: 40,
+        tags: ['dropper', 'crystal'], attributes: {},
+        ports: [{ dx: 3, dy: 0.5, kind: 'output', color: '#c084fc', dropSide: null }],
+        produces: { item: 'crystalOre', rate: 1100 }
+      },
+      antimatterSiphon: {
+        id: 'antimatterSiphon', name: 'Antimatter Siphon', category: 'extractor', rarity: 'legendary', cost: 2500000, priceGrowth: 1.15,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 2, h: 2 }, layer: 'machine', color: '#ec4899', speed: 40,
+        tags: ['dropper', 'antimatter'], attributes: {},
+        ports: [{ dx: 2, dy: 0.5, kind: 'output', color: '#f472b6', dropSide: null }],
+        produces: { item: 'antimatterPellet', rate: 1400 }
+      },
+      temporalFluxBorer: {
+        id: 'temporalFluxBorer', name: 'Temporal Flux Borer', category: 'extractor', rarity: 'exotic', cost: 1400000, priceGrowth: 1.14,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 3, h: 3 }, layer: 'machine', color: '#06b6d4', speed: 40,
+        tags: ['dropper', 'temporal'], attributes: {},
+        ports: [{ dx: 3, dy: 1, kind: 'output', color: '#67e8f9', dropSide: null }],
+        produces: { item: 'timeCrystalOre', rate: 1000 }
+      },
+      algaeVat: {
+        id: 'algaeVat', name: 'Bioluminescent Algae Vat', category: 'extractor', rarity: 'epic', cost: 65000, priceGrowth: 1.13,
+        unlockMethod: 'exoticCrate', crateOnly: true, size: { w: 2, h: 1 }, layer: 'machine', color: '#10b981', speed: 40,
+        tags: ['dropper', 'algae'], attributes: {},
+        ports: [{ dx: 2, dy: 0, kind: 'output', color: '#34d399', dropSide: null }],
+        produces: { item: 'glowAlgaeOre', rate: 900 }
+      },
+      voidHarvester: {
+        id: 'voidHarvester', name: 'Void Fragment Harvester', category: 'extractor', rarity: 'mythic', cost: 25000000, priceGrowth: 1.16,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 4, h: 2 }, layer: 'machine', color: '#312e81', speed: 40,
+        tags: ['dropper', 'void'], attributes: {},
+        ports: [{ dx: 4, dy: 0.5, kind: 'output', color: '#818cf8', dropSide: null }],
+        produces: { item: 'voidShardOre', rate: 1600 }
+      },
+
+      // --- CORE CONVEYORS & LOGISTICS ---
+      belt: {
+        id: 'belt', name: 'Conveyor Belt', category: 'belt', rarity: 'common', cost: 15, priceGrowth: 1.08,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#4b4f58', speed: 90,
+        tags: ['transport'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#ffcf5c', dropSide: 0 }]
+      },
+      halfBelt: {
+        id: 'halfBelt', name: 'Half-Width Belt', category: 'belt', rarity: 'uncommon', cost: 35, priceGrowth: 1.09,
+        unlockMethod: 'shop', size: { w: 0.5, h: 1 }, layer: 'belt', color: '#334155', isHalfBelt: true, speed: 90,
+        tags: ['transport', 'narrow'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#94a3b8', dropSide: 0 }]
+      },
+      fastBelt: {
+        id: 'fastBelt', name: 'Fast Conveyor', category: 'belt', rarity: 'uncommon', cost: 120, priceGrowth: 1.10,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#3a7ca5', speed: 180,
+        tags: ['transport'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#7fd0ff', dropSide: 0 }]
+      },
+      splitter: {
+        id: 'splitter', name: 'Belt Splitter', category: 'belt', rarity: 'rare', cost: 1100, priceGrowth: 1.11,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#e67e22', isSplitter: true, speed: 100,
+        tags: ['routing'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#f39c12', dropSide: 0 }]
+      },
+      merger: {
+        id: 'merger', name: 'Belt Merger', category: 'belt', rarity: 'rare', cost: 1100, priceGrowth: 1.11,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#27ae60', isMerger: true, speed: 100,
+        tags: ['routing'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#2ecc71', dropSide: 0 }]
+      },
+      ultraBelt: {
+        id: 'ultraBelt', name: 'Ultra Conveyor', category: 'belt', rarity: 'epic', cost: 8000, priceGrowth: 1.12,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#d97706', speed: 320,
+        tags: ['transport'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#fbbf24', dropSide: 0 }]
+      },
+
+      // --- NEW LOGISTICS MACHINES ---
+      magLevRail: {
+        id: 'magLevRail', name: 'Magnetic Levitation Rail', category: 'belt', rarity: 'epic', cost: 30000, priceGrowth: 1.12,
+        unlockMethod: 'goldenCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#6366f1', speed: 450,
+        tags: ['transport', 'maglev'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#818cf8', dropSide: 0 }]
+      },
+      phaseShiftBelt: {
+        id: 'phaseShiftBelt', name: 'Phase-Shift Conveyor', category: 'belt', rarity: 'exotic', cost: 220000, priceGrowth: 1.13,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#8b5cf6', speed: 250,
+        tags: ['transport', 'intangible'], attributes: {}, passesThrough: true,
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#c084fc', dropSide: 0 }]
+      },
+      gravityInverter: {
+        id: 'gravityInverter', name: 'Gravity Inverter Belt', category: 'belt', rarity: 'rare', cost: 4500, priceGrowth: 1.11,
+        unlockMethod: 'goldenCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#e11d48', speed: 120,
+        tags: ['transport', 'gravity'], attributes: {}, gravityInvert: true,
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#fb7185', dropSide: 0 }]
+      },
+      cryoStorageBelt: {
+        id: 'cryoStorageBelt', name: 'Cryo-Storage Conveyor', category: 'belt', rarity: 'rare', cost: 7500, priceGrowth: 1.11,
+        unlockMethod: 'goldenCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#0284c7', speed: 40,
+        tags: ['transport', 'freeze'], attributes: {}, freezesOres: true,
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#38bdf8', dropSide: 0 }]
+      },
+      quantumLink: {
+        id: 'quantumLink', name: 'Quantum Entanglement Link', category: 'belt', rarity: 'legendary', cost: 1800000, priceGrowth: 1.14,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#d946ef', speed: 200,
+        tags: ['transport', 'teleport'], attributes: {}, isTeleporter: true,
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#f0abfc', dropSide: 0 }]
+      },
+
+      // --- CORE UPGRADERS ---
+      upgrader1x1: {
+        id: 'upgrader1x1', name: '1x1 Upgrader', category: 'upgrader', rarity: 'common', cost: 300, priceGrowth: 1.10,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#d35400', multiplier: 2.0, energyCost: 10, speed: 90,
+        tags: ['multiplier'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#e67e22', dropSide: 0 }]
+      },
+      upgraderHalf: {
+        id: 'upgraderHalf', name: 'Half Upgrader', category: 'upgrader', rarity: 'uncommon', cost: 550, priceGrowth: 1.11,
+        unlockMethod: 'shop', size: { w: 0.5, h: 1 }, layer: 'belt', color: '#8e44ad', multiplier: 1.5, energyCost: 5, isHalf: true, speed: 90,
+        tags: ['multiplier', 'narrow'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#9b59b6', dropSide: 0 }]
+      },
+      freonSprayer: {
+        id: 'freonSprayer', name: 'Freon Cooling Sprayer', category: 'upgrader', rarity: 'uncommon', cost: 2200, priceGrowth: 1.11,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#0284c7', extinguishes: true, appliesWet: 6, cooldownEnergy: 50, speed: 90,
+        tags: ['cooling', 'extinguisher'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#38bdf8', dropSide: 0 }]
+      },
+      upgrader2x1: {
+        id: 'upgrader2x1', name: '2x1 Wide Upgrader', category: 'upgrader', rarity: 'rare', cost: 8500, priceGrowth: 1.12,
+        unlockMethod: 'shop', size: { w: 2, h: 1 }, layer: 'belt', color: '#c0392b', multiplier: 3.0, energyCost: 20, speed: 90,
+        tags: ['multiplier'], attributes: {},
+        ports: [
+          { dx: 0, dy: 0, kind: 'through', color: '#e74c3c', dropSide: 0 },
+          { dx: 1, dy: 0, kind: 'through', color: '#e74c3c', dropSide: 0 }
+        ]
+      },
+      pyroRefiner: {
+        id: 'pyroRefiner', name: 'Pyro Blast Furnace', category: 'upgrader', rarity: 'rare', cost: 14000, priceGrowth: 1.12,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#b91c1c', multiplier: 3.5, appliesFlaming: true, speed: 90,
+        tags: ['multiplier', 'flaming'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#f87171', dropSide: 0 }]
+      },
+      leadDecontaminator: {
+        id: 'leadDecontaminator', name: 'Lead Decontaminator', category: 'upgrader', rarity: 'epic', cost: 40000, priceGrowth: 1.13,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#475569', removesRadioactive: true, multiplier: 2.5, speed: 90,
+        tags: ['decontaminator', 'multiplier'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#94a3b8', dropSide: 0 }]
+      },
+      stellarSparkler: {
+        id: 'stellarSparkler', name: 'Stellar Prism', category: 'upgrader', rarity: 'exotic', cost: 750000, priceGrowth: 1.13,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#eab308', appliesSparkling: true, speed: 90,
+        tags: ['sparkles', 'buff'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#fde047', dropSide: 0 }]
+      },
+      upgraderPlasma: {
+        id: 'upgraderPlasma', name: 'Plasma Supercharger', category: 'upgrader', rarity: 'epic', cost: 800000, priceGrowth: 1.14,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#ff0055', flatAdd: 500, energyCost: 35, speed: 100,
+        tags: ['flat_boost', 'plasma'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#ff0055', dropSide: 0 }]
+      },
+
+      // --- NEW UPGRADERS & UTILITY MACHINES ---
+      oreCrystallizer: {
+        id: 'oreCrystallizer', name: 'Ore Crystallizer', category: 'upgrader', rarity: 'rare', cost: 22000, priceGrowth: 1.12,
+        unlockMethod: 'goldenCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#06b6d4', multiplier: 2.2, appliesCrystalline: true, speed: 90,
+        tags: ['multiplier', 'crystal'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#67e8f9', dropSide: 0 }]
+      },
+      probabilityAmp: {
+        id: 'probabilityAmp', name: 'Probability Amplifier', category: 'upgrader', rarity: 'exotic', cost: 750000, priceGrowth: 1.13,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#f59e0b', multiplier: 1.8, appliesLucky: true, speed: 90,
+        tags: ['multiplier', 'lucky'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#fbbf24', dropSide: 0 }]
+      },
+      entropyStabilizer: {
+        id: 'entropyStabilizer', name: 'Entropy Stabilizer', category: 'upgrader', rarity: 'epic', cost: 110000, priceGrowth: 1.13,
+        unlockMethod: 'exoticCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#14b8a6', multiplier: 3.0, nullifiesBadStatuses: true, speed: 90,
+        tags: ['multiplier', 'stabilizer'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#2dd4bf', dropSide: 0 }]
+      },
+      resonanceHarmonizer: {
+        id: 'resonanceHarmonizer', name: 'Resonance Harmonizer', category: 'upgrader', rarity: 'legendary', cost: 1600000, priceGrowth: 1.14,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#eab308', multiplier: 4.5, sparklingSynergy: true, speed: 90,
+        tags: ['multiplier', 'synergy'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#fde047', dropSide: 0 }]
+      },
+      matterReplicator: {
+        id: 'matterReplicator', name: 'Matter Replicator', category: 'upgrader', rarity: 'mythic', cost: 12000000, priceGrowth: 1.15,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 2, h: 1 }, layer: 'belt', color: '#a855f7', duplicatesOre: true, maxDuplicateCount: 1, speed: 90,
+        tags: ['duplicator'], attributes: {},
+        ports: [
+          { dx: 0, dy: 0, kind: 'through', color: '#c084fc', dropSide: 0 },
+          { dx: 1, dy: 0, kind: 'through', color: '#c084fc', dropSide: 0 }
+        ]
+      },
+      oreTransmuter: {
+        id: 'oreTransmuter', name: 'Ore Transmuter', category: 'upgrader', rarity: 'epic', cost: 250000, priceGrowth: 1.13,
+        unlockMethod: 'exoticCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#f43f5e', multiplier: 2.5, transmutation: true, speed: 90,
+        tags: ['transmuter'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#fb7185', dropSide: 0 }]
+      },
+      shardOfLife: {
+        id: 'shardOfLife', name: 'Shard of Life', category: 'upgrader', rarity: 'mythic', cost: 40000000, priceGrowth: 1.16,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 2, h: 2 }, layer: 'belt', color: '#22c55e', multiplier: 6.0, auraRadius: 2, speed: 90,
+        tags: ['aura', 'multiplier'], attributes: {},
+        ports: [
+          { dx: 0, dy: 0, kind: 'through', color: '#4ade80', dropSide: 0 },
+          { dx: 1, dy: 0, kind: 'through', color: '#4ade80', dropSide: 0 }
+        ]
+      },
+
+      // --- CORE SELLERS ---
+      seller: {
+        id: 'seller', name: 'Seller', category: 'seller', rarity: 'common', cost: 0, priceGrowth: 1.00,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'machine', color: '#7a4fa0', consumes: true,
+        tags: ['furnace', 'starter'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'input', color: '#9ad1ff', dropSide: null }]
+      },
+      blastSmelter: {
+        id: 'blastSmelter', name: 'Blast Smelter (2.0x)', category: 'seller', rarity: 'exotic', cost: 275000, priceGrowth: 1.14,
+        unlockMethod: 'shop', size: { w: 2, h: 2 }, layer: 'machine', color: '#581c87', consumes: true, sellerBonus: 2.0,
+        tags: ['furnace', 'heavy_machinery'], attributes: {},
+        ports: [{ dx: 0, dy: 0.5, kind: 'input', color: '#a855f7', dropSide: null }]
+      },
+
+      // --- NEW SELLERS ---
+      dimensionalVault: {
+        id: 'dimensionalVault', name: 'Dimensional Vault', category: 'seller', rarity: 'exotic', cost: 1400000, priceGrowth: 1.14,
+        unlockMethod: 'exoticCrate', crateOnly: true, size: { w: 2, h: 2 }, layer: 'machine', color: '#4c1d95', consumes: true, sellerBonus: 3.5, batchThreshold: 5,
+        tags: ['vault', 'batch_seller'], attributes: {},
+        ports: [{ dx: 0, dy: 0.5, kind: 'input', color: '#818cf8', dropSide: null }]
+      },
+      catalyticConverter: {
+        id: 'catalyticConverter', name: 'Catalytic Converter', category: 'seller', rarity: 'rare', cost: 95000, priceGrowth: 1.12,
+        unlockMethod: 'exoticCrate', crateOnly: true, size: { w: 2, h: 1 }, layer: 'machine', color: '#84cc16', consumes: true, sellerBonus: 2.5, radioactiveBonus: 4.0,
+        tags: ['furnace', 'radioactive_bonus'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'input', color: '#a3e635', dropSide: null }]
+      },
+      soulForge: {
+        id: 'soulForge', name: 'Soul Forge', category: 'seller', rarity: 'legendary', cost: 6500000, priceGrowth: 1.15,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 3, h: 2 }, layer: 'machine', color: '#7f1d1d', consumes: true, sellerBonus: 8.0, penaltyRisk: 0.10,
+        tags: ['furnace', 'high_risk'], attributes: {},
+        ports: [{ dx: 0, dy: 0.5, kind: 'input', color: '#f87171', dropSide: null }]
+      }
+    },
+
+    relicDefs: {
+      warehouseCharter: { id: 'warehouseCharter', name: 'Warehouse Charter I', desc: '+10 permanent inventory capacity', effect: { inventoryCap: 10 } },
+      starterBelts: { id: 'starterBelts', name: 'Starter Belt License', desc: 'Start each run with 8 Conveyor Belts', effect: { startingItems: { belt: 8 } } },
+      sellerPermit: { id: 'sellerPermit', name: 'Seller Permit', desc: 'Start each run with 1 Seller', effect: { startingItems: { seller: 1 } } },
+      crateMagnet: { id: 'crateMagnet', name: 'Crate Magnet', desc: '+3% crate blueprint odds', effect: { crateLuck: 0.03 } },
+      salvageToolkit: { id: 'salvageToolkit', name: 'Salvage Toolkit', desc: 'Demolished items always return full stock to inventory', effect: { salvage100: true } },
+      insuranceSeal: { id: 'insuranceSeal', name: 'Insurance Seal', desc: 'Mark 1 placed machine per run as prestige-safe', effect: { maxInsured: 1 } },
+      exoticPermit: { id: 'exoticPermit', name: 'Exotic Handling Permit', desc: 'First exotic item placed each run has free cost', effect: { freeFirstExotic: true } },
+      vaultArchivist: { id: 'vaultArchivist', name: 'Vault Archivist', desc: '+20% Prestige Dust from Prestige Crates', effect: { prestigeCrateBonus: 0.20 } }
+    },
+
+    crateDefs: {
+      regular: { id: 'regular', name: 'Regular Crate', currency: 'money', cost: 250 },
+      golden: { id: 'golden', name: 'Golden Crate', currency: 'money', cost: 1000 },
+      exotic: { id: 'exotic', name: 'Exotic Crate', currency: 'money', cost: 5000 },
+      prestige: { id: 'prestige', name: 'Prestige Crate', currency: 'prestigeKeys', cost: 1 }
+    }
+  },
+
+  // Backward compatibility getters
+  get world() {
+    return {
+      get money() { return STATE.run.money; },
+      set money(v) { STATE.run.money = v; },
+      get buildings() { return STATE.run.buildings; },
+      set buildings(v) { STATE.run.buildings = v; },
+      get ores() { return STATE.run.ores; },
+      set ores(v) { STATE.run.ores = v; }
+    };
+  },
+  get unlockedBuildingIds() {
+    return Object.keys(STATE.meta.blueprintUnlocks).filter(k => STATE.meta.blueprintUnlocks[k]);
+  },
+  get buildingDefs() {
+    return STATE.defs.buildingDefs;
+  },
+  get itemDefs() {
+    return STATE.defs.itemDefs;
+  },
+
+  camera: { x: 0, y: 0, zoom: 1, minZoom: 0.25, maxZoom: 4 },
   nextId: 1
 };
 
@@ -208,7 +443,243 @@ function genId(prefix) {
   return `${prefix}_${STATE.nextId++}`;
 }
 
-// Transient UI State
+// ===========================================================
+// HELPER & MANAGEMENT SYSTEMS (SHOP, INVENTORY, PRESTIGE, CRATES)
+// ===========================================================
+
+function getShopItemPrice(defId) {
+  const def = STATE.defs.buildingDefs[defId];
+  if (!def) return 0;
+  const owned = STATE.shop.stock[defId]?.ownedCount || 0;
+  const growth = def.priceGrowth || 1.10;
+  return Math.round(def.cost * Math.pow(growth, owned));
+}
+
+function buyShopItem(defId, qty = 1) {
+  const def = STATE.defs.buildingDefs[defId];
+  if (!def) return false;
+  if (!STATE.meta.blueprintUnlocks[defId]) {
+    showToast(`${def.name} blueprint is locked. Open Crates to unlock.`);
+    return false;
+  }
+  const price = getShopItemPrice(defId);
+  if (STATE.run.money < price * qty) {
+    showToast(`Need $${(price * qty).toLocaleString()} to buy ${qty}x ${def.name}.`);
+    return false;
+  }
+
+  STATE.run.money -= price * qty;
+  if (!STATE.shop.stock[defId]) {
+    STATE.shop.stock[defId] = { defId, currentPrice: price, ownedCount: 0 };
+  }
+  STATE.shop.stock[defId].ownedCount += qty;
+
+  addToInventory(defId, qty, false, 'shop');
+  showToast(`Purchased ${qty}x ${def.name}!`);
+  triggerSaveState();
+  return true;
+}
+
+function addToInventory(defId, qty = 1, isPermanent = false, source = 'shop') {
+  if (isPermanent) {
+    if (!STATE.inventory.permanentItems[defId]) {
+      STATE.inventory.permanentItems[defId] = { qty: 0, permanent: true, source };
+    }
+    STATE.inventory.permanentItems[defId].qty += qty;
+  } else {
+    if (!STATE.inventory.items[defId]) {
+      STATE.inventory.items[defId] = { qty: 0, permanent: false, source };
+    }
+    STATE.inventory.items[defId].qty += qty;
+  }
+  triggerSaveState();
+}
+
+function removeFromInventory(defId, qty = 1) {
+  if (STATE.inventory.items[defId] && STATE.inventory.items[defId].qty >= qty) {
+    STATE.inventory.items[defId].qty -= qty;
+    return true;
+  } else if (STATE.inventory.permanentItems[defId] && STATE.inventory.permanentItems[defId].qty >= qty) {
+    STATE.inventory.permanentItems[defId].qty -= qty;
+    return true;
+  }
+  return false;
+}
+
+function getInventoryQty(defId) {
+  const standard = STATE.inventory.items[defId]?.qty || 0;
+  const perm = STATE.inventory.permanentItems[defId]?.qty || 0;
+  return standard + perm;
+}
+
+function canPlaceFromInventory(defId) {
+  return getInventoryQty(defId) > 0;
+}
+
+// Prestige Calculator & Execution
+function calculatePrestigePayout(lifetimeEarnings) {
+  const threshold = STATE.config.prestigeThresholdLifetime || 1e10;
+  if (lifetimeEarnings < threshold) {
+    return { canPrestige: false, pointsGained: 0, keysGained: 0 };
+  }
+  const pointsGained = Math.floor(Math.pow(lifetimeEarnings / threshold, 0.5));
+  const keysGained = Math.max(1, 1 + Math.floor(Math.log10(lifetimeEarnings / threshold)));
+  return { canPrestige: true, pointsGained, keysGained };
+}
+
+function executePrestigeReset() {
+  const payout = calculatePrestigePayout(STATE.run.lifetimeEarnings);
+  if (!payout.canPrestige) return false;
+
+  STATE.meta.prestigePoints += payout.pointsGained;
+  STATE.meta.prestigeKeys += payout.keysGained;
+
+  // Reset active run state
+  STATE.run.money = 1000;
+  STATE.run.lifetimeEarnings = 0;
+  STATE.run.buildings = [];
+  STATE.run.ores = [];
+  STATE.run.timeScale = 1.0;
+  STATE.run.isPaused = false;
+
+  // Apply starting relic inventory grants
+  if (STATE.meta.relics.starterBelts) addToInventory('belt', 8, false, 'relic');
+  if (STATE.meta.relics.sellerPermit) addToInventory('seller', 1, false, 'relic');
+
+  showToast(`Prestige Complete! Gained +${payout.pointsGained} Points & +${payout.keysGained} Keys!`);
+  triggerSaveState();
+  return true;
+}
+
+// Crate Reward Resolution Engine
+function openCrate(tier) {
+  const crateDef = STATE.defs.crateDefs[tier];
+  if (!crateDef) return null;
+
+  if (crateDef.currency === 'money') {
+    if (STATE.run.money < crateDef.cost) {
+      showToast(`Need $${crateDef.cost} cash for ${crateDef.name}.`);
+      return null;
+    }
+    STATE.run.money -= crateDef.cost;
+  } else if (crateDef.currency === 'prestigeKeys') {
+    if (STATE.meta.prestigeKeys < crateDef.cost) {
+      showToast(`Need ${crateDef.cost} Prestige Key for ${crateDef.name}.`);
+      return null;
+    }
+    STATE.meta.prestigeKeys -= crateDef.cost;
+  }
+
+  // Roll rewards from weighted tables
+  const rand = Math.random();
+  let reward = null;
+
+  if (tier === 'regular') {
+    if (rand < 0.72) {
+      const ids = ['extractor', 'belt', 'fastBelt', 'upgrader1x1', 'freonSprayer'];
+      const id = ids[Math.floor(Math.random() * ids.length)];
+      addToInventory(id, 2, false, 'crate');
+      reward = { type: 'item', id, qty: 2, label: `2x ${STATE.defs.buildingDefs[id].name}` };
+    } else if (rand < 0.92) {
+      const ids = ['halfBelt', 'splitter', 'merger', 'upgraderHalf'];
+      const id = ids[Math.floor(Math.random() * ids.length)];
+      addToInventory(id, 1, true, 'crate');
+      reward = { type: 'permanent', id, qty: 1, label: `1x Permanent ${STATE.defs.buildingDefs[id].name}` };
+    } else if (rand < 0.99) {
+      const ids = ['coalExtractor', 'megaExtractor', 'pyroRefiner'];
+      const id = ids[Math.floor(Math.random() * ids.length)];
+      if (!STATE.meta.blueprintUnlocks[id]) {
+        STATE.meta.blueprintUnlocks[id] = true;
+        reward = { type: 'blueprint', id, label: `Blueprint: ${STATE.defs.buildingDefs[id].name}` };
+      } else {
+        STATE.meta.shards += 1;
+        reward = { type: 'shards', qty: 1, label: `Duplicate Blueprint -> +1 Shard` };
+      }
+    } else {
+      const rId = 'warehouseCharter';
+      STATE.meta.relics[rId] = true;
+      reward = { type: 'relic', id: rId, label: `Relic Unlocked: ${STATE.defs.relicDefs[rId].name}` };
+    }
+  } else if (tier === 'golden') {
+    if (rand < 0.45) {
+      const ids = ['geodeDriller', 'magLevRail', 'gravityInverter', 'cryoStorageBelt', 'oreCrystallizer'];
+      const id = ids[Math.floor(Math.random() * ids.length)];
+      addToInventory(id, 1, true, 'crate');
+      reward = { type: 'permanent', id, qty: 1, label: `1x Permanent ${STATE.defs.buildingDefs[id].name}` };
+    } else if (rand < 0.80) {
+      const ids = ['volcanoDropper', 'thermalExtractor', 'upgrader2x1', 'geodeDriller'];
+      const id = ids[Math.floor(Math.random() * ids.length)];
+      if (!STATE.meta.blueprintUnlocks[id]) {
+        STATE.meta.blueprintUnlocks[id] = true;
+        reward = { type: 'blueprint', id, label: `Blueprint: ${STATE.defs.buildingDefs[id].name}` };
+      } else {
+        STATE.meta.shards += 4;
+        reward = { type: 'shards', qty: 4, label: `Duplicate Blueprint -> +4 Shards` };
+      }
+    } else if (rand < 0.95) {
+      const rId = 'starterBelts';
+      STATE.meta.relics[rId] = true;
+      reward = { type: 'relic', id: rId, label: `Relic Unlocked: ${STATE.defs.relicDefs[rId].name}` };
+    } else {
+      STATE.meta.shards += 10;
+      reward = { type: 'shards', qty: 10, label: `Meta Currency Bundle: +10 Shards` };
+    }
+  } else if (tier === 'exotic') {
+    if (rand < 0.35) {
+      const ids = ['algaeVat', 'entropyStabilizer', 'oreTransmuter', 'dimensionalVault', 'catalyticConverter'];
+      const id = ids[Math.floor(Math.random() * ids.length)];
+      addToInventory(id, 1, true, 'crate');
+      reward = { type: 'permanent', id, qty: 1, label: `1x Permanent ${STATE.defs.buildingDefs[id].name}` };
+    } else if (rand < 0.70) {
+      const ids = ['algaeVat', 'entropyStabilizer', 'oreTransmuter', 'dimensionalVault', 'catalyticConverter'];
+      const id = ids[Math.floor(Math.random() * ids.length)];
+      if (!STATE.meta.blueprintUnlocks[id]) {
+        STATE.meta.blueprintUnlocks[id] = true;
+        reward = { type: 'blueprint', id, label: `Blueprint: ${STATE.defs.buildingDefs[id].name}` };
+      } else {
+        STATE.meta.shards += 15;
+        reward = { type: 'shards', qty: 15, label: `Duplicate Blueprint -> +15 Shards` };
+      }
+    } else if (rand < 0.90) {
+      const rId = 'salvageToolkit';
+      STATE.meta.relics[rId] = true;
+      reward = { type: 'relic', id: rId, label: `Relic Unlocked: ${STATE.defs.relicDefs[rId].name}` };
+    } else {
+      STATE.meta.shards += 25;
+      reward = { type: 'shards', qty: 25, label: `Shard Bundle: +25 Shards` };
+    }
+  } else if (tier === 'prestige') {
+    if (rand < 0.45) {
+      const ids = ['antimatterSiphon', 'temporalFluxBorer', 'phaseShiftBelt', 'quantumLink', 'probabilityAmp', 'resonanceHarmonizer', 'matterReplicator', 'voidHarvester', 'soulForge', 'shardOfLife'];
+      const id = ids[Math.floor(Math.random() * ids.length)];
+      if (!STATE.meta.blueprintUnlocks[id]) {
+        STATE.meta.blueprintUnlocks[id] = true;
+        reward = { type: 'blueprint', id, label: `Prestige Blueprint: ${STATE.defs.buildingDefs[id].name}` };
+      } else {
+        STATE.meta.prestigeDust += 50;
+        reward = { type: 'prestigeDust', qty: 50, label: `Duplicate Prestige Blueprint -> +50 Dust` };
+      }
+    } else if (rand < 0.70) {
+      const ids = ['antimatterSiphon', 'quantumLink', 'matterReplicator', 'soulForge', 'shardOfLife'];
+      const id = ids[Math.floor(Math.random() * ids.length)];
+      addToInventory(id, 1, true, 'crate');
+      reward = { type: 'permanent', id, qty: 1, label: `1x Mythic Copy: ${STATE.defs.buildingDefs[id].name}` };
+    } else if (rand < 0.90) {
+      const rIds = ['insuranceSeal', 'exoticPermit', 'vaultArchivist'];
+      const rId = rIds[Math.floor(Math.random() * rIds.length)];
+      STATE.meta.relics[rId] = true;
+      reward = { type: 'relic', id: rId, label: `Relic Unlocked: ${STATE.defs.relicDefs[rId].name}` };
+    } else {
+      STATE.meta.prestigeDust += 100;
+      reward = { type: 'prestigeDust', qty: 100, label: `Prestige Dust Cache: +100 Dust` };
+    }
+  }
+
+  triggerSaveState();
+  return reward;
+}
+
+// Transient UI State Variables
 let mode = 'idle';
 let placingState = null;
 let movingState = null;
@@ -228,7 +699,7 @@ function cancelMode() {
   placingState = null; movingState = null; isBeltDragging = false; beltDragStart = null; setMode('idle');
 }
 
-// Save Game Engine
+// Save & Migration System
 function triggerSaveState() {
   try {
     const jsonStr = JSON.stringify(STATE, null, 2);
@@ -243,34 +714,44 @@ function triggerSaveState() {
   }
 }
 
+function migrateSavedState(savedState) {
+  if (!savedState) return;
+
+  if (savedState.world) {
+    if (typeof savedState.world.money === 'number') STATE.run.money = savedState.world.money;
+    if (Array.isArray(savedState.world.buildings)) STATE.run.buildings = savedState.world.buildings;
+  }
+  if (savedState.run) Object.assign(STATE.run, savedState.run);
+  if (savedState.shop) Object.assign(STATE.shop, savedState.shop);
+  if (savedState.inventory) Object.assign(STATE.inventory, savedState.inventory);
+  if (savedState.meta) Object.assign(STATE.meta, savedState.meta);
+
+  if (Array.isArray(savedState.unlockedBuildingIds)) {
+    savedState.unlockedBuildingIds.forEach(id => { STATE.meta.blueprintUnlocks[id] = true; });
+  }
+
+  // Ensure default unlocks exist
+  ['extractor', 'belt', 'fastBelt', 'halfBelt', 'upgrader1x1', 'upgraderHalf', 'seller', 'coalExtractor'].forEach(id => {
+    STATE.meta.blueprintUnlocks[id] = true;
+  });
+}
+
 function loadSavedGame() {
   fetch('/savegame.json')
     .then(res => res.json())
     .then(savedState => {
-      if (savedState && savedState.world) {
-        if (typeof savedState.world.money === 'number') STATE.world.money = savedState.world.money;
-        if (Array.isArray(savedState.world.buildings)) STATE.world.buildings = savedState.world.buildings;
-        if (Array.isArray(savedState.unlockedBuildingIds)) STATE.unlockedBuildingIds = savedState.unlockedBuildingIds;
-        if (savedState.buildingDefs) Object.assign(STATE.buildingDefs, savedState.buildingDefs);
-        if (savedState.itemDefs) Object.assign(STATE.itemDefs, savedState.itemDefs);
-        renderHotbar();
-        renderInventoryGrid();
-      }
+      migrateSavedState(savedState);
+      if (typeof renderHotbar === 'function') renderHotbar();
+      if (typeof renderInventoryGrid === 'function') renderInventoryGrid();
     })
     .catch(() => {
       const local = localStorage.getItem('miners_haven_save');
       if (local) {
         try {
           const savedState = JSON.parse(local);
-          if (savedState && savedState.world) {
-            if (typeof savedState.world.money === 'number') STATE.world.money = savedState.world.money;
-            if (Array.isArray(savedState.world.buildings)) STATE.world.buildings = savedState.world.buildings;
-            if (Array.isArray(savedState.unlockedBuildingIds)) STATE.unlockedBuildingIds = savedState.unlockedBuildingIds;
-            if (savedState.buildingDefs) Object.assign(STATE.buildingDefs, savedState.buildingDefs);
-            if (savedState.itemDefs) Object.assign(STATE.itemDefs, savedState.itemDefs);
-            renderHotbar();
-            renderInventoryGrid();
-          }
+          migrateSavedState(savedState);
+          if (typeof renderHotbar === 'function') renderHotbar();
+          if (typeof renderInventoryGrid === 'function') renderInventoryGrid();
         } catch(e) {}
       }
     });
@@ -343,7 +824,7 @@ function clampedOrigin(w, h, rawCol, rawRow) {
 
 function worldToCell(wx, wy, defId) {
   const cs = STATE.config.grid.cellSize;
-  const def = defId ? STATE.buildingDefs[defId] : (placingState ? STATE.buildingDefs[placingState.defId] : null);
+  const def = defId ? STATE.defs.buildingDefs[defId] : (placingState ? STATE.defs.buildingDefs[placingState.defId] : null);
 
   let col = Math.floor(wx / cs);
   let row = Math.floor(wy / cs);
@@ -374,9 +855,10 @@ function showToast(msg) {
 function getCellOccupants(col, row, excludeId) {
   const occupants = [];
   const eps = 0.0001;
-  for (const b of STATE.world.buildings) {
+  for (const b of STATE.run.buildings) {
     if (excludeId && b.id === excludeId) continue;
-    const def = STATE.buildingDefs[b.defId];
+    const def = STATE.defs.buildingDefs[b.defId];
+    if (!def) continue;
     const fp = getFootprint(def, b.rot);
     if (col >= b.col - eps && col < b.col + fp.w - eps && row >= b.row - eps && row < b.row + fp.h - eps) {
       const localDx = Math.floor(col - b.col), localDy = Math.floor(row - b.row);
@@ -390,14 +872,15 @@ function getCellOccupants(col, row, excludeId) {
 function wouldOverlapAt(defId, col, row, w, h, excludeId) {
   const gridW = STATE.config.grid.cols;
   const gridH = STATE.config.grid.rows;
-  const def = STATE.buildingDefs[defId];
+  const def = STATE.defs.buildingDefs[defId];
 
   if (col < 0 || row < 0 || col + w > gridW || row + h > gridH) return true;
 
   const eps = 0.0001;
-  for (const b of STATE.world.buildings) {
+  for (const b of STATE.run.buildings) {
     if (b.id === excludeId) continue;
-    const bDef = STATE.buildingDefs[b.defId];
+    const bDef = STATE.defs.buildingDefs[b.defId];
+    if (!bDef) continue;
     const fp = getFootprint(bDef, b.rot);
 
     if (col < b.col + fp.w - eps && col + w > b.col + eps &&
@@ -414,46 +897,49 @@ function wouldOverlapAt(defId, col, row, w, h, excludeId) {
 }
 
 function findBuildingAtCell(col, row) {
-  for (let i = STATE.world.buildings.length - 1; i >= 0; i--) {
-    const b = STATE.world.buildings[i];
-    const def = STATE.buildingDefs[b.defId];
+  for (let i = STATE.run.buildings.length - 1; i >= 0; i--) {
+    const b = STATE.run.buildings[i];
+    const def = STATE.defs.buildingDefs[b.defId];
+    if (!def) continue;
     const fp = getFootprint(def, b.rot);
     if (col >= b.col && col < b.col + fp.w && row >= b.row && row < b.row + fp.h) return b;
   }
   return null;
 }
+
 function findBuildingById(id) {
-  return STATE.world.buildings.find(b => b.id === id) || null;
+  return STATE.run.buildings.find(b => b.id === id) || null;
 }
 
-// Building Placement & Actions
+// Building Placement & Demolition with Inventory Integration
 function tryPlaceBuilding(defId, col, row, rot) {
-  const def = STATE.buildingDefs[defId];
+  const def = STATE.defs.buildingDefs[defId];
   if (!def) return false;
-  if (!STATE.unlockedBuildingIds.includes(defId)) {
-    showToast(`${def.name} is locked. Open Crates to unlock.`);
+  if (!STATE.meta.blueprintUnlocks[defId]) {
+    showToast(`${def.name} blueprint is locked.`);
     return false;
   }
-  const cost = def.cost || 0;
-  if (STATE.world.money < cost) {
-    showToast(`Need $${cost} to place ${def.name}.`);
+  if (!canPlaceFromInventory(defId)) {
+    showToast(`No ${def.name} available in inventory! Buy from Shop.`);
     return false;
   }
   const fp = getFootprint(def, rot);
   if (wouldOverlapAt(defId, col, row, fp.w, fp.h, null)) return false;
 
-  STATE.world.money -= cost;
-  STATE.world.buildings.push({
+  removeFromInventory(defId, 1);
+  STATE.run.buildings.push({
     id: genId('bldg'), defId, col, row, rot,
     fuelTimer: 0,
     lastProduced: performance.now()
   });
   triggerSaveState();
+  if (typeof renderInventoryGrid === 'function') renderInventoryGrid();
+  if (typeof renderHotbar === 'function') renderHotbar();
   return true;
 }
 
 function tryMoveBuilding(building, col, row, rot) {
-  const def = STATE.buildingDefs[building.defId];
+  const def = STATE.defs.buildingDefs[building.defId];
   const fp = getFootprint(def, rot);
   if (wouldOverlapAt(building.defId, col, row, fp.w, fp.h, building.id)) return false;
   building.col = col; building.row = row; building.rot = rot;
@@ -462,7 +948,7 @@ function tryMoveBuilding(building, col, row, rot) {
 }
 
 function rotateBuildingInPlace(building) {
-  const def = STATE.buildingDefs[building.defId];
+  const def = STATE.defs.buildingDefs[building.defId];
   const newRot = (building.rot + 1) % 4;
   const fp = getFootprint(def, newRot);
   const origin = clampedOrigin(fp.w, fp.h, building.col, building.row);
@@ -473,16 +959,16 @@ function rotateBuildingInPlace(building) {
 }
 
 function deleteBuilding(building) {
-  const def = STATE.buildingDefs[building.defId];
-  if (def && def.cost) {
-    STATE.world.money += Math.floor(def.cost * 0.75);
-  }
-  const idx = STATE.world.buildings.findIndex(b => b.id === building.id);
-  if (idx >= 0) STATE.world.buildings.splice(idx, 1);
+  addToInventory(building.defId, 1, building.isPermanent || false, 'salvage');
+  const idx = STATE.run.buildings.findIndex(b => b.id === building.id);
+  if (idx >= 0) STATE.run.buildings.splice(idx, 1);
   if (selectedEntity && selectedEntity.type === 'building' && selectedEntity.id === building.id) {
     selectedEntity = null;
   }
+  showToast(`Demolished ${STATE.defs.buildingDefs[building.defId]?.name || 'Building'} -> Returned to Inventory`);
   triggerSaveState();
+  if (typeof renderInventoryGrid === 'function') renderInventoryGrid();
+  if (typeof renderHotbar === 'function') renderHotbar();
 }
 
 // Mouse & Dragging Controls
@@ -522,7 +1008,7 @@ canvas.addEventListener('wheel', (e) => {
 function handleClickAction(screenX, screenY) {
   const world = screenToWorld(screenX, screenY);
   if (mode === 'placing') {
-    const def = STATE.buildingDefs[placingState.defId];
+    const def = STATE.defs.buildingDefs[placingState.defId];
     const fp = getFootprint(def, placingState.rot);
     const raw = worldToCell(world.x, world.y);
     const origin = clampedOrigin(fp.w, fp.h, raw.col, raw.row);
@@ -530,7 +1016,7 @@ function handleClickAction(screenX, screenY) {
   } else if (mode === 'moving') {
     const building = findBuildingById(movingState.buildingId);
     if (building) {
-      const def = STATE.buildingDefs[building.defId];
+      const def = STATE.defs.buildingDefs[building.defId];
       const fp = getFootprint(def, movingState.rot);
       const raw = worldToCell(world.x, world.y);
       const origin = clampedOrigin(fp.w, fp.h, raw.col, raw.row);
@@ -549,7 +1035,7 @@ canvas.addEventListener('mousedown', (e) => {
   const cell = worldToCell(world.x, world.y);
 
   if (mode === 'placing' && placingState) {
-    const def = STATE.buildingDefs[placingState.defId];
+    const def = STATE.defs.buildingDefs[placingState.defId];
     if (def && def.layer === 'belt') {
       isBeltDragging = true;
       beltDragStart = cell;
@@ -596,7 +1082,7 @@ window.addEventListener('mouseup', (e) => {
   canvas.classList.remove('dragging');
 });
 
-// Touch Event Handling for Mobile Devices
+// Mobile Touch Interactions
 let touchStartDist = 0;
 let lastTouchPos = { x: 0, y: 0 };
 let lastTapTime = 0;
@@ -621,14 +1107,13 @@ canvas.addEventListener('touchstart', (e) => {
     if (mode === 'placing' && placingState) {
       const world = screenToWorld(t.clientX, t.clientY);
       const cell = worldToCell(world.x, world.y);
-      const def = STATE.buildingDefs[placingState.defId];
+      const def = STATE.defs.buildingDefs[placingState.defId];
       if (def && def.layer === 'belt') {
         isBeltDragging = true;
         beltDragStart = cell;
       }
     }
-    isDragging = true;
-    dragMoved = false;
+    isDragging = true; dragMoved = false;
   } else if (e.touches.length === 2) {
     const t1 = e.touches[0], t2 = e.touches[1];
     touchStartDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
@@ -639,8 +1124,7 @@ canvas.addEventListener('touchmove', (e) => {
   if (e.touches.length === 1 && isDragging) {
     const t = e.touches[0];
     mouseScreen = { x: t.clientX, y: t.clientY };
-    const dx = t.clientX - lastTouchPos.x;
-    const dy = t.clientY - lastTouchPos.y;
+    const dx = t.clientX - lastTouchPos.x, dy = t.clientY - lastTouchPos.y;
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragMoved = true;
 
     if (mode !== 'placing') {
@@ -677,13 +1161,13 @@ canvas.addEventListener('touchend', (e) => {
   }
 }, { passive: true });
 
-// Selection Logic
+// Entity Selection & Inspector Panel
 function selectEntityAt(wx, wy) {
   const cell = worldToCell(wx, wy);
   const b = findBuildingAtCell(cell.col, cell.row);
   if (b) { selectedEntity = { type: 'building', id: b.id }; updateInspectorPanel(); return; }
-  for (let i = STATE.world.ores.length - 1; i >= 0; i--) {
-    const o = STATE.world.ores[i];
+  for (let i = STATE.run.ores.length - 1; i >= 0; i--) {
+    const o = STATE.run.ores[i];
     const dx = o.x - wx, dy = o.y - wy;
     if (dx * dx + dy * dy <= (o.size / 2) * (o.size / 2)) {
       selectedEntity = { type: 'ore', id: o.id };
@@ -695,7 +1179,7 @@ function selectEntityAt(wx, wy) {
 
 function getSelectedEntityObject() {
   if (!selectedEntity) return null;
-  if (selectedEntity.type === 'ore') return STATE.world.ores.find(o => o.id === selectedEntity.id) || null;
+  if (selectedEntity.type === 'ore') return STATE.run.ores.find(o => o.id === selectedEntity.id) || null;
   return findBuildingById(selectedEntity.id);
 }
 
@@ -710,19 +1194,23 @@ function updateInspectorPanel() {
   if (!obj) { selectedEntity = null; panel.classList.remove('open'); return; }
   panel.classList.add('open');
 
-  const typeLabel = selectedEntity.type === 'ore' ? 'Ore' : (STATE.buildingDefs[obj.defId] ? STATE.buildingDefs[obj.defId].name : 'Building');
+  const typeLabel = selectedEntity.type === 'ore' ? 'Ore' : (STATE.defs.buildingDefs[obj.defId] ? STATE.defs.buildingDefs[obj.defId].name : 'Building');
   title.textContent = `${typeLabel} — ${obj.id}`;
 
   if (selectedEntity.type === 'ore') {
     let activeEffects = [];
     if (obj.status) {
-      if (obj.status.flaming) activeEffects.push('🔥 Flaming (Explodes in 4s!)');
-      if (obj.status.radioactive) activeEffects.push('☢️ Radioactive (Hazardous!)');
-      if (obj.status.wet > 0) activeEffects.push(`💧 Wet (${Math.ceil(obj.status.wet)}s Fire Immunity)`);
-      if (obj.status.sparkling) activeEffects.push('✨ Sparkling (+0.5x Multiplier!)');
+      if (obj.status.flaming) activeEffects.push('🔥 Flaming');
+      if (obj.status.radioactive) activeEffects.push('☢️ Radioactive');
+      if (obj.status.wet > 0) activeEffects.push(`💧 Wet (${Math.ceil(obj.status.wet)}s)`);
+      if (obj.status.sparkling) activeEffects.push('✨ Sparkling');
+      if (obj.status.crystalline) activeEffects.push('💎 Crystalline');
+      if (obj.status.lucky) activeEffects.push('🍀 Lucky (2x Next Upgrade)');
+      if (obj.status.duplicated) activeEffects.push('👯 Duplicated');
+      if (obj.status.timeAged) activeEffects.push('⏳ Time-Aged');
     }
     const inspectData = {
-      id: obj.id, itemType: obj.itemType, value: `$${obj.value}`, energy: obj.energy || 0,
+      id: obj.id, itemType: obj.itemType, value: `$${obj.value.toLocaleString()}`,
       statusEffects: activeEffects.length ? activeEffects : ['Normal'],
       position: { x: Math.round(obj.x), y: Math.round(obj.y) }
     };
@@ -732,7 +1220,7 @@ function updateInspectorPanel() {
   }
 }
 
-// Simulation & Physics Engine
+// Particle & Physics Effects
 let lastFrameTime = performance.now();
 const particles = [];
 const explosions = [];
@@ -746,8 +1234,8 @@ function triggerExplosion(x, y, radius = 96) {
       life: 0.6, maxLife: 0.6, color: Math.random() > 0.4 ? '#ff4757' : '#ffa502', size: 3 + Math.random() * 5
     });
   }
-  for (let j = 0; j < STATE.world.ores.length; j++) {
-    const nearOre = STATE.world.ores[j];
+  for (let j = 0; j < STATE.run.ores.length; j++) {
+    const nearOre = STATE.run.ores[j];
     if (!nearOre) continue;
     const dx = nearOre.x - x, dy = nearOre.y - y;
     if (dx * dx + dy * dy <= radius * radius) nearOre.destroyed = true;
@@ -770,8 +1258,8 @@ function updateEffects(dt) {
 function update(now) {
   const rawDt = Math.min(0.05, (now - lastFrameTime) / 1000);
   lastFrameTime = now;
-  if (STATE.isPaused) return;
-  const dt = rawDt * (STATE.timeScale || 1.0);
+  if (STATE.run.isPaused) return;
+  const dt = rawDt * (STATE.run.timeScale || 1.0);
 
   updateProduction(dt);
   updateOrePhysics(dt);
@@ -781,10 +1269,10 @@ function update(now) {
 }
 
 function updateProduction(dt) {
-  for (const b of STATE.world.buildings) {
+  for (const b of STATE.run.buildings) {
     if (movingState && movingState.buildingId === b.id) continue;
-    const def = STATE.buildingDefs[b.defId];
-    if (!def.produces) continue;
+    const def = STATE.defs.buildingDefs[b.defId];
+    if (!def || !def.produces) continue;
 
     if (def.requiresFuel) {
       if ((b.fuelTimer || 0) > 0) {
@@ -806,17 +1294,17 @@ function updateProduction(dt) {
 }
 
 function spawnOreFromBuilding(building, def) {
-  if (STATE.world.ores.length >= STATE.config.maxOres) return;
+  if (STATE.run.ores.length >= STATE.config.maxOres) return;
   const fp = getFootprint(def, building.rot);
   const outPort = fp.ports.find(p => p.kind === 'output');
   if (!outPort) return;
-  const itemDef = STATE.itemDefs[def.produces.item] || STATE.itemDefs['ore'];
+  const itemDef = STATE.defs.itemDefs[def.produces.item] || STATE.defs.itemDefs['ore'];
   const cs = STATE.config.grid.cellSize;
 
   const portX = (building.col + outPort.dx + 0.5) * cs;
   const portY = (building.row + outPort.dy + 0.5) * cs;
 
-  STATE.world.ores.push({
+  STATE.run.ores.push({
     id: genId('ore'),
     itemType: itemDef.id,
     x: portX, y: portY,
@@ -846,19 +1334,18 @@ function updateOrePhysics(dt) {
   const worldH = STATE.config.grid.rows * cs;
   const cfg = STATE.config;
 
-  for (let i = STATE.world.ores.length - 1; i >= 0; i--) {
-    const ore = STATE.world.ores[i];
+  for (let i = STATE.run.ores.length - 1; i >= 0; i--) {
+    const ore = STATE.run.ores[i];
     if (!ore || ore.destroyed) continue;
 
     if (!ore.status) ore.status = {};
 
-    // 1. Wet Status
+    // 1. Status Timers & Reactions
     if (ore.status.wet > 0) {
       ore.status.wet = Math.max(0, ore.status.wet - dt);
       if (ore.status.flaming) { ore.status.flaming = false; ore.status.flameTime = 0; }
     }
 
-    // 2. Flaming Status
     if (ore.status.flaming) {
       if (ore.status.wet > 0) {
         ore.status.flaming = false;
@@ -879,24 +1366,10 @@ function updateOrePhysics(dt) {
       }
     }
 
-    // 3. Radioactive Status
-    if (ore.status.radioactive) {
-      if (Math.random() < 0.25) {
-        particles.push({
-          x: ore.x + (Math.random() - 0.5) * 10, y: ore.y + (Math.random() - 0.5) * 10,
-          vx: 0, vy: -12, life: 0.4, maxLife: 0.4, color: '#2ecc71', size: 3
-        });
-      }
-    }
-
-    // 4. Sparkling Status
-    if (ore.status.sparkling) {
-      if (Math.random() < 0.3) {
-        particles.push({
-          x: ore.x + (Math.random() - 0.5) * 8, y: ore.y + (Math.random() - 0.5) * 8,
-          vx: (Math.random() - 0.5) * 15, vy: (Math.random() - 0.5) * 15,
-          life: 0.35, maxLife: 0.35, color: '#ffcf5c', size: 3
-        });
+    if (ore.status.timeAged) {
+      ore.travelTime = (ore.travelTime || 0) + dt;
+      if (ore.travelTime <= 10) {
+        ore.value += Math.round(50 * dt);
       }
     }
 
@@ -909,7 +1382,7 @@ function updateOrePhysics(dt) {
       const b = transport.building;
       const def = transport.def;
 
-      // Fuel Extractor input port handling!
+      // Fuel Extractor input port handling
       if (def.requiresFuel && transport.port.kind === 'input' && ore.isFuel) {
         b.fuelTimer = (b.fuelTimer || 0) + (def.attributes.runDurationSec || 8);
         ore.destroyed = true;
@@ -917,36 +1390,52 @@ function updateOrePhysics(dt) {
         continue;
       }
 
-      if (def.riskChance && !ore.quantumChecked) {
-        ore.quantumChecked = true;
-        if (Math.random() < def.riskChance) {
-          ore.destroyed = true; triggerExplosion(ore.x, ore.y, 40); continue;
-        }
-      }
-
       if (!ore.upgradersPassed) ore.upgradersPassed = [];
       if (!ore.upgradersPassed.includes(b.id)) {
         ore.upgradersPassed.push(b.id);
+
         if (def.extinguishes) { ore.status.flaming = false; ore.status.flameTime = 0; ore.energy = 0; }
         if (def.appliesWet) { ore.status.wet = def.appliesWet; ore.status.flaming = false; }
         if (def.appliesFlaming && !ore.status.wet) { ore.status.flaming = true; ore.status.flameTime = 0; }
         if (def.removesRadioactive) { ore.status.radioactive = false; }
         if (def.appliesSparkling) { ore.status.sparkling = true; }
+        if (def.appliesCrystalline) { ore.status.crystalline = true; }
+        if (def.appliesLucky) { ore.status.lucky = true; }
+        if (def.nullifiesBadStatuses) {
+          ore.status.flaming = false;
+          ore.status.radioactive = false;
+        }
 
+        // Multiplier & Lucky Calculation
         let effectiveMulti = def.multiplier || 1.0;
         if (def.multiplier && ore.status.sparkling) effectiveMulti += 0.5;
+        if (def.multiplier && ore.status.crystalline) effectiveMulti += 0.75;
+        if (def.multiplier && def.sparklingSynergy && ore.status.sparkling) effectiveMulti *= 1.5;
+
+        if (ore.status.lucky && def.multiplier) {
+          effectiveMulti *= 2.0;
+          ore.status.lucky = false; // Consumed lucky
+        }
+
         if (def.multiplier) { ore.value = Math.round(ore.value * effectiveMulti); ore.upgraded = true; }
         if (def.flatAdd) { ore.value += def.flatAdd; ore.upgraded = true; }
-        if (def.isDiminishing) {
-          const passCount = ore.upgradersPassed.filter(id => id === b.id).length;
-          const multi = passCount === 1 ? 3.0 : (passCount === 2 ? 1.8 : (passCount === 3 ? 1.2 : 1.05));
-          ore.value = Math.round(ore.value * multi); ore.upgraded = true;
-        }
-        if (def.energyCost) ore.energy = (ore.energy || 0) + def.energyCost;
-        if (def.cooldownEnergy) ore.energy = Math.max(0, (ore.energy || 0) - def.cooldownEnergy);
 
-        if (ore.energy > (ore.maxEnergy || 100)) {
-          ore.destroyed = true; triggerExplosion(ore.x, ore.y, 110); continue;
+        // Matter Replicator Duplication
+        if (def.duplicatesOre && !ore.status.duplicated && STATE.run.ores.length < STATE.config.maxOres) {
+          ore.status.duplicated = true;
+          STATE.run.ores.push({
+            id: genId('ore'),
+            itemType: ore.itemType,
+            x: ore.x + 12, y: ore.y + 12,
+            vx: ore.vx * 0.8, vy: ore.vy * 0.8,
+            size: ore.size,
+            color: ore.color,
+            shape: ore.shape,
+            value: ore.value,
+            energy: ore.energy,
+            status: { ...ore.status, duplicated: true },
+            upgradersPassed: [...ore.upgradersPassed]
+          });
         }
       }
 
@@ -969,7 +1458,7 @@ function updateOrePhysics(dt) {
       }
 
       const dv = dirVector(currentDropSide !== null && currentDropSide !== undefined ? currentDropSide : b.rot);
-      const speed = def.speed || 0;
+      const speed = def.speed || 90;
       targetVx = dv.x * speed; targetVy = dv.y * speed;
       blend = 1 - Math.exp(-cfg.beltAcceleration * dt);
     } else {
@@ -991,17 +1480,18 @@ function updateOrePhysics(dt) {
     if (ore.y > worldH - r) { ore.y = worldH - r; ore.vy = Math.min(0, ore.vy); }
   }
 
-  STATE.world.ores = STATE.world.ores.filter(o => !o.destroyed);
+  STATE.run.ores = STATE.run.ores.filter(o => !o.destroyed);
   if (selectedEntity && selectedEntity.type === 'ore') {
-    if (!STATE.world.ores.some(o => o.id === selectedEntity.id)) selectedEntity = null;
+    if (!STATE.run.ores.some(o => o.id === selectedEntity.id)) selectedEntity = null;
   }
 }
 
 function resolveOreCollisions() {
-  const list = STATE.world.ores;
+  const list = STATE.run.ores;
   for (let i = 0; i < list.length; i++) {
     for (let j = i + 1; j < list.length; j++) {
       const a = list[i], b = list[j];
+      if (!a || !b) continue;
       const dx = b.x - a.x, dy = b.y - a.y;
       const distSq = dx * dx + dy * dy;
       const minDist = (a.size + b.size) / 2;
@@ -1018,7 +1508,7 @@ function resolveOreCollisions() {
 
 function processConsumption() {
   const cs = STATE.config.grid.cellSize;
-  for (const ore of STATE.world.ores) {
+  for (const ore of STATE.run.ores) {
     if (ore.destroyed) continue;
     const cell = worldToCell(ore.x, ore.y);
     const occupants = getCellOccupants(cell.col, cell.row);
@@ -1026,13 +1516,22 @@ function processConsumption() {
     if (sellerAcc) {
       let soldVal = ore.value;
       if (sellerAcc.def.sellerBonus) soldVal = Math.round(soldVal * sellerAcc.def.sellerBonus);
-      STATE.world.money += soldVal;
+      if (sellerAcc.def.radioactiveBonus && ore.status && ore.status.radioactive) {
+        soldVal = Math.round(soldVal * sellerAcc.def.radioactiveBonus);
+      }
+      if (sellerAcc.def.penaltyRisk && Math.random() < sellerAcc.def.penaltyRisk) {
+        soldVal = 0; // Soul Forge penalty reset
+        showToast('Soul Forge destroyed an ore!');
+      }
+
+      STATE.run.money += soldVal;
+      STATE.run.lifetimeEarnings += soldVal;
       ore.destroyed = true;
     }
   }
 }
 
-// Rendering System
+// Rendering Pipeline
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawGrid();
@@ -1068,7 +1567,7 @@ function drawGrid() {
 function currentGhost() {
   if (mode === 'placing' && placingState) {
     const world = screenToWorld(mouseScreen.x, mouseScreen.y);
-    const def = STATE.buildingDefs[placingState.defId];
+    const def = STATE.defs.buildingDefs[placingState.defId];
     if (!def) return null;
     const fp = getFootprint(def, placingState.rot);
     const raw = worldToCell(world.x, world.y);
@@ -1079,7 +1578,7 @@ function currentGhost() {
     const building = findBuildingById(movingState.buildingId);
     if (!building) return null;
     const world = screenToWorld(mouseScreen.x, mouseScreen.y);
-    const def = STATE.buildingDefs[building.defId];
+    const def = STATE.defs.buildingDefs[building.defId];
     if (!def) return null;
     const fp = getFootprint(def, movingState.rot);
     const raw = worldToCell(world.x, world.y);
@@ -1103,22 +1602,6 @@ function drawSelectionGlowAndGizmo(p1, p2, rot = 0) {
   ctx.setLineDash([6, 4]);
   ctx.strokeRect(gx1, gy1, gw, gh);
   ctx.setLineDash([]);
-
-  const cx = (p1.x + p2.x) / 2, cy = (p1.y + p2.y) / 2;
-  const arrowDist = 18 * STATE.camera.zoom;
-  const arrows = [
-    { dir: 0, x: p2.x + arrowDist, y: cy, char: '▶' },
-    { dir: 1, x: cx, y: p2.y + arrowDist, char: '▼' },
-    { dir: 2, x: p1.x - arrowDist, y: cy, char: '◀' },
-    { dir: 3, x: cx, y: p1.y - arrowDist, char: '▲' }
-  ];
-
-  ctx.font = `bold ${Math.max(12, 14 * STATE.camera.zoom)}px system-ui`;
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  arrows.forEach(arr => {
-    ctx.fillStyle = arr.dir === rot ? '#ff9f6b' : 'rgba(255,255,255,0.4)';
-    ctx.fillText(arr.char, arr.x, arr.y);
-  });
   ctx.restore();
 }
 
@@ -1168,8 +1651,9 @@ function drawPorts(fp, col, row) {
 
 function drawBuildings() {
   const cs = STATE.config.grid.cellSize;
-  for (const b of STATE.world.buildings) {
-    const def = STATE.buildingDefs[b.defId];
+  for (const b of STATE.run.buildings) {
+    const def = STATE.defs.buildingDefs[b.defId];
+    if (!def) continue;
     const fp = getFootprint(def, b.rot);
     const p1 = worldToScreen(b.col * cs, b.row * cs);
     const p2 = worldToScreen((b.col + fp.w) * cs, (b.row + fp.h) * cs);
@@ -1178,24 +1662,10 @@ function drawBuildings() {
     ctx.save();
     if (isSelected) drawSelectionGlowAndGizmo(p1, p2, b.rot);
 
-    if (def.isHalfBelt) {
-      ctx.fillStyle = '#1e293b'; ctx.fillRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
-      ctx.fillStyle = def.color;
-      if (b.rot % 2 === 0) {
-        const h = (p2.y - p1.y) * 0.5; ctx.fillRect(p1.x, p1.y + h * 0.5, p2.x - p1.x, h);
-      } else {
-        const w = (p2.x - p1.x) * 0.5; ctx.fillRect(p1.x + w * 0.5, p1.y, w, p2.y - p1.y);
-      }
-    } else {
-      ctx.fillStyle = def.color; ctx.fillRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
-    }
-
+    ctx.fillStyle = def.color; ctx.fillRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
     ctx.strokeStyle = isSelected ? '#7fd0ff' : 'rgba(0,0,0,0.5)';
     ctx.lineWidth = isSelected ? 3 : 2;
     ctx.strokeRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
-
-    if (b.walls) drawBeltWalls(b, p1, p2);
-    if (def.category === 'upgrader') drawUpgraderGuideWalls(b, p1, p2);
 
     drawPorts(fp, b.col, b.row);
 
@@ -1209,31 +1679,9 @@ function drawBuildings() {
   }
 }
 
-function drawUpgraderGuideWalls(b, p1, p2) {
-  const wallThick = Math.max(3, 5 * STATE.camera.zoom);
-  ctx.fillStyle = '#334155'; ctx.strokeStyle = '#64748b'; ctx.lineWidth = 1.5;
-  if (b.rot % 2 === 0) {
-    ctx.fillRect(p1.x, p1.y, p2.x - p1.x, wallThick); ctx.strokeRect(p1.x, p1.y, p2.x - p1.x, wallThick);
-    ctx.fillRect(p1.x, p2.y - wallThick, p2.x - p1.x, wallThick); ctx.strokeRect(p1.x, p2.y - wallThick, p2.x - p1.x, wallThick);
-  } else {
-    ctx.fillRect(p1.x, p1.y, wallThick, p2.y - p1.y); ctx.strokeRect(p1.x, p1.y, wallThick, p2.y - p1.y);
-    ctx.fillRect(p2.x - wallThick, p1.y, wallThick, p2.y - p1.y); ctx.strokeRect(p2.x - wallThick, p1.y, wallThick, p2.y - p1.y);
-  }
-}
-
-function drawBeltWalls(b, p1, p2) {
-  if (!b.walls) return;
-  const wallThick = Math.max(3, 4 * STATE.camera.zoom);
-  ctx.fillStyle = '#1e293b'; ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1;
-  if (b.walls[0]) { ctx.fillRect(p2.x - wallThick, p1.y, wallThick, p2.y - p1.y); ctx.strokeRect(p2.x - wallThick, p1.y, wallThick, p2.y - p1.y); }
-  if (b.walls[1]) { ctx.fillRect(p1.x, p2.y - wallThick, p2.x - p1.x, wallThick); ctx.strokeRect(p1.x, p2.y - wallThick, p2.x - p1.x, wallThick); }
-  if (b.walls[2]) { ctx.fillRect(p1.x, p1.y, wallThick, p2.y - p1.y); ctx.strokeRect(p1.x, p1.y, wallThick, p2.y - p1.y); }
-  if (b.walls[3]) { ctx.fillRect(p1.x, p1.y, p2.x - p1.x, wallThick); ctx.strokeRect(p1.x, p1.y, p2.x - p1.x, wallThick); }
-}
-
 function drawOres() {
   const lifespan = STATE.config.oreGroundLifespan;
-  for (const o of STATE.world.ores) {
+  for (const o of STATE.run.ores) {
     const s = worldToScreen(o.x, o.y);
     const r = (o.size / 2) * STATE.camera.zoom;
     const isSelected = selectedEntity && selectedEntity.type === 'ore' && selectedEntity.id === o.id;
@@ -1246,21 +1694,6 @@ function drawOres() {
 
     ctx.save();
     ctx.globalAlpha = alpha;
-
-    if (o.status) {
-      if (o.status.flaming) { ctx.shadowColor = '#ff4757'; ctx.shadowBlur = 18 * STATE.camera.zoom; }
-      else if (o.status.radioactive) { ctx.shadowColor = '#2ecc71'; ctx.shadowBlur = 16 * STATE.camera.zoom; }
-      else if (o.status.sparkling) { ctx.shadowColor = '#ffcf5c'; ctx.shadowBlur = 14 * STATE.camera.zoom; }
-      else if (o.status.wet > 0) { ctx.shadowColor = '#38bdf8'; ctx.shadowBlur = 12 * STATE.camera.zoom; }
-      else if (o.energy && o.energy > 0) {
-        const energyRatio = Math.min(1.0, o.energy / (o.maxEnergy || 100));
-        ctx.shadowColor = energyRatio > 0.7 ? '#ff0055' : '#ffa502';
-        ctx.shadowBlur = (8 + energyRatio * 16) * STATE.camera.zoom;
-      } else if (o.upgraded) {
-        ctx.shadowColor = o.color || '#ffcf5c'; ctx.shadowBlur = 10 * STATE.camera.zoom;
-      }
-    }
-
     ctx.fillStyle = o.color;
     ctx.beginPath();
 
@@ -1302,14 +1735,16 @@ function drawEffects() {
 function drawHUD() {
   const hud = document.getElementById('hud');
   if (!hud) return;
-  const money = `$${(STATE.world.money || 0).toLocaleString()}`;
-  const bldgCount = STATE.world.buildings.length;
-  const oreCount = STATE.world.ores.length;
-  let hudText = `Cash: ${money}  |  Buildings: ${bldgCount}  |  Active Ores: ${oreCount}/${STATE.config.maxOres}\n[Controls] Click+Drag: Pan | Scroll: Zoom | E: Inventory | R: Rotate | 1-6: Hotbar`;
+  const money = `$${(STATE.run.money || 0).toLocaleString()}`;
+  const lifetime = `$${(STATE.run.lifetimeEarnings || 0).toLocaleString()}`;
+  const bldgCount = STATE.run.buildings.length;
+  const oreCount = STATE.run.ores.length;
+  let hudText = `Cash: ${money}  |  Lifetime: ${lifetime}\nPoints: 🌟 ${STATE.meta.prestigePoints} | Keys: 🔑 ${STATE.meta.prestigeKeys} | Shards: 💎 ${STATE.meta.shards} | Dust: 🌌 ${STATE.meta.prestigeDust}\nBuildings: ${bldgCount}  |  Active Ores: ${oreCount}/${STATE.config.maxOres}\n[Controls] Click+Drag: Pan | Scroll: Zoom | E: Shop/Inv | R: Rotate | 1-6: Hotbar`;
 
   if (mode === 'placing' && placingState) {
-    const def = STATE.buildingDefs[placingState.defId];
-    hudText += `\nPLACING: ${def ? def.name : ''} ($${def ? def.cost : 0}) [R: Rotate | Esc: Cancel]`;
+    const def = STATE.defs.buildingDefs[placingState.defId];
+    const qty = getInventoryQty(placingState.defId);
+    hudText += `\nPLACING: ${def ? def.name : ''} (Owned: ${qty}) [R: Rotate | Esc: Cancel]`;
   } else if (mode === 'moving') {
     hudText += `\nMOVING BUILDING [R: Rotate | Esc: Cancel]`;
   }
@@ -1324,9 +1759,9 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-// Periodic live saving every 5 seconds
+// Periodic live save
 setInterval(triggerSaveState, 5000);
 
-// Main Game Loop
+// Main Animation Loop
 function loop(now) { update(now); draw(); requestAnimationFrame(loop); }
 requestAnimationFrame(loop);
