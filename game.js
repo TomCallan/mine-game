@@ -1072,6 +1072,10 @@ function handleClickAction(screenX, screenY) {
 }
 
 canvas.addEventListener('mousedown', (e) => {
+  if (e.button === 2 && mode !== 'idle') {
+    cancelMode();
+    return;
+  }
   if (e.button !== 0) return;
   if (typeof closeContextMenu === 'function') closeContextMenu();
   const world = screenToWorld(e.clientX, e.clientY);
@@ -1252,14 +1256,24 @@ function updateInspectorPanel() {
       if (obj.status.duplicated) activeEffects.push('👯 Duplicated');
       if (obj.status.timeAged) activeEffects.push('⏳ Time-Aged');
     }
-    const inspectData = {
-      id: obj.id, itemType: obj.itemType, value: `$${obj.value.toLocaleString()}`,
-      statusEffects: activeEffects.length ? activeEffects : ['Normal'],
-      position: { x: Math.round(obj.x), y: Math.round(obj.y) }
-    };
-    body.textContent = JSON.stringify(inspectData, null, 2);
+    body.innerHTML = `
+      <div style="margin-bottom:8px;"><strong>ID:</strong> ${obj.id}</div>
+      <div style="margin-bottom:8px;"><strong>Type:</strong> ${obj.itemType}</div>
+      <div style="margin-bottom:8px;"><strong>Value:</strong> $${obj.value.toLocaleString()}</div>
+      <div style="margin-bottom:8px;"><strong>Effects:</strong> ${activeEffects.length ? activeEffects.join(', ') : 'Normal'}</div>
+      <div style="margin-bottom:8px;"><strong>Pos:</strong> (${Math.round(obj.x)}, ${Math.round(obj.y)})</div>
+      <div style="margin-bottom:8px;"><strong>Age:</strong> ${obj.age ? obj.age.toFixed(1) + 's' : '0s'}</div>
+    `;
   } else {
-    body.textContent = JSON.stringify(obj, null, 2);
+    const def = STATE.defs.buildingDefs[obj.defId];
+    body.innerHTML = `
+      <div style="margin-bottom:8px;"><strong>Name:</strong> ${def ? def.name : obj.defId}</div>
+      <div style="margin-bottom:8px;"><strong>Category:</strong> ${def ? def.category : 'N/A'}</div>
+      <div style="margin-bottom:8px;"><strong>ID:</strong> ${obj.id}</div>
+      <div style="margin-bottom:8px;"><strong>Pos:</strong> (${obj.x}, ${obj.y})</div>
+      <div style="margin-bottom:8px;"><strong>Rotation:</strong> ${obj.rot * 90}°</div>
+      ${obj.fuelTimer ? `<div style="margin-bottom:8px;"><strong>Fuel Remaining:</strong> ${Math.ceil(obj.fuelTimer)}s</div>` : ''}
+    `;
   }
 }
 

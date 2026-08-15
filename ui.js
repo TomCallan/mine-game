@@ -21,12 +21,37 @@ function openContextMenu(building, screenX, screenY) {
   document.getElementById('ctxSub').textContent = `${def.category.toUpperCase()} • ${fp.w}x${fp.h} Tile • ${def.rarity ? def.rarity.toUpperCase() : 'COMMON'}`;
   document.getElementById('ctxSwatch').style.background = def.color;
 
-  let stats = `Speed: ${def.speed || 'N/A'}`;
-  if (def.multiplier) stats += ` | ${def.multiplier}x Multiplier`;
-  if (def.flatAdd) stats += ` | +$${def.flatAdd} Flat`;
-  if (def.category === 'upgrader') stats += ` | Integrated Guide Walls`;
-  if (building.fuelTimer) stats += ` | Fuel Active: ${Math.ceil(building.fuelTimer)}s`;
-  document.getElementById('ctxStats').textContent = stats;
+  let stats = [];
+  if (def.category === 'extractor') {
+    stats.push(`Produces: ${def.produces ? def.produces.item : 'N/A'}`);
+    if (def.attributes?.spawnRateMs) stats.push(`Rate: ${def.attributes.spawnRateMs}ms`);
+    if (building.fuelTimer) stats.push(`Fuel: ${Math.ceil(building.fuelTimer)}s`);
+  } else if (def.category === 'upgrader') {
+    if (def.multiplier) stats.push(`Multiplier: ${def.multiplier}x`);
+    if (def.flatAdd) stats.push(`Bonus: +$${def.flatAdd}`);
+    if (def.energyCost) stats.push(`Energy: ${def.energyCost}`);
+  } else if (def.category === 'seller') {
+    if (def.sellerBonus) stats.push(`Bonus: ${def.sellerBonus}x`);
+  } else if (def.category === 'belt') {
+    stats.push(`Speed: ${def.speed || 'N/A'}`);
+  }
+  document.getElementById('ctxStats').textContent = stats.join(' | ');
+
+  const actionsContainer = document.querySelector('.ctx-actions');
+  let fuelBtn = document.getElementById('ctxBtnFuel');
+  if (def.requiresFuel) {
+    if (!fuelBtn) {
+      fuelBtn = document.createElement('button');
+      fuelBtn.className = 'ctx-btn';
+      fuelBtn.id = 'ctxBtnFuel';
+      actionsContainer.insertBefore(fuelBtn, actionsContainer.firstChild);
+    }
+    const pct = building.fuelTimer ? Math.min(100, Math.round((building.fuelTimer / def.attributes.runDurationSec) * 100)) : 0;
+    fuelBtn.textContent = `Fuel: ${pct}%`;
+    fuelBtn.style.background = `linear-gradient(90deg, rgba(232,160,48,0.2) ${pct}%, transparent ${pct}%)`;
+  } else if (fuelBtn) {
+    fuelBtn.remove();
+  }
 
   const wallsSection = document.getElementById('ctxWallsSection');
   if (def.category === 'belt') {
@@ -43,8 +68,9 @@ function openContextMenu(building, screenX, screenY) {
     wallsSection.style.display = 'none';
   }
 
-  const menuW = 250, menuH = 260;
-  let posX = Math.min(window.innerWidth - menuW - 16, Math.max(16, screenX + 12));
+  const menuW = 260, menuH = 300;
+  let posX = screenX + 16;
+  if (posX + menuW > window.innerWidth) posX = screenX - menuW - 16;
   let posY = Math.min(window.innerHeight - menuH - 16, Math.max(16, screenY - 40));
   menu.style.left = posX + 'px';
   menu.style.top = posY + 'px';
@@ -59,6 +85,14 @@ function closeContextMenu() {
 
 function initContextMenuListeners() {
   document.getElementById('closeCtxBtn')?.addEventListener('click', closeContextMenu);
+  canvas.addEventListener('mousedown', (e) => {
+    if (e.button === 0 && document.getElementById('contextMenu')?.classList.contains('open')) {
+      const rect = document.getElementById('contextMenu').getBoundingClientRect();
+      if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
+        closeContextMenu();
+      }
+    }
+  });
 
   document.getElementById('ctxBtnRotate')?.addEventListener('click', () => {
     if (activeContextBuilding) {
@@ -225,7 +259,7 @@ function renderInventoryGrid() {
   // --- TAB 1: SHOP TAB ---
   if (currentMainTab === 'shop') {
     Object.values(STATE.defs.buildingDefs).forEach(def => {
-      if (def.crateOnly) return; // Crate-exclusive items do not sell in shop directly
+      if (def.crateOnly && !STATE.meta.blueprintUnlocks[def.id]) return;
       if (currentCategory !== 'all' && def.category !== currentCategory) return;
       if (search && !def.name.toLowerCase().includes(search) && !def.id.toLowerCase().includes(search)) return;
 
@@ -246,6 +280,7 @@ function renderInventoryGrid() {
       top.appendChild(swatch);
 
       const titleBox = document.createElement('div');
+      titleBox.className = 'inv-card-info';
       const title = document.createElement('div');
       title.className = 'inv-card-title';
       title.textContent = isUnlocked ? def.name : `Locked Blueprint: ${def.name}`;
@@ -269,21 +304,37 @@ function renderInventoryGrid() {
 
       const priceTag = document.createElement('div');
       priceTag.className = 'inv-card-price';
-      priceTag.textContent = `Cost: $${price.toLocaleString()}`;
+      priceTag.textContent = isUnlocked ? `1x: $${price.toLocaleString()} | 10x: $${(price*10).toLocaleString()} | 100x: $${(price*100).toLocaleString()}` : `Cost: $${price.toLocaleString()}`;
       card.appendChild(priceTag);
 
-      const buyBtn = document.createElement('button');
-      buyBtn.className = `inv-card-place-btn ${isUnlocked ? '' : 'locked-btn'}`;
-      buyBtn.textContent = isUnlocked ? `Buy 1x ($${price.toLocaleString()})` : 'Blueprint Locked';
-      buyBtn.disabled = !isUnlocked || STATE.run.money < price;
+      if (!isUnlocked) {
+        const lockedBtn = document.createElement('button');
+        lockedBtn.className = 'inv-card-place-btn locked-btn';
+        lockedBtn.textContent = 'Blueprint Locked';
+        lockedBtn.disabled = true;
+        card.appendChild(lockedBtn);
+      } else {
+        const batchRow = document.createElement('div');
+        batchRow.className = 'buy-batch-row';
+        batchRow.style.display = 'flex';
+        batchRow.style.gap = '4px';
 
-      buyBtn.addEventListener('click', () => {
-        if (buyShopItem(def.id, 1)) {
-          renderInventoryGrid();
-          renderHotbar();
-        }
-      });
-      card.appendChild(buyBtn);
+        [1, 10, 100].forEach(qty => {
+          const btn = document.createElement('button');
+          btn.className = 'inv-card-place-btn buy-batch-btn';
+          btn.style.flex = '1';
+          btn.textContent = `${qty}x`;
+          btn.disabled = STATE.run.money < (price * qty);
+          btn.addEventListener('click', () => {
+            if (buyShopItem(def.id, qty)) {
+              renderInventoryGrid();
+              renderHotbar();
+            }
+          });
+          batchRow.appendChild(btn);
+        });
+        card.appendChild(batchRow);
+      }
       grid.appendChild(card);
     });
   }
@@ -324,6 +375,7 @@ function renderInventoryGrid() {
       top.appendChild(swatch);
 
       const titleBox = document.createElement('div');
+      titleBox.className = 'inv-card-info';
       const title = document.createElement('div');
       title.className = 'inv-card-title';
       title.textContent = def.name;
