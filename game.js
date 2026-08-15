@@ -838,18 +838,51 @@ function worldToCell(wx, wy, defId) {
 }
 
 let toastTimer = null;
-function showToast(msg) {
+function showToast(msg, type = 'info') {
   let toast = document.getElementById('gameToast');
   if (!toast) {
     toast = document.createElement('div');
     toast.id = 'gameToast';
-    toast.style.cssText = 'position:fixed; top:20px; left:50%; transform:translateX(-50%); background:#ef476f; color:#fff; font-weight:800; padding:10px 20px; border-radius:8px; z-index:200; box-shadow:0 6px 20px rgba(0,0,0,0.5); font-size:13px; font-family:system-ui;';
+    toast.style.cssText = [
+      'position:fixed',
+      'top:20px',
+      'left:50%',
+      'transform:translateX(-50%) translateY(-4px)',
+      'color:#fff',
+      'font-weight:700',
+      'padding:9px 18px',
+      'border-radius:10px',
+      'z-index:200',
+      'box-shadow:0 6px 24px rgba(0,0,0,0.6)',
+      'font-size:12px',
+      'font-family:Inter,system-ui,sans-serif',
+      'border:1px solid rgba(255,255,255,0.15)',
+      'backdrop-filter:blur(8px)',
+      'letter-spacing:0.01em',
+      'pointer-events:none',
+      'transition:opacity 0.2s,transform 0.2s',
+    ].join(';');
     document.body.appendChild(toast);
   }
+  const colors = {
+    info:    { bg: 'rgba(30,50,80,0.92)', border: 'rgba(59,130,246,0.4)' },
+    success: { bg: 'rgba(20,60,40,0.92)', border: 'rgba(34,197,94,0.4)' },
+    warn:    { bg: 'rgba(80,50,20,0.92)', border: 'rgba(245,158,11,0.4)' },
+    error:   { bg: 'rgba(80,20,20,0.92)', border: 'rgba(239,68,68,0.4)' },
+  };
+  const c = colors[type] || colors.info;
+  toast.style.background = c.bg;
+  toast.style.borderColor = c.border;
   toast.textContent = msg;
+  toast.style.opacity = '1';
   toast.style.display = 'block';
+  toast.style.transform = 'translateX(-50%) translateY(0)';
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { toast.style.display = 'none'; }, 2200);
+  toastTimer = setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(-50%) translateY(-4px)';
+    setTimeout(() => { toast.style.display = 'none'; }, 200);
+  }, 2400);
 }
 
 function getCellOccupants(col, row, excludeId) {
@@ -912,19 +945,28 @@ function findBuildingById(id) {
 }
 
 // Building Placement & Demolition with Inventory Integration
+// Flash feedback for placement
+let placementFlash = null;
+function triggerPlacementFlash(col, row, fp, success) {
+  placementFlash = { col, row, w: fp.w, h: fp.h, success, alpha: 0.7, timer: 0 };
+}
+
 function tryPlaceBuilding(defId, col, row, rot) {
   const def = STATE.defs.buildingDefs[defId];
   if (!def) return false;
   if (!STATE.meta.blueprintUnlocks[defId]) {
-    showToast(`${def.name} blueprint is locked.`);
+    showToast(`${def.name} blueprint is locked.`, 'error');
     return false;
   }
   if (!canPlaceFromInventory(defId)) {
-    showToast(`No ${def.name} available in inventory! Buy from Shop.`);
+    showToast(`No ${def.name} in inventory — buy from Shop.`, 'warn');
     return false;
   }
   const fp = getFootprint(def, rot);
-  if (wouldOverlapAt(defId, col, row, fp.w, fp.h, null)) return false;
+  if (wouldOverlapAt(defId, col, row, fp.w, fp.h, null)) {
+    triggerPlacementFlash(col, row, fp, false);
+    return false;
+  }
 
   removeFromInventory(defId, 1);
   STATE.run.buildings.push({
@@ -932,6 +974,7 @@ function tryPlaceBuilding(defId, col, row, rot) {
     fuelTimer: 0,
     lastProduced: performance.now()
   });
+  triggerPlacementFlash(col, row, fp, true);
   triggerSaveState();
   if (typeof renderInventoryGrid === 'function') renderInventoryGrid();
   if (typeof renderHotbar === 'function') renderHotbar();
@@ -1535,31 +1578,54 @@ function processConsumption() {
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawGrid();
+  drawBeltPaths();
   drawBuildings();
   drawOres();
   drawGhostPreview();
+  drawBeltDragPreview();
+  drawPlacementFlash();
   drawEffects();
-  drawHUD();
+  updateHUD();
 }
 
 function drawGrid() {
   const grid = STATE.config.grid;
   const cs = grid.cellSize;
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  const zoom = STATE.camera.zoom;
+
+  // Only draw grid lines when zoomed in enough
+  if (zoom > 0.3) {
+    ctx.strokeStyle = `rgba(255,255,255,${Math.min(0.07, 0.07 * zoom)})`;
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    for (let col = 0; col <= grid.cols; col++) {
+      const sx = worldToScreen(col * cs, 0).x;
+      ctx.moveTo(sx, 0); ctx.lineTo(sx, canvas.height);
+    }
+    for (let row = 0; row <= grid.rows; row++) {
+      const sy = worldToScreen(0, row * cs).y;
+      ctx.moveTo(0, sy); ctx.lineTo(canvas.width, sy);
+    }
+    ctx.stroke();
+  }
+
+  // Chunked grid lines at every 4 cells for orientation
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  for (let col = 0; col <= grid.cols; col++) {
+  for (let col = 0; col <= grid.cols; col += 4) {
     const sx = worldToScreen(col * cs, 0).x;
     ctx.moveTo(sx, 0); ctx.lineTo(sx, canvas.height);
   }
-  for (let row = 0; row <= grid.rows; row++) {
+  for (let row = 0; row <= grid.rows; row += 4) {
     const sy = worldToScreen(0, row * cs).y;
     ctx.moveTo(0, sy); ctx.lineTo(canvas.width, sy);
   }
   ctx.stroke();
 
-  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-  ctx.lineWidth = 2;
+  // World boundary
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+  ctx.lineWidth = 1.5;
   const p1 = worldToScreen(0, 0), p2 = worldToScreen(grid.cols * cs, grid.rows * cs);
   ctx.strokeRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
 }
@@ -1649,41 +1715,203 @@ function drawPorts(fp, col, row) {
   }
 }
 
-function drawBuildings() {
+// Belt conveyor animation tick (0..1)
+let beltAnimTick = 0;
+
+function drawBeltPaths() {
+  // Draw directional arrows on belt cells
   const cs = STATE.config.grid.cellSize;
+  const zoom = STATE.camera.zoom;
+  if (zoom < 0.35) return;
+
   for (const b of STATE.run.buildings) {
     const def = STATE.defs.buildingDefs[b.defId];
-    if (!def) continue;
+    if (!def || def.layer !== 'belt') continue;
     const fp = getFootprint(def, b.rot);
     const p1 = worldToScreen(b.col * cs, b.row * cs);
     const p2 = worldToScreen((b.col + fp.w) * cs, (b.row + fp.h) * cs);
-    const isSelected = selectedEntity && selectedEntity.type === 'building' && selectedEntity.id === b.id;
+    const cx = (p1.x + p2.x) / 2, cy = (p1.y + p2.y) / 2;
+    const port = fp.ports[0];
+    if (!port || port.dropSide === null || port.dropSide === undefined) continue;
+
+    // Draw animated stripe
+    const side = port.dropSide;
+    const stripeSpacing = 14 * zoom;
+    const stripeOffset = (beltAnimTick * stripeSpacing) % stripeSpacing;
 
     ctx.save();
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = def.color;
+    ctx.fillRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
+    ctx.globalAlpha = 0.7;
+    ctx.restore();
+
+    // Small direction arrow in center
+    if (zoom > 0.5) {
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = def.color;
+      ctx.beginPath();
+      const aw = 5 * zoom, ah = 7 * zoom;
+      if (side === 0) { ctx.moveTo(cx - aw, cy - ah/2); ctx.lineTo(cx + aw, cy); ctx.lineTo(cx - aw, cy + ah/2); }
+      else if (side === 1) { ctx.moveTo(cx - ah/2, cy - aw); ctx.lineTo(cx, cy + aw); ctx.lineTo(cx + ah/2, cy - aw); }
+      else if (side === 2) { ctx.moveTo(cx + aw, cy - ah/2); ctx.lineTo(cx - aw, cy); ctx.lineTo(cx + aw, cy + ah/2); }
+      else { ctx.moveTo(cx - ah/2, cy + aw); ctx.lineTo(cx, cy - aw); ctx.lineTo(cx + ah/2, cy + aw); }
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+  }
+}
+
+const CATEGORY_ICONS = {
+  extractor: (cx, cy, s, col) => {
+    ctx.strokeStyle = col; ctx.lineWidth = s * 0.08;
+    ctx.beginPath();
+    ctx.moveTo(cx - s*0.3, cy); ctx.lineTo(cx + s*0.3, cy);
+    ctx.moveTo(cx + s*0.3, cy); ctx.lineTo(cx + s*0.1, cy - s*0.2);
+    ctx.moveTo(cx + s*0.3, cy); ctx.lineTo(cx + s*0.1, cy + s*0.2);
+    ctx.moveTo(cx, cy - s*0.35); ctx.lineTo(cx, cy + s*0.35);
+    ctx.stroke();
+  },
+  upgrader: (cx, cy, s, col) => {
+    ctx.strokeStyle = col; ctx.lineWidth = s * 0.08;
+    ctx.beginPath();
+    ctx.moveTo(cx - s*0.25, cy + s*0.2); ctx.lineTo(cx, cy - s*0.25); ctx.lineTo(cx + s*0.25, cy + s*0.2);
+    ctx.stroke();
+  },
+  seller: (cx, cy, s, col) => {
+    ctx.strokeStyle = col; ctx.lineWidth = s * 0.08;
+    ctx.beginPath(); ctx.arc(cx, cy, s * 0.3, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - s*0.15, cy); ctx.lineTo(cx + s*0.15, cy);
+    ctx.moveTo(cx, cy - s*0.15); ctx.lineTo(cx, cy + s*0.15);
+    ctx.stroke();
+  }
+};
+
+function drawBuildings() {
+  const cs = STATE.config.grid.cellSize;
+  const zoom = STATE.camera.zoom;
+
+  for (const b of STATE.run.buildings) {
+    const def = STATE.defs.buildingDefs[b.defId];
+    if (!def) continue;
+    if (def.layer === 'belt') continue; // drawn by drawBeltPaths, below we draw machines
+    const fp = getFootprint(def, b.rot);
+    const p1 = worldToScreen(b.col * cs, b.row * cs);
+    const p2 = worldToScreen((b.col + fp.w) * cs, (b.row + fp.h) * cs);
+    const w = p2.x - p1.x, h = p2.y - p1.y;
+    const isSelected = selectedEntity && selectedEntity.type === 'building' && selectedEntity.id === b.id;
+    const isMoving = movingState && movingState.buildingId === b.id;
+
+    ctx.save();
+    if (isMoving) { ctx.globalAlpha = 0.45; }
     if (isSelected) drawSelectionGlowAndGizmo(p1, p2, b.rot);
 
-    ctx.fillStyle = def.color; ctx.fillRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
-    ctx.strokeStyle = isSelected ? '#7fd0ff' : 'rgba(0,0,0,0.5)';
-    ctx.lineWidth = isSelected ? 3 : 2;
-    ctx.strokeRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
+    // Base fill with gradient for depth
+    const grad = ctx.createLinearGradient(p1.x, p1.y, p1.x, p2.y);
+    const baseCol = hexToRgba(def.color, 1);
+    const lightCol = hexShift(def.color, 30);
+    const darkCol  = hexShift(def.color, -30);
+    grad.addColorStop(0, lightCol);
+    grad.addColorStop(0.5, baseCol);
+    grad.addColorStop(1, darkCol);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    roundRect(ctx, p1.x, p1.y, w, h, Math.min(4 * zoom, 6));
+    ctx.fill();
 
+    // Inner highlight stripe at top
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.fillRect(p1.x + 2, p1.y + 2, w - 4, Math.min(h * 0.25, 8));
+
+    // Border
+    ctx.strokeStyle = isSelected ? '#7fd0ff' : hexToRgba(def.color, 0.7);
+    ctx.lineWidth = isSelected ? 2.5 * zoom : 1.5 * zoom;
+    ctx.beginPath();
+    roundRect(ctx, p1.x, p1.y, w, h, Math.min(4 * zoom, 6));
+    ctx.stroke();
+
+    // Category icon when zoomed in
+    if (zoom > 0.55 && w > 20) {
+      const cx = (p1.x + p2.x) / 2, cy = (p1.y + p2.y) / 2;
+      const iconSize = Math.min(w, h) * 0.38;
+      ctx.globalAlpha = (isMoving ? 0.45 : 1) * 0.55;
+      const iconFn = CATEGORY_ICONS[def.category];
+      if (iconFn) iconFn(cx, cy, iconSize, 'rgba(255,255,255,0.8)');
+    }
+
+    // Fuel timer progress bar
+    if (def.requiresFuel && zoom > 0.45) {
+      const maxFuel = def.attributes.runDurationSec || 8;
+      const fuelPct = Math.min(1, (b.fuelTimer || 0) / maxFuel);
+      if (fuelPct > 0) {
+        const barH = Math.max(3, 4 * zoom);
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(p1.x, p2.y - barH, w, barH);
+        ctx.fillStyle = fuelPct > 0.3 ? '#22c55e' : '#ef4444';
+        ctx.fillRect(p1.x, p2.y - barH, w * fuelPct, barH);
+      }
+    }
+
+    ctx.globalAlpha = isMoving ? 0.45 : 1;
     drawPorts(fp, b.col, b.row);
 
-    if (STATE.camera.zoom > 0.4) {
+    // Name label
+    if (zoom > 0.5 && w > 30) {
+      ctx.globalAlpha = isMoving ? 0.45 : 0.9;
+      const fontSize = Math.max(8, Math.min(11, 10 * zoom));
       ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      ctx.font = `${Math.max(10, 11 * STATE.camera.zoom)}px system-ui, sans-serif`;
+      ctx.font = `700 ${fontSize}px Inter,system-ui,sans-serif`;
       ctx.textAlign = 'center';
-      ctx.fillText(def.name, (p1.x + p2.x) / 2, p1.y - 6);
+      ctx.shadowColor = 'rgba(0,0,0,0.8)';
+      ctx.shadowBlur = 3;
+      // Truncate name to fit
+      let label = def.name;
+      while (ctx.measureText(label).width > w - 8 && label.length > 4) label = label.slice(0, -1);
+      if (label !== def.name) label += '…';
+      ctx.fillText(label, p1.x + w/2, p2.y + fontSize + 2);
+      ctx.shadowBlur = 0;
     }
+    ctx.restore();
+  }
+
+  // Draw belt machines on top
+  for (const b of STATE.run.buildings) {
+    const def = STATE.defs.buildingDefs[b.defId];
+    if (!def || def.layer !== 'belt') continue;
+    const fp = getFootprint(def, b.rot);
+    const p1 = worldToScreen(b.col * cs, b.row * cs);
+    const p2 = worldToScreen((b.col + fp.w) * cs, (b.row + fp.h) * cs);
+    const w = p2.x - p1.x, h = p2.y - p1.y;
+    const isSelected = selectedEntity && selectedEntity.type === 'building' && selectedEntity.id === b.id;
+    const isMoving = movingState && movingState.buildingId === b.id;
+
+    ctx.save();
+    if (isMoving) ctx.globalAlpha = 0.45;
+    if (isSelected) drawSelectionGlowAndGizmo(p1, p2, b.rot);
+
+    ctx.fillStyle = hexToRgba(def.color, 0.35);
+    ctx.fillRect(p1.x, p1.y, w, h);
+
+    ctx.strokeStyle = isSelected ? '#7fd0ff' : hexToRgba(def.color, 0.5);
+    ctx.lineWidth = isSelected ? 2.5 * zoom : 1 * zoom;
+    ctx.strokeRect(p1.x, p1.y, w, h);
+
+    ctx.globalAlpha = isMoving ? 0.45 : 1;
+    drawPorts(fp, b.col, b.row);
     ctx.restore();
   }
 }
 
 function drawOres() {
   const lifespan = STATE.config.oreGroundLifespan;
+  const zoom = STATE.camera.zoom;
+
   for (const o of STATE.run.ores) {
     const s = worldToScreen(o.x, o.y);
-    const r = (o.size / 2) * STATE.camera.zoom;
+    const r = (o.size / 2) * zoom;
+    if (r < 1) continue;
     const isSelected = selectedEntity && selectedEntity.type === 'ore' && selectedEntity.id === o.id;
 
     let alpha = 1.0;
@@ -1694,23 +1922,101 @@ function drawOres() {
 
     ctx.save();
     ctx.globalAlpha = alpha;
+
+    // Status effect glow halos (rendered behind ore)
+    if (o.status) {
+      if (o.status.flaming && r > 3) {
+        ctx.shadowColor = '#ff6b35';
+        ctx.shadowBlur = r * 1.4;
+      } else if (o.status.radioactive && r > 3) {
+        ctx.shadowColor = '#4ade80';
+        ctx.shadowBlur = r * 1.2;
+      } else if (o.status.sparkling && r > 3) {
+        ctx.shadowColor = '#fde047';
+        ctx.shadowBlur = r * 1.0;
+      } else if (o.status.wet > 0 && r > 3) {
+        ctx.shadowColor = '#38bdf8';
+        ctx.shadowBlur = r * 0.8;
+      } else if (o.status.crystalline && r > 3) {
+        ctx.shadowColor = '#a5f3fc';
+        ctx.shadowBlur = r * 1.0;
+      }
+    }
+
+    // Ore body
+    const effectiveR = Math.max(0.5, r * (alpha < 1 ? 0.6 + 0.4 * alpha : 1));
     ctx.fillStyle = o.color;
     ctx.beginPath();
-
     if (o.shape === 'diamond') {
-      ctx.moveTo(s.x, s.y - r * 1.3); ctx.lineTo(s.x + r * 1.3, s.y);
-      ctx.lineTo(s.x, s.y + r * 1.3); ctx.lineTo(s.x - r * 1.3, s.y);
-      ctx.closePath(); ctx.fill();
+      ctx.moveTo(s.x, s.y - effectiveR * 1.35);
+      ctx.lineTo(s.x + effectiveR * 1.35, s.y);
+      ctx.lineTo(s.x, s.y + effectiveR * 1.35);
+      ctx.lineTo(s.x - effectiveR * 1.35, s.y);
+      ctx.closePath();
     } else if (o.shape === 'square') {
-      ctx.fillRect(s.x - r, s.y - r, r * 2, r * 2);
+      ctx.rect(s.x - effectiveR, s.y - effectiveR, effectiveR * 2, effectiveR * 2);
     } else {
-      ctx.arc(s.x, s.y, Math.max(0.5, r * (alpha < 1 ? 0.6 + 0.4 * alpha : 1)), 0, Math.PI * 2);
+      ctx.arc(s.x, s.y, effectiveR, 0, Math.PI * 2);
+    }
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Highlight glint
+    if (zoom > 0.5 && effectiveR > 4) {
+      ctx.fillStyle = 'rgba(255,255,255,0.28)';
+      ctx.beginPath();
+      ctx.ellipse(s.x - effectiveR * 0.28, s.y - effectiveR * 0.28, effectiveR * 0.28, effectiveR * 0.18, -0.6, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    ctx.strokeStyle = isSelected ? '#7fd0ff' : 'rgba(0,0,0,0.5)';
-    ctx.lineWidth = isSelected ? 2.5 : 1.2;
+    // Outline
+    ctx.strokeStyle = isSelected ? '#7fd0ff' : 'rgba(0,0,0,0.4)';
+    ctx.lineWidth = isSelected ? Math.max(2, 2.5 * zoom) : Math.max(0.5, 1 * zoom);
+    ctx.beginPath();
+    if (o.shape === 'diamond') {
+      ctx.moveTo(s.x, s.y - effectiveR * 1.35);
+      ctx.lineTo(s.x + effectiveR * 1.35, s.y);
+      ctx.lineTo(s.x, s.y + effectiveR * 1.35);
+      ctx.lineTo(s.x - effectiveR * 1.35, s.y);
+      ctx.closePath();
+    } else if (o.shape === 'square') {
+      ctx.rect(s.x - effectiveR, s.y - effectiveR, effectiveR * 2, effectiveR * 2);
+    } else {
+      ctx.arc(s.x, s.y, effectiveR, 0, Math.PI * 2);
+    }
     ctx.stroke();
+
+    // Status indicators (small dots above ore)
+    if (zoom > 0.45 && effectiveR > 5 && o.status) {
+      const indicators = [];
+      if (o.status.flaming)    indicators.push('#ff6b35');
+      if (o.status.radioactive)indicators.push('#4ade80');
+      if (o.status.wet > 0)    indicators.push('#38bdf8');
+      if (o.status.sparkling)  indicators.push('#fde047');
+      if (o.status.crystalline)indicators.push('#a5f3fc');
+      if (o.status.lucky)      indicators.push('#86efac');
+      if (indicators.length > 0) {
+        const dotR = Math.max(2, 2.5 * zoom);
+        const startX = s.x - ((indicators.length - 1) * (dotR * 2.2)) / 2;
+        indicators.forEach((col, i) => {
+          ctx.fillStyle = col;
+          ctx.beginPath();
+          ctx.arc(startX + i * dotR * 2.2, s.y - effectiveR - dotR - 2, dotR, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+    }
+
+    // Value label (only when selected or zoomed very close)
+    if (isSelected && zoom > 0.8) {
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.font = `700 ${Math.max(8, 9 * zoom)}px Inter,system-ui,sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 3;
+      ctx.fillText(`$${o.value.toLocaleString()}`, s.x, s.y + effectiveR + 12);
+      ctx.shadowBlur = 0;
+    }
+
     ctx.restore();
   }
 }
@@ -1732,23 +2038,54 @@ function drawEffects() {
   ctx.restore();
 }
 
-function drawHUD() {
-  const hud = document.getElementById('hud');
-  if (!hud) return;
-  const money = `$${(STATE.run.money || 0).toLocaleString()}`;
-  const lifetime = `$${(STATE.run.lifetimeEarnings || 0).toLocaleString()}`;
-  const bldgCount = STATE.run.buildings.length;
-  const oreCount = STATE.run.ores.length;
-  let hudText = `Cash: ${money}  |  Lifetime: ${lifetime}\nPoints: 🌟 ${STATE.meta.prestigePoints} | Keys: 🔑 ${STATE.meta.prestigeKeys} | Shards: 💎 ${STATE.meta.shards} | Dust: 🌌 ${STATE.meta.prestigeDust}\nBuildings: ${bldgCount}  |  Active Ores: ${oreCount}/${STATE.config.maxOres}\n[Controls] Click+Drag: Pan | Scroll: Zoom | E: Shop/Inv | R: Rotate | 1-6: Hotbar`;
+function updateHUD() {
+  // Update HUD data elements
+  const hudCash = document.getElementById('hudCash');
+  const hudLifetime = document.getElementById('hudLifetime');
+  const hudBuildings = document.getElementById('hudBuildings');
+  const hudOres = document.getElementById('hudOres');
+  const hudModeBadge = document.getElementById('hudModeBadge');
+  const hudTips = document.getElementById('hudTips');
 
-  if (mode === 'placing' && placingState) {
-    const def = STATE.defs.buildingDefs[placingState.defId];
-    const qty = getInventoryQty(placingState.defId);
-    hudText += `\nPLACING: ${def ? def.name : ''} (Owned: ${qty}) [R: Rotate | Esc: Cancel]`;
-  } else if (mode === 'moving') {
-    hudText += `\nMOVING BUILDING [R: Rotate | Esc: Cancel]`;
+  if (hudCash) hudCash.textContent = `$${(STATE.run.money || 0).toLocaleString()}`;
+  if (hudLifetime) hudLifetime.textContent = `$${(STATE.run.lifetimeEarnings || 0).toLocaleString()}`;
+  if (hudBuildings) hudBuildings.textContent = STATE.run.buildings.length;
+  const oreCount = STATE.run.ores.length;
+  const maxOres = STATE.config.maxOres;
+  if (hudOres) {
+    hudOres.textContent = `${oreCount} / ${maxOres}`;
+    if (hudOres.classList) {
+      hudOres.classList.toggle('warn', oreCount > maxOres * 0.85);
+    }
   }
-  hud.textContent = hudText;
+
+  if (hudModeBadge) {
+    if (mode === 'placing' && placingState) {
+      const def = STATE.defs.buildingDefs[placingState.defId];
+      const qty = getInventoryQty(placingState.defId);
+      hudModeBadge.textContent = `Placing: ${def ? def.name : ''} (${qty} left)`;
+      hudModeBadge.className = 'hud-mode-badge placing';
+    } else if (mode === 'moving') {
+      hudModeBadge.textContent = 'Moving';
+      hudModeBadge.className = 'hud-mode-badge moving';
+    } else if (mode === 'inspecting') {
+      hudModeBadge.textContent = 'Inspector';
+      hudModeBadge.className = 'hud-mode-badge';
+    } else {
+      hudModeBadge.textContent = 'Idle';
+      hudModeBadge.className = 'hud-mode-badge';
+    }
+  }
+
+  if (hudTips) {
+    if (mode === 'placing') {
+      hudTips.textContent = 'Click: Place  |  Drag: Belt Line  |  R: Rotate  |  Esc: Cancel';
+    } else if (mode === 'moving') {
+      hudTips.textContent = 'Click destination  |  R: Rotate  |  Esc: Cancel';
+    } else {
+      hudTips.textContent = 'Drag: Pan  |  Scroll: Zoom  |  E: Shop  |  Dbl-Click: Inspect  |  1-6: Hotbar';
+    }
+  }
 }
 
 function hexToRgba(hex, alpha) {
@@ -1759,9 +2096,83 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+function hexShift(hex, amount) {
+  if (!hex || hex[0] !== '#') return hex;
+  let r = Math.min(255, Math.max(0, parseInt(hex.slice(1, 3), 16) + amount));
+  let g = Math.min(255, Math.max(0, parseInt(hex.slice(3, 5), 16) + amount));
+  let b = Math.min(255, Math.max(0, parseInt(hex.slice(5, 7), 16) + amount));
+  return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+}
+
+function roundRect(ctx2d, x, y, w, h, r) {
+  if (typeof ctx2d.roundRect === 'function') {
+    ctx2d.roundRect(x, y, w, h, r);
+  } else {
+    r = Math.min(r, w/2, h/2);
+    ctx2d.moveTo(x + r, y);
+    ctx2d.lineTo(x + w - r, y); ctx2d.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx2d.lineTo(x + w, y + h - r); ctx2d.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx2d.lineTo(x + r, y + h); ctx2d.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx2d.lineTo(x, y + r); ctx2d.quadraticCurveTo(x, y, x + r, y);
+    ctx2d.closePath();
+  }
+}
+
+// Belt drag path preview
+function drawBeltDragPreview() {
+  if (!isBeltDragging || !beltDragStart || mode !== 'placing') return;
+  const cs = STATE.config.grid.cellSize;
+  const world = screenToWorld(mouseScreen.x, mouseScreen.y);
+  const endCell = worldToCell(world.x, world.y);
+  const line = getBeltDragPath(beltDragStart, endCell);
+
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = placingState ? (STATE.defs.buildingDefs[placingState.defId]?.color || '#7fd0ff') : '#7fd0ff';
+  for (const c of line.cells) {
+    const p1 = worldToScreen(c.col * cs, c.row * cs);
+    const p2 = worldToScreen((c.col + 1) * cs, (c.row + 1) * cs);
+    ctx.fillRect(p1.x + 2, p1.y + 2, p2.x - p1.x - 4, p2.y - p1.y - 4);
+  }
+  // Count label
+  if (line.cells.length > 0 && STATE.camera.zoom > 0.4) {
+    const last = line.cells[line.cells.length - 1];
+    const lp = worldToScreen((last.col + 0.5) * cs, (last.row + 0.5) * cs);
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${Math.max(10, 12 * STATE.camera.zoom)}px Inter,system-ui,sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`${line.cells.length}x`, lp.x, lp.y - 10 * STATE.camera.zoom);
+  }
+  ctx.restore();
+}
+
+// Placement flash feedback
+function drawPlacementFlash() {
+  if (!placementFlash) return;
+  const cs = STATE.config.grid.cellSize;
+  placementFlash.timer += 0.06;
+  placementFlash.alpha = Math.max(0, 0.7 - placementFlash.timer * 2.5);
+  if (placementFlash.alpha <= 0) { placementFlash = null; return; }
+
+  const p1 = worldToScreen(placementFlash.col * cs, placementFlash.row * cs);
+  const p2 = worldToScreen((placementFlash.col + placementFlash.w) * cs, (placementFlash.row + placementFlash.h) * cs);
+  ctx.save();
+  ctx.globalAlpha = placementFlash.alpha;
+  ctx.fillStyle = placementFlash.success ? '#22c55e' : '#ef4444';
+  ctx.fillRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
+  ctx.restore();
+}
+
 // Periodic live save
 setInterval(triggerSaveState, 5000);
 
 // Main Animation Loop
-function loop(now) { update(now); draw(); requestAnimationFrame(loop); }
+function loop(now) {
+  update(now);
+  // Advance belt animation
+  beltAnimTick = (beltAnimTick + 0.016) % 1;
+  draw();
+  requestAnimationFrame(loop);
+}
 requestAnimationFrame(loop);

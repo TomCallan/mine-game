@@ -3,21 +3,45 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Miner's Haven Clone</title>
+  <title>Miner's Haven</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
 <canvas id="game"></canvas>
-<div id="hud"></div>
+
+<!-- HUD — Top Left Data Panel -->
+<div id="hud">
+  <div class="hud-header">
+    <span class="hud-title">Miner's Haven</span>
+    <span class="hud-mode-badge" id="hudModeBadge">Idle</span>
+  </div>
+  <div class="hud-row">
+    <span class="hud-label">Cash</span>
+    <span class="hud-value cash" id="hudCash">$0</span>
+  </div>
+  <div class="hud-row">
+    <span class="hud-label">Lifetime</span>
+    <span class="hud-value" id="hudLifetime">$0</span>
+  </div>
+  <div class="hud-row">
+    <span class="hud-label">Buildings</span>
+    <span class="hud-value" id="hudBuildings">0</span>
+  </div>
+  <div class="hud-row">
+    <span class="hud-label">Active Ores</span>
+    <span class="hud-value" id="hudOres">0 / 300</span>
+  </div>
+  <div class="hud-tips" id="hudTips">Pan: Drag  |  Zoom: Scroll  |  Shop: E  |  Rotate: R  |  Cancel: Esc</div>
+</div>
 
 <!-- Mobile Touch Quick-Action Toolbar -->
 <div id="mobileControls">
-  <button class="mobile-action-btn" id="mobileRotateBtn" title="Rotate Machine [R]">🔄 Rotate</button>
-  <button class="mobile-action-btn" id="mobileInspectBtn" title="Toggle Inspector [👁️]">👁️ Inspect</button>
-  <button class="mobile-action-btn" id="mobileZoomInBtn" title="Zoom In">🔍+</button>
-  <button class="mobile-action-btn" id="mobileZoomOutBtn" title="Zoom Out">🔍-</button>
-  <button class="mobile-action-btn danger-btn" id="mobileCancelBtn" title="Cancel Selection [Esc]">✖ Cancel</button>
+  <button class="mobile-action-btn" id="mobileRotateBtn" title="Rotate [R]">Rotate</button>
+  <button class="mobile-action-btn" id="mobileInspectBtn" title="Toggle Inspector">Inspect</button>
+  <button class="mobile-action-btn" id="mobileZoomInBtn" title="Zoom In">Zoom +</button>
+  <button class="mobile-action-btn" id="mobileZoomOutBtn" title="Zoom Out">Zoom -</button>
+  <button class="mobile-action-btn danger-btn" id="mobileCancelBtn" title="Cancel [Esc]">Cancel</button>
 </div>
 
 <!-- Building Context Menu Card -->
@@ -27,20 +51,20 @@
       <div class="ctx-swatch" id="ctxSwatch"></div>
       <div>
         <div class="ctx-title" id="ctxTitle">Building Name</div>
-        <div class="ctx-sub" id="ctxSub">Category • 1x1 Tile</div>
+        <div class="ctx-sub" id="ctxSub">Category &bull; 1x1</div>
       </div>
     </div>
-    <button class="ctx-close" id="closeCtxBtn">×</button>
+    <button class="ctx-close" id="closeCtxBtn">&times;</button>
   </div>
   <div class="ctx-body">
     <div class="ctx-stats" id="ctxStats"></div>
     <div class="ctx-actions">
       <button class="ctx-btn" id="ctxBtnRotate">Rotate [R]</button>
       <button class="ctx-btn" id="ctxBtnMove">Move Building</button>
-      <button class="ctx-btn danger" id="ctxBtnDelete">Delete</button>
+      <button class="ctx-btn danger" id="ctxBtnDelete">Demolish</button>
     </div>
     <div class="ctx-walls-section" id="ctxWallsSection" style="display: none;">
-      <div class="ctx-walls-title">Conveyor Side Walls</div>
+      <div class="ctx-walls-title">Side Walls</div>
       <div class="ctx-walls-grid">
         <button class="ctx-wall-btn" id="ctxWall0">Right Wall</button>
         <button class="ctx-wall-btn" id="ctxWall1">Bottom Wall</button>
@@ -51,53 +75,54 @@
   </div>
 </div>
 
-<!-- Reactive Hotbar UI -->
+<!-- Hotbar -->
 <div id="hotbarContainer">
-  <div id="hotbarSlots" style="display: flex; gap: 8px;"></div>
-  <button class="inventory-btn" id="openInvBtn">Inventory & Shop [E]</button>
-  <button class="inventory-btn crate-shop-btn" id="openCrateBtn">Crate Shop</button>
-  <button class="inventory-btn prestige-btn" id="openPrestigeBtn">Prestige 🌟</button>
+  <div id="hotbarSlots" style="display: contents;"></div>
+  <div class="hotbar-divider"></div>
+  <button class="hb-action-btn inv" id="openInvBtn">Shop [E]</button>
+  <button class="hb-action-btn crate" id="openCrateBtn">Crates</button>
+  <button class="hb-action-btn prestige" id="openPrestigeBtn">Prestige</button>
 </div>
 
-<!-- Industrial Dark Inventory Catalog & Shop -->
+<!-- Inventory & Shop Modal -->
 <div id="inventoryModal">
   <div class="inv-wrapper">
     <div class="inv-header">
       <div class="inv-main-tabs" id="invMainTabs">
-        <button class="inv-main-tab active" data-tab="shop">🏪 Shop</button>
-        <button class="inv-main-tab" data-tab="inventory">📦 Inventory</button>
-        <button class="inv-main-tab" data-tab="relics">🗿 Relics</button>
-        <button class="inv-main-tab" data-tab="meta">🌟 Meta / Prestige</button>
+        <button class="inv-main-tab active" data-tab="shop">Shop</button>
+        <button class="inv-main-tab" data-tab="inventory">Inventory</button>
+        <button class="inv-main-tab" data-tab="relics">Relics</button>
+        <button class="inv-main-tab" data-tab="meta">Prestige</button>
       </div>
-      <button class="inv-close" id="closeInvBtn">×</button>
+      <button class="inv-close" id="closeInvBtn">&times;</button>
     </div>
-    
-    <!-- Meta Currency Status Bar -->
+
+    <!-- Currency Status Bar -->
     <div class="meta-status-bar" id="metaStatusBar">
-      <span class="meta-chip chip-cash">💰 Cash: <strong id="metaCash">$0</strong></span>
-      <span class="meta-chip chip-points">🌟 Points: <strong id="metaPoints">0</strong></span>
-      <span class="meta-chip chip-keys">🔑 Keys: <strong id="metaKeys">0</strong></span>
-      <span class="meta-chip chip-shards">💎 Shards: <strong id="metaShards">0</strong></span>
-      <span class="meta-chip chip-dust">🌌 Dust: <strong id="metaDust">0</strong></span>
+      <span class="meta-chip chip-cash"><span class="chip-dot"></span>Cash: <strong id="metaCash">$0</strong></span>
+      <span class="meta-chip chip-points"><span class="chip-dot"></span>Points: <strong id="metaPoints">0</strong></span>
+      <span class="meta-chip chip-keys"><span class="chip-dot"></span>Keys: <strong id="metaKeys">0</strong></span>
+      <span class="meta-chip chip-shards"><span class="chip-dot"></span>Shards: <strong id="metaShards">0</strong></span>
+      <span class="meta-chip chip-dust"><span class="chip-dot"></span>Dust: <strong id="metaDust">0</strong></span>
     </div>
 
     <div class="inv-window">
-      <!-- Category Filter Header (Visible for Shop & Inventory) -->
+      <!-- Category Filter + Search -->
       <div class="inv-sub-header" id="invSubHeader">
         <div class="inv-tabs" id="invTabs">
-          <button class="inv-tab active" data-category="all">All Items</button>
+          <button class="inv-tab active" data-category="all">All</button>
           <button class="inv-tab" data-category="extractor">Extractors</button>
           <button class="inv-tab" data-category="belt">Conveyors</button>
           <button class="inv-tab" data-category="upgrader">Upgraders</button>
           <button class="inv-tab" data-category="seller">Sellers</button>
         </div>
         <div class="inv-search-wrap">
-          <input type="text" class="inv-search-input" id="invSearchInput" placeholder="Search items by name or category...">
+          <input type="text" class="inv-search-input" id="invSearchInput" placeholder="Search by name or type...">
         </div>
-        <button class="inventory-btn creator-launch-btn" id="openCreatorBtn">+ Custom Machine</button>
+        <button class="creator-launch-btn" id="openCreatorBtn">+ Custom</button>
       </div>
 
-      <!-- Main Dynamic Content Grid -->
+      <!-- Dynamic Item Grid -->
       <div class="inv-grid" id="invGrid"></div>
     </div>
   </div>
@@ -107,40 +132,52 @@
 <div id="crateModal">
   <div class="crate-window">
     <div class="crate-header">
-      <div class="crate-title">Crate Shop & Meta Unboxing</div>
-      <button class="creator-close" id="closeCrateBtn">×</button>
+      <div class="crate-title">Crate Shop</div>
+      <button class="creator-close" id="closeCrateBtn">&times;</button>
     </div>
     <div class="crate-body">
       <div class="crate-cards">
         <div class="crate-card">
+          <div class="crate-card-icon" style="background:rgba(100,116,139,0.15);border:1px solid rgba(100,116,139,0.2);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+          </div>
           <div class="crate-name">Regular Crate</div>
           <div class="crate-cost">$250</div>
-          <div class="crate-desc">72% Item Copy, 20% Permanent Utility, 7% Rare Blueprint, 1% Relic.</div>
-          <button class="crate-buy-btn" data-crate="regular">Open ($250)</button>
+          <div class="crate-desc">72% Item Copy &bull; 20% Permanent Utility &bull; 7% Rare Blueprint &bull; 1% Relic</div>
+          <button class="crate-buy-btn" data-crate="regular">Open for $250</button>
         </div>
         <div class="crate-card">
+          <div class="crate-card-icon" style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.2);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+          </div>
           <div class="crate-name">Golden Crate</div>
           <div class="crate-cost">$1,000</div>
-          <div class="crate-desc">45% Permanent Copy, 35% Rare/Epic Blueprint, 15% Relic, 5% Shards.</div>
-          <button class="crate-buy-btn" data-crate="gold">Open ($1,000)</button>
+          <div class="crate-desc">45% Permanent Copy &bull; 35% Rare/Epic Blueprint &bull; 15% Relic &bull; 5% Shards</div>
+          <button class="crate-buy-btn" data-crate="gold">Open for $1,000</button>
         </div>
         <div class="crate-card">
+          <div class="crate-card-icon" style="background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.2);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+          </div>
           <div class="crate-name">Exotic Crate</div>
           <div class="crate-cost">$5,000</div>
-          <div class="crate-desc">35% Epic/Exotic Permanent, 35% Blueprint, 20% Relic, 8% Shards, 2% Key Fragment.</div>
-          <button class="crate-buy-btn" data-crate="exotic">Open ($5,000)</button>
+          <div class="crate-desc">35% Epic/Exotic Permanent &bull; 35% Blueprint &bull; 20% Relic &bull; 8% Shards &bull; 2% Key Fragment</div>
+          <button class="crate-buy-btn" data-crate="exotic">Open for $5,000</button>
         </div>
         <div class="crate-card crate-prestige">
-          <div class="crate-name">Prestige Crate 🔑</div>
+          <div class="crate-card-icon" style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.25);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+          </div>
+          <div class="crate-name">Prestige Crate</div>
           <div class="crate-cost">1 Prestige Key</div>
-          <div class="crate-desc">45% Exclusive Blueprint, 25% Mythic Copy, 20% Relic, 10% Prestige Dust.</div>
+          <div class="crate-desc">45% Exclusive Blueprint &bull; 25% Mythic Copy &bull; 20% Relic &bull; 10% Prestige Dust</div>
           <button class="crate-buy-btn prestige-key-btn" data-crate="prestige">Open (1 Key)</button>
         </div>
       </div>
 
-      <!-- Unboxing Roulette Animation -->
+      <!-- Unboxing Roulette -->
       <div class="unboxing-overlay" id="unboxingOverlay">
-        <div class="creator-section-title" id="rouletteTitle">Unboxing Rewards...</div>
+        <div class="creator-section-title" id="rouletteTitle">Unboxing...</div>
         <div class="roulette-container">
           <div class="roulette-pointer"></div>
           <div class="roulette-track" id="rouletteTrack"></div>
@@ -154,8 +191,8 @@
 <div id="prestigeModal" class="modal-backdrop" style="display: none;">
   <div class="prestige-window">
     <div class="prestige-header">
-      <div class="prestige-title">🌟 Reset & Prestige</div>
-      <button class="creator-close" id="closePrestigeBtn">×</button>
+      <div class="prestige-title">Reset &amp; Prestige</div>
+      <button class="creator-close" id="closePrestigeBtn">&times;</button>
     </div>
     <div class="prestige-body">
       <div class="prestige-stats-box">
@@ -165,7 +202,7 @@
         </div>
         <div class="prestige-stat-row">
           <span>Prestige Requirement:</span>
-          <strong>$10,000,000,000 ($10B)</strong>
+          <strong>$10,000,000,000</strong>
         </div>
         <div class="prestige-divider"></div>
         <div class="prestige-payout-box">
@@ -182,42 +219,42 @@
 
       <div class="prestige-explanation">
         <div class="explanation-col loss">
-          <h4>❌ RESET ON PRESTIGE</h4>
+          <h4>RESET ON PRESTIGE</h4>
           <ul>
-            <li>Current Cash & Lifetime Earnings</li>
-            <li>All Active Placed Factory Buildings</li>
-            <li>All Active Ores on Belts/Ground</li>
+            <li>Current Cash &amp; Lifetime Earnings</li>
+            <li>All Placed Factory Buildings</li>
+            <li>All Active Ores</li>
             <li>Run-specific Shop Level Costs</li>
           </ul>
         </div>
         <div class="explanation-col keep">
-          <h4>✅ KEPT ACROSS PRESTIGE</h4>
+          <h4>KEPT ACROSS PRESTIGE</h4>
           <ul>
-            <li>All Owned Unplaced Inventory Items</li>
-            <li>All Permanent Crate Unlocks & Blueprints</li>
-            <li>All Equipped & Collected Relics</li>
-            <li>Prestige Points, Keys, Shards & Dust</li>
+            <li>All Unplaced Inventory Items</li>
+            <li>All Permanent Crate Unlocks</li>
+            <li>All Equipped Relics</li>
+            <li>Points, Keys, Shards &amp; Dust</li>
           </ul>
         </div>
       </div>
 
       <div class="prestige-actions">
-        <button class="prestige-confirm-btn" id="btnConfirmPrestige" disabled>Prestige Now 🌟</button>
+        <button class="prestige-confirm-btn" id="btnConfirmPrestige" disabled>Prestige Now</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Interactive Object Creator Modal -->
+<!-- Custom Object Creator Modal -->
 <div id="customCreatorModal">
   <div class="creator-window">
     <div class="creator-header">
-      <div class="creator-title">Object & Machine Creator</div>
-      <button class="creator-close" id="closeCreatorBtn">×</button>
+      <div class="creator-title">Custom Machine Creator</div>
+      <button class="creator-close" id="closeCreatorBtn">&times;</button>
     </div>
     <div class="creator-body">
       <div class="creator-left">
-        <div class="creator-section-title">Pixel Art Sprite Editor (12x12)</div>
+        <div class="creator-section-title">Pixel Art Sprite (12x12)</div>
         <canvas id="pixelCanvas" width="192" height="192"></canvas>
         <div class="palette-row" id="paletteRow"></div>
         <div class="creator-tool-row">
@@ -227,7 +264,7 @@
         </div>
       </div>
       <div class="creator-right">
-        <div class="creator-section-title">Item Data Configuration</div>
+        <div class="creator-section-title">Item Configuration</div>
         <div class="creator-field">
           <label>Item Name</label>
           <input type="text" id="custName" value="Custom Machine" placeholder="Name your machine...">
@@ -266,9 +303,9 @@
           </div>
         </div>
 
-        <!-- Dynamic Category Specific Panels -->
+        <!-- Category-specific panels -->
         <div id="custSettingsExtractor" class="cust-cat-panel">
-          <div class="creator-section-title" style="margin-top:6px;">Mining & Ore Settings</div>
+          <div class="creator-section-title" style="margin-top:4px;">Mining &amp; Ore Settings</div>
           <div class="creator-field-row">
             <div class="creator-field">
               <label>Ore Name</label>
@@ -285,7 +322,7 @@
           </div>
           <div class="creator-field-row">
             <div class="creator-field">
-              <label>Ore Base Value ($)</label>
+              <label>Base Value ($)</label>
               <input type="number" id="custOreValue" value="25" min="1">
             </div>
             <div class="creator-field">
@@ -296,49 +333,50 @@
         </div>
 
         <div id="custSettingsBelt" class="cust-cat-panel" style="display: none;">
-          <div class="creator-section-title" style="margin-top:6px;">Conveyor Settings</div>
+          <div class="creator-section-title" style="margin-top:4px;">Conveyor Settings</div>
           <div class="creator-field">
-            <label>Conveyor Speed (px/s)</label>
+            <label>Speed (px/s)</label>
             <input type="number" id="custSpeed" value="180" min="20" max="500">
           </div>
         </div>
 
         <div id="custSettingsUpgrader" class="cust-cat-panel" style="display: none;">
-          <div class="creator-section-title" style="margin-top:6px;">Upgrader Stats</div>
+          <div class="creator-section-title" style="margin-top:4px;">Upgrader Stats</div>
           <div class="creator-field-row">
             <div class="creator-field">
               <label>Value Multiplier (x)</label>
               <input type="number" id="custMulti" value="2.5" step="0.5" min="1">
             </div>
             <div class="creator-field">
-              <label>Flat Boost (+$)</label>
+              <label>Flat Bonus (+$)</label>
               <input type="number" id="custFlat" value="50" min="0">
             </div>
           </div>
           <div class="creator-field">
-            <label>Heat / Energy Cost</label>
+            <label>Energy Cost</label>
             <input type="number" id="custEnergy" value="15" min="0">
           </div>
         </div>
 
         <div id="custSettingsSeller" class="cust-cat-panel" style="display: none;">
-          <div class="creator-section-title" style="margin-top:6px;">Seller Settings</div>
+          <div class="creator-section-title" style="margin-top:4px;">Seller Settings</div>
           <div class="creator-field">
             <label>Sale Bonus Multiplier</label>
             <input type="number" id="custSellerMulti" value="1.0" step="0.1" min="0.5">
           </div>
         </div>
 
-        <button class="creator-save-btn" id="btnSaveCustomItem">Save & Register Item</button>
+        <button class="creator-save-btn" id="btnSaveCustomItem">Save &amp; Register Item</button>
       </div>
     </div>
   </div>
 </div>
 
+<!-- Inspector Panel -->
 <div id="inspectorPanel">
   <div class="panel-header">
     <span id="inspectorTitle">—</span>
-    <button id="inspectorClose">×</button>
+    <button id="inspectorClose">&times;</button>
   </div>
   <pre id="inspectorBody"></pre>
 </div>

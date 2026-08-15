@@ -102,9 +102,19 @@ canvas.addEventListener('dblclick', (e) => {
 
 canvas.addEventListener('contextmenu', (e) => {
   e.preventDefault();
-  closeContextMenu();
-  if (mode !== 'idle') { cancelMode(); }
-  else openInventoryModal();
+  if (mode !== 'idle') {
+    cancelMode();
+    return;
+  }
+  // Right-click on building opens context menu; otherwise cancel
+  const world = screenToWorld(e.clientX, e.clientY);
+  const cell = worldToCell(world.x, world.y);
+  const b = findBuildingAtCell(cell.col, cell.row);
+  if (b) {
+    openContextMenu(b, e.clientX, e.clientY);
+  } else {
+    closeContextMenu();
+  }
 });
 
 // Mode Placers
@@ -144,6 +154,9 @@ function renderHotbar() {
     if (mode === 'placing' && placingState && placingState.defId === defId) {
       slot.classList.add('active');
     }
+    if (!defId || !STATE.defs.buildingDefs[defId]) {
+      slot.classList.add('empty');
+    }
 
     const keySpan = document.createElement('span');
     keySpan.className = 'hotbar-key';
@@ -154,6 +167,12 @@ function renderHotbar() {
       const def = STATE.defs.buildingDefs[defId];
       const qty = getInventoryQty(defId);
 
+      // Qty badge top-right
+      const qtyBadge = document.createElement('span');
+      qtyBadge.className = 'hotbar-qty';
+      qtyBadge.textContent = qty;
+      slot.appendChild(qtyBadge);
+
       const swatch = document.createElement('div');
       swatch.className = 'hotbar-swatch';
       swatch.style.background = def.color;
@@ -161,7 +180,9 @@ function renderHotbar() {
 
       const label = document.createElement('div');
       label.className = 'hotbar-label';
-      label.textContent = `${def.name} (${qty})`;
+      // Truncate name
+      const shortName = def.name.length > 12 ? def.name.slice(0, 11) + '…' : def.name;
+      label.textContent = shortName;
       slot.appendChild(label);
     } else {
       const label = document.createElement('div');
@@ -172,7 +193,11 @@ function renderHotbar() {
 
     slot.addEventListener('click', () => {
       if (defId && STATE.defs.buildingDefs[defId]) {
-        enterPlacingMode(defId);
+        if (mode === 'placing' && placingState && placingState.defId === defId) {
+          cancelMode();
+        } else {
+          enterPlacingMode(defId);
+        }
         renderHotbar();
       }
     });
@@ -281,7 +306,7 @@ function renderInventoryGrid() {
       if (permQty > 0) {
         const permBadge = document.createElement('div');
         permBadge.className = 'inv-card-perm-badge';
-        permBadge.textContent = 'Permanent ⭐';
+        permBadge.textContent = 'Permanent';
         card.appendChild(permBadge);
       }
 
@@ -359,11 +384,11 @@ function renderInventoryGrid() {
       const isUnlocked = !!STATE.meta.relics[relic.id];
       const card = document.createElement('div');
       card.className = 'relic-card';
-      if (!isUnlocked) card.style.opacity = '0.45';
+      if (!isUnlocked) card.style.opacity = '0.4';
 
       const title = document.createElement('div');
       title.className = 'relic-card-title';
-      title.textContent = isUnlocked ? `🗿 ${relic.name}` : `🔒 ${relic.name}`;
+      title.textContent = isUnlocked ? relic.name : `[Locked] ${relic.name}`;
       card.appendChild(title);
 
       const desc = document.createElement('div');
@@ -374,7 +399,7 @@ function renderInventoryGrid() {
       if (isUnlocked) {
         const activeTag = document.createElement('div');
         activeTag.className = 'relic-active-tag';
-        activeTag.textContent = 'ACTIVE PASSIVE';
+        activeTag.textContent = 'Active Passive';
         card.appendChild(activeTag);
       }
       grid.appendChild(card);
@@ -387,19 +412,19 @@ function renderInventoryGrid() {
 
     const payout = calculatePrestigePayout(STATE.run.lifetimeEarnings);
     metaContainer.innerHTML = `
-      <div style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: 12px; border: 1px solid rgba(168,85,247,0.3);">
-        <h3 style="margin: 0 0 10px 0; color: #e9d5ff;">🌟 Prestige Meta Progression</h3>
-        <p style="font-size: 13px; color: #cbd5e1; margin-bottom: 12px;">Reset your factory run to earn permanent Prestige Points & Prestige Keys.</p>
-        <div style="display: flex; gap: 16px; flex-wrap: wrap;">
-          <div>Current Lifetime Earnings: <strong style="color:#fde047;">$${(STATE.run.lifetimeEarnings || 0).toLocaleString()}</strong></div>
-          <div>Requirement: <strong style="color:#f472b6;">$10,000,000,000 ($10B)</strong></div>
+      <div style="background: rgba(0,0,0,0.25); padding: 16px; border-radius: 12px; border: 1px solid rgba(168,85,247,0.2);">
+        <h3 style="margin: 0 0 10px 0; color: #e9d5ff; font-size:15px;">Prestige Meta Progression</h3>
+        <p style="font-size: 12px; color: #8b9ab5; margin-bottom: 12px;">Reset your factory to earn permanent Prestige Points &amp; Keys.</p>
+        <div style="display: flex; gap: 16px; flex-wrap: wrap; font-size:13px;">
+          <div>Lifetime Earnings: <strong style="color:#fbbf24;font-family:monospace;">${'$' + (STATE.run.lifetimeEarnings || 0).toLocaleString()}</strong></div>
+          <div>Requirement: <strong style="color:#f472b6;font-family:monospace;">$10,000,000,000</strong></div>
         </div>
-        <div style="margin-top: 14px; display: flex; gap: 16px;">
-          <div>Pending Points: <strong style="color:#c084fc;">+${payout.pointsGained}</strong></div>
-          <div>Pending Keys: <strong style="color:#fbbf24;">+${payout.keysGained}</strong></div>
+        <div style="margin-top: 14px; display: flex; gap: 16px; font-size:13px;">
+          <div>Pending Points: <strong style="color:#c084fc;font-family:monospace;">+${payout.pointsGained}</strong></div>
+          <div>Pending Keys: <strong style="color:#fbbf24;font-family:monospace;">+${payout.keysGained}</strong></div>
         </div>
-        <button id="tabPrestigeTriggerBtn" class="prestige-confirm-btn" style="margin-top: 16px;" ${payout.canPrestige ? '' : 'disabled'}>
-          ${payout.canPrestige ? 'Prestige Factory Now 🌟' : 'Lifetime Earnings Below $10B Threshold'}
+        <button id="tabPrestigeTriggerBtn" class="prestige-confirm-btn" style="margin-top: 16px; width:auto; padding: 10px 24px; font-size:13px;" ${payout.canPrestige ? '' : 'disabled'}>
+          ${payout.canPrestige ? 'Prestige Factory Now' : 'Lifetime Earnings Below $10B Threshold'}
         </button>
       </div>
     `;
@@ -772,6 +797,12 @@ function initHotbarAndInventory() {
       currentCategory = e.target.getAttribute('data-category');
       renderInventoryGrid();
     });
+  });
+
+  // Inspector close
+  document.getElementById('inspectorClose')?.addEventListener('click', () => {
+    selectedEntity = null;
+    updateInspectorPanel();
   });
 }
 
