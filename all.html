@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Miner's Haven Clone</title>
   <style>
 /* ===========================================================
@@ -21,7 +21,7 @@ html, body {
   height: 100vh;
 }
 
-canvas { display: block; cursor: grab; }
+canvas { display: block; cursor: grab; touch-action: none; -webkit-tap-highlight-color: transparent; }
 canvas.dragging { cursor: grabbing; }
 canvas.mode-placing, canvas.mode-moving { cursor: crosshair; }
 canvas.mode-inspecting { cursor: help; }
@@ -757,10 +757,63 @@ canvas.mode-inspecting { cursor: help; }
 }
 .relic-card-title { font-size: 13px; font-weight: 800; color: #38bdf8; }
 .relic-card-desc { font-size: 11px; color: #cbd5e1; line-height: 1.4; }
-.relic-active-tag {
-  align-self: flex-start; background: #10b981; color: #fff; font-size: 9px;
-  font-weight: 800; padding: 2px 6px; border-radius: 4px;
+/* Mobile Touch Action Toolbar */
+#mobileControls {
+  position: fixed;
+  right: 12px;
+  bottom: 84px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 85;
+  pointer-events: auto;
 }
+
+.mobile-action-btn {
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(8px);
+  color: #f8fafc;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  min-height: 44px;
+  min-width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  touch-action: manipulation;
+  transition: transform 0.1s, background 0.15s;
+}
+.mobile-action-btn:active {
+  transform: scale(0.94);
+  background: #3b82f6;
+}
+.mobile-action-btn.danger-btn {
+  background: rgba(225, 29, 72, 0.85);
+  border-color: #f43f5e;
+}
+.mobile-action-btn.active {
+  background: #3b82f6;
+  border-color: #60a5fa;
+}
+
+@media (max-width: 768px) {
+  #mobileControls {
+    bottom: 90px;
+    right: 8px;
+    gap: 6px;
+  }
+  .mobile-action-btn {
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+}
+
 
 
 </style>
@@ -769,6 +822,15 @@ canvas.mode-inspecting { cursor: help; }
 
 <canvas id="game"></canvas>
 <div id="hud"></div>
+
+<!-- Mobile Touch Quick-Action Toolbar -->
+<div id="mobileControls">
+  <button class="mobile-action-btn" id="mobileRotateBtn" title="Rotate Machine [R]">🔄 Rotate</button>
+  <button class="mobile-action-btn" id="mobileInspectBtn" title="Toggle Inspector [👁️]">👁️ Inspect</button>
+  <button class="mobile-action-btn" id="mobileZoomInBtn" title="Zoom In">🔍+</button>
+  <button class="mobile-action-btn" id="mobileZoomOutBtn" title="Zoom Out">🔍-</button>
+  <button class="mobile-action-btn danger-btn" id="mobileCancelBtn" title="Cancel Selection [Esc]">✖ Cancel</button>
+</div>
 
 <!-- Building Context Menu Card -->
 <div id="contextMenu">
@@ -3536,10 +3598,64 @@ function initCustomObjectCreator() {
   });
 }
 
+function initMobileToolbarListeners() {
+  document.getElementById('mobileRotateBtn')?.addEventListener('click', () => {
+    if (mode === 'placing' && placingState) {
+      placingState.rot = (placingState.rot + 1) % 4;
+      showToast(`Rotated Placement [${placingState.rot * 90}°]`);
+    } else if (mode === 'moving' && movingState) {
+      movingState.rot = (movingState.rot + 1) % 4;
+      showToast(`Rotated Moving [${movingState.rot * 90}°]`);
+    } else if (activeContextBuilding) {
+      rotateBuildingInPlace(activeContextBuilding);
+      showToast('Rotated Machine');
+    } else {
+      showToast('Select a machine or enter placing mode to rotate.');
+    }
+  });
+
+  document.getElementById('mobileInspectBtn')?.addEventListener('click', (e) => {
+    const btn = document.getElementById('mobileInspectBtn');
+    if (mode === 'inspecting') {
+      cancelMode();
+      btn?.classList.remove('active');
+      showToast('Inspector Mode Off');
+    } else {
+      setMode('inspecting');
+      btn?.classList.add('active');
+      showToast('Inspector Mode On: Tap machine or ore');
+    }
+  });
+
+  document.getElementById('mobileZoomInBtn')?.addEventListener('click', () => {
+    const cam = STATE.camera;
+    cam.zoom = Math.min(cam.maxZoom, cam.zoom * 1.25);
+    clampCamera();
+  });
+
+  document.getElementById('mobileZoomOutBtn')?.addEventListener('click', () => {
+    const cam = STATE.camera;
+    cam.zoom = Math.max(cam.minZoom, cam.zoom / 1.25);
+    clampCamera();
+  });
+
+  document.getElementById('mobileCancelBtn')?.addEventListener('click', () => {
+    closeContextMenu();
+    closeInventoryModal();
+    closeCrateModal();
+    closePrestigeModal();
+    cancelMode();
+    document.getElementById('mobileInspectBtn')?.classList.remove('active');
+    renderHotbar();
+    showToast('Selection Cancelled');
+  });
+}
+
 function initHotbarAndInventory() {
   renderHotbar();
   initContextMenuListeners();
   initCustomObjectCreator();
+  initMobileToolbarListeners();
   loadSavedGame();
 
   // Tab Listeners for Main Tabs

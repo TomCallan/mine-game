@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Miner's Haven Clone</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -10,6 +10,15 @@
 
 <canvas id="game"></canvas>
 <div id="hud"></div>
+
+<!-- Mobile Touch Quick-Action Toolbar -->
+<div id="mobileControls">
+  <button class="mobile-action-btn" id="mobileRotateBtn" title="Rotate Machine [R]">🔄 Rotate</button>
+  <button class="mobile-action-btn" id="mobileInspectBtn" title="Toggle Inspector [👁️]">👁️ Inspect</button>
+  <button class="mobile-action-btn" id="mobileZoomInBtn" title="Zoom In">🔍+</button>
+  <button class="mobile-action-btn" id="mobileZoomOutBtn" title="Zoom Out">🔍-</button>
+  <button class="mobile-action-btn danger-btn" id="mobileCancelBtn" title="Cancel Selection [Esc]">✖ Cancel</button>
+</div>
 
 <!-- Building Context Menu Card -->
 <div id="contextMenu">

@@ -671,10 +671,64 @@ function initCustomObjectCreator() {
   });
 }
 
+function initMobileToolbarListeners() {
+  document.getElementById('mobileRotateBtn')?.addEventListener('click', () => {
+    if (mode === 'placing' && placingState) {
+      placingState.rot = (placingState.rot + 1) % 4;
+      showToast(`Rotated Placement [${placingState.rot * 90}°]`);
+    } else if (mode === 'moving' && movingState) {
+      movingState.rot = (movingState.rot + 1) % 4;
+      showToast(`Rotated Moving [${movingState.rot * 90}°]`);
+    } else if (activeContextBuilding) {
+      rotateBuildingInPlace(activeContextBuilding);
+      showToast('Rotated Machine');
+    } else {
+      showToast('Select a machine or enter placing mode to rotate.');
+    }
+  });
+
+  document.getElementById('mobileInspectBtn')?.addEventListener('click', (e) => {
+    const btn = document.getElementById('mobileInspectBtn');
+    if (mode === 'inspecting') {
+      cancelMode();
+      btn?.classList.remove('active');
+      showToast('Inspector Mode Off');
+    } else {
+      setMode('inspecting');
+      btn?.classList.add('active');
+      showToast('Inspector Mode On: Tap machine or ore');
+    }
+  });
+
+  document.getElementById('mobileZoomInBtn')?.addEventListener('click', () => {
+    const cam = STATE.camera;
+    cam.zoom = Math.min(cam.maxZoom, cam.zoom * 1.25);
+    clampCamera();
+  });
+
+  document.getElementById('mobileZoomOutBtn')?.addEventListener('click', () => {
+    const cam = STATE.camera;
+    cam.zoom = Math.max(cam.minZoom, cam.zoom / 1.25);
+    clampCamera();
+  });
+
+  document.getElementById('mobileCancelBtn')?.addEventListener('click', () => {
+    closeContextMenu();
+    closeInventoryModal();
+    closeCrateModal();
+    closePrestigeModal();
+    cancelMode();
+    document.getElementById('mobileInspectBtn')?.classList.remove('active');
+    renderHotbar();
+    showToast('Selection Cancelled');
+  });
+}
+
 function initHotbarAndInventory() {
   renderHotbar();
   initContextMenuListeners();
   initCustomObjectCreator();
+  initMobileToolbarListeners();
   loadSavedGame();
 
   // Tab Listeners for Main Tabs
