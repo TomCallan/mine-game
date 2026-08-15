@@ -431,12 +431,12 @@ function tryPlaceBuilding(defId, col, row, rot) {
   const def = STATE.buildingDefs[defId];
   if (!def) return false;
   if (!STATE.unlockedBuildingIds.includes(defId)) {
-    showToast(`🔒 ${def.name} is locked! Open Crates to unlock.`);
+    showToast(`${def.name} is locked. Open Crates to unlock.`);
     return false;
   }
   const cost = def.cost || 0;
   if (STATE.world.money < cost) {
-    showToast(`❌ Need $${cost} to place ${def.name}!`);
+    showToast(`Need $${cost} to place ${def.name}.`);
     return false;
   }
   const fp = getFootprint(def, rot);
@@ -913,7 +913,7 @@ function updateOrePhysics(dt) {
       if (def.requiresFuel && transport.port.kind === 'input' && ore.isFuel) {
         b.fuelTimer = (b.fuelTimer || 0) + (def.attributes.runDurationSec || 8);
         ore.destroyed = true;
-        showToast(`⛽ Fuel Loaded! Thermal Mine running for ${Math.round(b.fuelTimer)}s!`);
+        showToast(`Fuel Loaded! Thermal Mine running for ${Math.round(b.fuelTimer)}s.`);
         continue;
       }
 
@@ -1305,13 +1305,13 @@ function drawHUD() {
   const money = `$${(STATE.world.money || 0).toLocaleString()}`;
   const bldgCount = STATE.world.buildings.length;
   const oreCount = STATE.world.ores.length;
-  let hudText = `💰 Cash: ${money}  |  🏭 Buildings: ${bldgCount}  |  💎 Active Ores: ${oreCount}/${STATE.config.maxOres}\n[Controls] Click+Drag: Pan | Scroll: Zoom | E: Inventory | R: Rotate | 1-6: Hotbar`;
+  let hudText = `Cash: ${money}  |  Buildings: ${bldgCount}  |  Active Ores: ${oreCount}/${STATE.config.maxOres}\n[Controls] Click+Drag: Pan | Scroll: Zoom | E: Inventory | R: Rotate | 1-6: Hotbar`;
 
   if (mode === 'placing' && placingState) {
     const def = STATE.buildingDefs[placingState.defId];
-    hudText += `\n📍 PLACING: ${def ? def.name : ''} ($${def ? def.cost : 0}) [R: Rotate | Esc: Cancel]`;
+    hudText += `\nPLACING: ${def ? def.name : ''} ($${def ? def.cost : 0}) [R: Rotate | Esc: Cancel]`;
   } else if (mode === 'moving') {
-    hudText += `\n🚚 MOVING BUILDING [R: Rotate | Esc: Cancel]`;
+    hudText += `\nMOVING BUILDING [R: Rotate | Esc: Cancel]`;
   }
   hud.textContent = hudText;
 }

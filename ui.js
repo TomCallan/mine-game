@@ -23,7 +23,7 @@ function openContextMenu(building, screenX, screenY) {
   if (def.multiplier) stats += ` | ${def.multiplier}x Multiplier`;
   if (def.flatAdd) stats += ` | +$${def.flatAdd} Flat`;
   if (def.category === 'upgrader') stats += ` | Integrated Guide Walls`;
-  if (b.fuelTimer) stats += ` | ⛽ Fuel Active: ${Math.ceil(b.fuelTimer)}s`;
+  if (building.fuelTimer) stats += ` | Fuel Active: ${Math.ceil(building.fuelTimer)}s`;
   document.getElementById('ctxStats').textContent = stats;
 
   const wallsSection = document.getElementById('ctxWallsSection');
@@ -180,7 +180,7 @@ function renderInventoryGrid() {
     const titleBox = document.createElement('div');
     const title = document.createElement('div');
     title.className = 'inv-card-title';
-    title.textContent = isUnlocked ? def.name : `🔒 Locked ${def.name}`;
+    title.textContent = isUnlocked ? def.name : `Locked: ${def.name}`;
     titleBox.appendChild(title);
 
     const badge = document.createElement('span');
@@ -198,7 +198,7 @@ function renderInventoryGrid() {
     if (def.flatAdd) stats += ` | +$${def.flatAdd} Flat`;
     if (def.consumes) stats = 'Sells ores for cash bonus';
     if (def.produces) stats = `Produces ${def.produces.item} every ${def.produces.rate}ms`;
-    if (!isUnlocked) stats = '🔒 Locked! Purchase Crates in the Crate Shop to unlock!';
+    if (!isUnlocked) stats = 'Locked: Open Crates in the Crate Shop to unlock.';
     desc.textContent = stats;
     card.appendChild(desc);
 
@@ -207,10 +207,10 @@ function renderInventoryGrid() {
 
     const placeBtn = document.createElement('button');
     placeBtn.className = `inv-card-place-btn ${isUnlocked ? '' : 'locked-btn'}`;
-    placeBtn.textContent = isUnlocked ? `📍 Place ($${def.cost || 0})` : '🔒 Locked (Open Crates)';
+    placeBtn.textContent = isUnlocked ? `Place ($${def.cost || 0})` : 'Locked';
     placeBtn.addEventListener('click', () => {
       if (!isUnlocked) {
-        showToast('🔒 Open Crates to unlock this item!');
+        showToast('Open Crates to unlock this item!');
         return;
       }
       closeInventoryModal();
@@ -293,7 +293,7 @@ function buyAndOpenCrate(crateTypeKey) {
   if (!crate) return;
 
   if (STATE.world.money < crate.cost) {
-    showToast(`❌ Need $${crate.cost} to open ${crate.name}!`);
+    showToast(`Need $${crate.cost} to open ${crate.name}!`);
     return;
   }
 
@@ -363,7 +363,7 @@ function startUnboxingAnimation(rewardDef) {
   }, 50);
 
   setTimeout(() => {
-    showToast(`🎉 UNLOCKED: ${rewardDef.name} (${(rewardDef.rarity || 'common').toUpperCase()})!`);
+    showToast(`Unlocked: ${rewardDef.name} (${(rewardDef.rarity || 'common').toUpperCase()})`);
     hotbarItems[0] = rewardDef.id;
     renderHotbar();
     renderInventoryGrid();
@@ -527,7 +527,7 @@ function initCustomObjectCreator() {
     triggerSaveState();
 
     document.getElementById('customCreatorModal')?.classList.remove('open');
-    showToast(`✨ Created custom ${name}! (Equipped to Hotbar Slot 1)`);
+    showToast(`Created custom ${name} (Equipped to Hotbar Slot 1)`);
   });
 }
 

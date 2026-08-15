@@ -638,9 +638,9 @@
     }
   },
   "camera": {
-    "x": 845.1003911342893,
-    "y": 731.9530638852673,
-    "zoom": 0.9986979166666666,
+    "x": 768,
+    "y": 768,
+    "zoom": 1.0755208333333333,
     "minZoom": 0.25,
     "maxZoom": 4
   },
@@ -654,7 +654,7 @@
         "rot": 0,
         "y": 0,
         "lastProduced": 4942.799999982119,
-        "prodTimer": 241.29999999999643
+        "prodTimer": 647.8999999999999
       },
       {
         "id": "bldg_6",
@@ -723,122 +723,8 @@
         ]
       }
     ],
-    "ores": [
-      {
-        "id": "ore_1",
-        "itemType": "ore",
-        "x": 1142.3305359395051,
-        "y": 969.0506312084143,
-        "vx": 0.013934262854053497,
-        "vy": 1.6655188857617431,
-        "size": 14,
-        "color": "#ffb03b",
-        "shape": "circle",
-        "value": 6,
-        "energy": 0,
-        "maxEnergy": 100,
-        "status": {},
-        "upgradersPassed": [
-          "bldg_6",
-          "bldg_7",
-          "bldg_13",
-          "bldg_14",
-          "bldg_15",
-          "bldg_16"
-        ],
-        "groundTime": 1.8695
-      },
-      {
-        "id": "ore_2",
-        "itemType": "ore",
-        "x": 1142.3097385393346,
-        "y": 955.0506466559891,
-        "vx": 0.17061863682085482,
-        "vy": 20.36103530918919,
-        "size": 14,
-        "color": "#ffb03b",
-        "shape": "circle",
-        "value": 6,
-        "energy": 0,
-        "maxEnergy": 100,
-        "status": {},
-        "upgradersPassed": [
-          "bldg_6",
-          "bldg_7",
-          "bldg_13",
-          "bldg_14",
-          "bldg_15",
-          "bldg_16"
-        ],
-        "groundTime": 0.8681000000000002
-      },
-      {
-        "id": "ore_3",
-        "itemType": "ore",
-        "x": 1141.5212095143072,
-        "y": 874.0959954585685,
-        "vx": 2.2287602332700795,
-        "vy": 177.57275504473756,
-        "size": 14,
-        "color": "#ffb03b",
-        "shape": "circle",
-        "value": 4,
-        "energy": 0,
-        "maxEnergy": 100,
-        "status": {},
-        "upgradersPassed": [
-          "bldg_6",
-          "bldg_7",
-          "bldg_13",
-          "bldg_14",
-          "bldg_15",
-          "bldg_16"
-        ],
-        "groundTime": 0
-      },
-      {
-        "id": "ore_4",
-        "itemType": "ore",
-        "x": 1128.0280294895535,
-        "y": 708.5632858426094,
-        "vx": 44.984842194469586,
-        "vy": 131.012907213541,
-        "size": 14,
-        "color": "#ffb03b",
-        "shape": "circle",
-        "value": 4,
-        "energy": 0,
-        "maxEnergy": 100,
-        "status": {},
-        "upgradersPassed": [
-          "bldg_6",
-          "bldg_7",
-          "bldg_13",
-          "bldg_14"
-        ],
-        "groundTime": 0
-      },
-      {
-        "id": "ore_5",
-        "itemType": "ore",
-        "x": 1008.6657379452004,
-        "y": 672,
-        "vx": 99.2985251444484,
-        "vy": 0,
-        "size": 14,
-        "color": "#ffb03b",
-        "shape": "circle",
-        "value": 5,
-        "energy": 0,
-        "maxEnergy": 100,
-        "status": {},
-        "upgradersPassed": [
-          "bldg_6"
-        ],
-        "groundTime": 0
-      }
-    ],
+    "ores": [],
     "money": 3482
   },
-  "nextId": 6
+  "nextId": 1
 }
