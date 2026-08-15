@@ -12,12 +12,21 @@
 <div id="hud"></div>
 
 <!-- Mobile Touch Quick-Action Toolbar -->
+<div id="mobileModeBar">
+  <button class="mobile-action-btn active" id="mobileModePanBtn" data-mode="pan">✋ Pan</button>
+  <button class="mobile-action-btn" id="mobileModeBuildBtn" data-mode="build">🏗 Build</button>
+  <button class="mobile-action-btn" id="mobileModeInspectBtn" data-mode="inspect">👁 Inspect</button>
+</div>
 <div id="mobileControls">
   <button class="mobile-action-btn" id="mobileRotateBtn" title="Rotate Machine [R]">🔄 Rotate</button>
-  <button class="mobile-action-btn" id="mobileInspectBtn" title="Toggle Inspector [👁️]">👁️ Inspect</button>
   <button class="mobile-action-btn" id="mobileZoomInBtn" title="Zoom In">🔍+</button>
   <button class="mobile-action-btn" id="mobileZoomOutBtn" title="Zoom Out">🔍-</button>
   <button class="mobile-action-btn danger-btn" id="mobileCancelBtn" title="Cancel Selection [Esc]">✖ Cancel</button>
+</div>
+<div id="mobilePlaceActions">
+  <button class="mobile-action-btn" id="mPlaceConfirm">✅ Place</button>
+  <button class="mobile-action-btn" id="mPlaceRotate">🔄 Rotate</button>
+  <button class="mobile-action-btn danger-btn" id="mPlaceCancel">❌ Cancel</button>
 </div>
 
 <!-- Building Context Menu Card -->

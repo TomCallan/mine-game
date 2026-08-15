@@ -112,10 +112,37 @@ function enterPlacingMode(defId) {
   if (!STATE.defs.buildingDefs[defId]) return;
   placingState = { defId, rot: 0 };
   setMode('placing');
+  if (IS_MOBILE_DEVICE) setMobileInteractionMode('build');
+  if (typeof updateMobileInteractionUI === 'function') updateMobileInteractionUI();
 }
 function enterMovingMode(building) {
   movingState = { buildingId: building.id, rot: building.rot };
   setMode('moving');
+  if (typeof updateMobileInteractionUI === 'function') updateMobileInteractionUI();
+}
+
+function updateMobileInteractionUI() {
+  const modeButtons = [
+    { id: 'mobileModePanBtn', mode: 'pan' },
+    { id: 'mobileModeBuildBtn', mode: 'build' },
+    { id: 'mobileModeInspectBtn', mode: 'inspect' }
+  ];
+  modeButtons.forEach(({ id, mode: btnMode }) => {
+    const btn = document.getElementById(id);
+    if (btn) btn.classList.toggle('active', mobileInteractionMode === btnMode);
+  });
+
+  const tray = document.getElementById('mobilePlaceActions');
+  const isPlacing = mode === 'placing' && !!placingState;
+  tray?.classList.toggle('visible', isPlacing);
+
+  const confirmBtn = document.getElementById('mPlaceConfirm');
+  const candidate = typeof getCurrentPlacementCandidate === 'function' ? getCurrentPlacementCandidate() : null;
+  const isValid = !candidate || candidate.isValid;
+  if (confirmBtn) {
+    confirmBtn.disabled = !isValid;
+    confirmBtn.textContent = isValid ? '✅ Place' : '🚫 Blocked';
+  }
 }
 
 // Meta Currency Header Updating
@@ -181,6 +208,7 @@ function renderHotbar() {
   });
 
   updateMetaStatusBar();
+  if (typeof updateMobileInteractionUI === 'function') updateMobileInteractionUI();
 }
 
 // Main Window Renderer (Shop, Inventory, Relics, Meta)
@@ -672,6 +700,22 @@ function initCustomObjectCreator() {
 }
 
 function initMobileToolbarListeners() {
+  document.getElementById('mobileModePanBtn')?.addEventListener('click', () => {
+    setMobileInteractionMode('pan');
+    closeContextMenu();
+    showToast('Pan Mode');
+  });
+
+  document.getElementById('mobileModeBuildBtn')?.addEventListener('click', () => {
+    setMobileInteractionMode('build');
+    showToast('Build Mode');
+  });
+
+  document.getElementById('mobileModeInspectBtn')?.addEventListener('click', () => {
+    setMobileInteractionMode('inspect');
+    showToast('Inspect Mode: tap to inspect, hold for context');
+  });
+
   document.getElementById('mobileRotateBtn')?.addEventListener('click', () => {
     if (mode === 'placing' && placingState) {
       placingState.rot = (placingState.rot + 1) % 4;
@@ -685,19 +729,31 @@ function initMobileToolbarListeners() {
     } else {
       showToast('Select a machine or enter placing mode to rotate.');
     }
+    updateMobileInteractionUI();
   });
 
-  document.getElementById('mobileInspectBtn')?.addEventListener('click', (e) => {
-    const btn = document.getElementById('mobileInspectBtn');
-    if (mode === 'inspecting') {
-      cancelMode();
-      btn?.classList.remove('active');
-      showToast('Inspector Mode Off');
+  document.getElementById('mPlaceConfirm')?.addEventListener('click', () => {
+    if (typeof placeAtScreenPosition === 'function' && placeAtScreenPosition(mouseScreen.x, mouseScreen.y)) {
+      showToast('Placed');
     } else {
-      setMode('inspecting');
-      btn?.classList.add('active');
-      showToast('Inspector Mode On: Tap machine or ore');
+      showToast('Invalid placement');
+      triggerHaptic('error');
     }
+    updateMobileInteractionUI();
+  });
+
+  document.getElementById('mPlaceRotate')?.addEventListener('click', () => {
+    if (mode === 'placing' && placingState) {
+      placingState.rot = (placingState.rot + 1) % 4;
+      showToast(`Rotated Placement [${placingState.rot * 90}°]`);
+    }
+    updateMobileInteractionUI();
+  });
+
+  document.getElementById('mPlaceCancel')?.addEventListener('click', () => {
+    cancelMode();
+    renderHotbar();
+    updateMobileInteractionUI();
   });
 
   document.getElementById('mobileZoomInBtn')?.addEventListener('click', () => {
@@ -718,10 +774,12 @@ function initMobileToolbarListeners() {
     closeCrateModal();
     closePrestigeModal();
     cancelMode();
-    document.getElementById('mobileInspectBtn')?.classList.remove('active');
     renderHotbar();
     showToast('Selection Cancelled');
+    updateMobileInteractionUI();
   });
+
+  updateMobileInteractionUI();
 }
 
 function initHotbarAndInventory() {
@@ -795,6 +853,7 @@ window.addEventListener('keydown', (e) => {
     closePrestigeModal();
     cancelMode();
     renderHotbar();
+    updateMobileInteractionUI();
   } else if (e.key === 'e' || e.key === 'E') {
     const modal = document.getElementById('inventoryModal');
     if (modal && modal.classList.contains('open')) closeInventoryModal();
@@ -812,6 +871,7 @@ window.addEventListener('keydown', (e) => {
     } else if (mode === 'moving' && movingState) {
       movingState.rot = (movingState.rot + 1) % 4;
     }
+    updateMobileInteractionUI();
   }
 });
 
