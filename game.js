@@ -689,14 +689,49 @@ let selectedEntity = null;
 let mouseScreen = { x: 0, y: 0 };
 let currentCategory = 'all';
 let hotbarItems = ['extractor', 'belt', 'fastBelt', 'upgrader1x1', 'freonSprayer', 'seller'];
+const IS_MOBILE_DEVICE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || window.matchMedia('(pointer: coarse)').matches;
+const MOBILE_HIT_RADIUS = IS_MOBILE_DEVICE ? 26 : 10;
+const LONG_PRESS_MS = 380;
+const LONG_PRESS_MOVE_THRESHOLD = 12;
+const pointerState = {
+  pointers: new Map(),
+  activePointerId: null,
+  dragMoved: false,
+  multiTouch: false,
+  lastPoint: { x: 0, y: 0 },
+  longPressTimer: null,
+  longPressTriggered: false,
+  longPressOrigin: null,
+  pinchDistance: 0,
+  pinchMidpoint: null
+};
+let mobileInteractionMode = 'pan';
+let mobileHudExpanded = false;
+if (IS_MOBILE_DEVICE) {
+  STATE.camera.minZoom = 0.35;
+  STATE.camera.maxZoom = 3;
+}
 
 function setMode(m) {
   mode = m;
   canvas.className = `mode-${mode}`;
   updateInspectorPanel();
+  if (typeof updateMobileInteractionUI === 'function') updateMobileInteractionUI();
 }
 function cancelMode() {
   placingState = null; movingState = null; isBeltDragging = false; beltDragStart = null; setMode('idle');
+}
+function triggerHaptic(kind = 'success') {
+  if (!IS_MOBILE_DEVICE || !navigator.vibrate) return;
+  if (kind === 'error') navigator.vibrate([10, 40, 10]);
+  else navigator.vibrate(10);
+}
+function setMobileInteractionMode(nextMode) {
+  if (!IS_MOBILE_DEVICE) return;
+  mobileInteractionMode = nextMode;
+  if (nextMode === 'inspect' && mode === 'idle') setMode('inspecting');
+  else if (nextMode !== 'inspect' && mode === 'inspecting') cancelMode();
+  if (typeof updateMobileInteractionUI === 'function') updateMobileInteractionUI();
 }
 
 // Save & Migration System
@@ -914,17 +949,25 @@ function findBuildingById(id) {
 // Building Placement & Demolition with Inventory Integration
 function tryPlaceBuilding(defId, col, row, rot) {
   const def = STATE.defs.buildingDefs[defId];
-  if (!def) return false;
+  if (!def) {
+    triggerHaptic('error');
+    return false;
+  }
   if (!STATE.meta.blueprintUnlocks[defId]) {
     showToast(`${def.name} blueprint is locked.`);
+    triggerHaptic('error');
     return false;
   }
   if (!canPlaceFromInventory(defId)) {
     showToast(`No ${def.name} available in inventory! Buy from Shop.`);
+    triggerHaptic('error');
     return false;
   }
   const fp = getFootprint(def, rot);
-  if (wouldOverlapAt(defId, col, row, fp.w, fp.h, null)) return false;
+  if (wouldOverlapAt(defId, col, row, fp.w, fp.h, null)) {
+    triggerHaptic('error');
+    return false;
+  }
 
   removeFromInventory(defId, 1);
   STATE.run.buildings.push({
@@ -933,6 +976,7 @@ function tryPlaceBuilding(defId, col, row, rot) {
     lastProduced: performance.now()
   });
   triggerSaveState();
+  triggerHaptic('success');
   if (typeof renderInventoryGrid === 'function') renderInventoryGrid();
   if (typeof renderHotbar === 'function') renderHotbar();
   return true;
@@ -966,6 +1010,7 @@ function deleteBuilding(building) {
     selectedEntity = null;
   }
   showToast(`Demolished ${STATE.defs.buildingDefs[building.defId]?.name || 'Building'} -> Returned to Inventory`);
+  triggerHaptic('success');
   triggerSaveState();
   if (typeof renderInventoryGrid === 'function') renderInventoryGrid();
   if (typeof renderHotbar === 'function') renderHotbar();
@@ -1024,17 +1069,115 @@ function handleClickAction(screenX, screenY) {
     }
     cancelMode();
   } else if (mode === 'inspecting') {
-    selectEntityAt(world.x, world.y);
+    selectEntityAt(world.x, world.y, MOBILE_HIT_RADIUS);
   }
 }
 
-canvas.addEventListener('mousedown', (e) => {
-  if (e.button !== 0) return;
-  if (typeof closeContextMenu === 'function') closeContextMenu();
-  const world = screenToWorld(e.clientX, e.clientY);
-  const cell = worldToCell(world.x, world.y);
+function clearLongPressTimer() {
+  if (pointerState.longPressTimer) clearTimeout(pointerState.longPressTimer);
+  pointerState.longPressTimer = null;
+}
 
-  if (mode === 'placing' && placingState) {
+function startLongPress(screenX, screenY) {
+  clearLongPressTimer();
+  pointerState.longPressTriggered = false;
+  pointerState.longPressOrigin = { x: screenX, y: screenY };
+  pointerState.longPressTimer = setTimeout(() => {
+    pointerState.longPressTimer = null;
+    pointerState.longPressTriggered = true;
+    if (mobileInteractionMode !== 'inspect' || typeof openContextMenu !== 'function') return;
+    const world = screenToWorld(screenX, screenY);
+    const building = findBuildingNearWorld(world.x, world.y, MOBILE_HIT_RADIUS);
+    if (building) {
+      selectedEntity = { type: 'building', id: building.id };
+      updateInspectorPanel();
+      openContextMenu(building, screenX, screenY);
+      triggerHaptic('success');
+    }
+  }, LONG_PRESS_MS);
+}
+
+function placeAtScreenPosition(screenX, screenY) {
+  if (mode !== 'placing' || !placingState) return false;
+  const world = screenToWorld(screenX, screenY);
+  const def = STATE.defs.buildingDefs[placingState.defId];
+  if (!def) return false;
+  const fp = getFootprint(def, placingState.rot);
+  const raw = worldToCell(world.x, world.y);
+  const origin = clampedOrigin(fp.w, fp.h, raw.col, raw.row);
+  return tryPlaceBuilding(placingState.defId, origin.col, origin.row, placingState.rot);
+}
+
+function applyPointerClickAction(screenX, screenY, pointerType) {
+  const isTouchLike = pointerType !== 'mouse';
+  const world = screenToWorld(screenX, screenY);
+  if (isTouchLike && IS_MOBILE_DEVICE) {
+    if (mobileInteractionMode === 'inspect') {
+      if (mode !== 'inspecting') setMode('inspecting');
+      selectEntityAt(world.x, world.y, MOBILE_HIT_RADIUS);
+    } else if (mobileInteractionMode === 'build' && mode === 'moving' && movingState) {
+      handleClickAction(screenX, screenY);
+    }
+    return;
+  }
+  handleClickAction(screenX, screenY);
+}
+
+function shouldPanFromSinglePointer(pointerType) {
+  if (pointerType === 'mouse') return mode !== 'placing';
+  if (!IS_MOBILE_DEVICE) return mode !== 'placing';
+  return mobileInteractionMode === 'pan';
+}
+
+function beginPinchGesture() {
+  const points = Array.from(pointerState.pointers.values());
+  if (points.length < 2) return;
+  const a = points[0], b = points[1];
+  pointerState.pinchDistance = Math.hypot(a.x - b.x, a.y - b.y);
+  pointerState.pinchMidpoint = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
+
+function updatePinchGesture() {
+  const points = Array.from(pointerState.pointers.values());
+  if (points.length < 2 || !pointerState.pinchMidpoint) return;
+  const a = points[0], b = points[1];
+  const newDistance = Math.hypot(a.x - b.x, a.y - b.y);
+  const newMidpoint = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  if (pointerState.pinchDistance > 0) {
+    const before = screenToWorld(pointerState.pinchMidpoint.x, pointerState.pinchMidpoint.y);
+    const ratio = newDistance / pointerState.pinchDistance;
+    STATE.camera.zoom = Math.min(STATE.camera.maxZoom, Math.max(STATE.camera.minZoom, STATE.camera.zoom * ratio));
+    const after = screenToWorld(newMidpoint.x, newMidpoint.y);
+    STATE.camera.x += before.x - after.x;
+    STATE.camera.y += before.y - after.y;
+    clampCamera();
+  }
+  pointerState.pinchDistance = newDistance;
+  pointerState.pinchMidpoint = newMidpoint;
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  if (typeof closeContextMenu === 'function') closeContextMenu();
+  pointerState.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  pointerState.activePointerId = e.pointerId;
+  pointerState.dragMoved = false;
+  pointerState.lastPoint = { x: e.clientX, y: e.clientY };
+  mouseScreen = { x: e.clientX, y: e.clientY };
+  canvas.classList.add('dragging');
+  canvas.setPointerCapture(e.pointerId);
+
+  if (pointerState.pointers.size >= 2) {
+    pointerState.multiTouch = true;
+    clearLongPressTimer();
+    beginPinchGesture();
+    e.preventDefault();
+    return;
+  }
+
+  if (mode === 'placing' && placingState && (!IS_MOBILE_DEVICE || e.pointerType === 'mouse')) {
+    const world = screenToWorld(e.clientX, e.clientY);
+    const cell = worldToCell(world.x, world.y);
     const def = STATE.defs.buildingDefs[placingState.defId];
     if (def && def.layer === 'belt') {
       isBeltDragging = true;
@@ -1042,139 +1185,145 @@ canvas.addEventListener('mousedown', (e) => {
     }
   }
 
-  isDragging = true; dragMoved = false;
-  canvas.classList.add('dragging');
-  lastMouse = { x: e.clientX, y: e.clientY };
-});
+  if (IS_MOBILE_DEVICE && e.pointerType !== 'mouse' && mobileInteractionMode === 'inspect') {
+    startLongPress(e.clientX, e.clientY);
+  }
+  if (e.pointerType !== 'mouse') e.preventDefault();
+}, { passive: false });
 
-let isDragging = false;
-let dragMoved = false;
-let lastMouse = { x: 0, y: 0 };
-
-canvas.addEventListener('mousemove', (e) => {
+canvas.addEventListener('pointermove', (e) => {
+  if (!pointerState.pointers.has(e.pointerId)) return;
+  pointerState.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   mouseScreen = { x: e.clientX, y: e.clientY };
-  if (!isDragging) return;
-  const dx = e.clientX - lastMouse.x, dy = e.clientY - lastMouse.y;
-  if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragMoved = true;
-  if (mode !== 'placing') {
+
+  if (pointerState.pointers.size >= 2) {
+    pointerState.multiTouch = true;
+    clearLongPressTimer();
+    updatePinchGesture();
+    e.preventDefault();
+    return;
+  }
+
+  const dx = e.clientX - pointerState.lastPoint.x;
+  const dy = e.clientY - pointerState.lastPoint.y;
+  if (Math.abs(dx) > 3 || Math.abs(dy) > 3) pointerState.dragMoved = true;
+  if (pointerState.longPressOrigin) {
+    const lx = e.clientX - pointerState.longPressOrigin.x;
+    const ly = e.clientY - pointerState.longPressOrigin.y;
+    if (Math.hypot(lx, ly) > LONG_PRESS_MOVE_THRESHOLD) clearLongPressTimer();
+  }
+  if (shouldPanFromSinglePointer(e.pointerType)) {
     STATE.camera.x -= dx / STATE.camera.zoom;
     STATE.camera.y -= dy / STATE.camera.zoom;
     clampCamera();
   }
-  lastMouse = { x: e.clientX, y: e.clientY };
-});
+  pointerState.lastPoint = { x: e.clientX, y: e.clientY };
+  if (e.pointerType !== 'mouse') e.preventDefault();
+}, { passive: false });
 
-window.addEventListener('mouseup', (e) => {
-  if (e.button !== 0) return;
-  if (mode === 'placing' && placingState) {
-    if (isBeltDragging && beltDragStart) {
-      const world = screenToWorld(e.clientX, e.clientY);
-      const endCell = worldToCell(world.x, world.y);
-      const line = getBeltDragPath(beltDragStart, endCell);
-      line.cells.forEach(c => { tryPlaceBuilding(placingState.defId, c.col, c.row, line.rot); });
-    } else {
-      handleClickAction(e.clientX, e.clientY);
-    }
-  } else if (isDragging && !dragMoved) {
-    handleClickAction(e.clientX, e.clientY);
+function endPointerInteraction(e) {
+  const point = pointerState.pointers.get(e.pointerId) || { x: e.clientX, y: e.clientY };
+  pointerState.pointers.delete(e.pointerId);
+  const hadMultiTouch = pointerState.multiTouch;
+  const moved = pointerState.dragMoved;
+  const longPressTriggered = pointerState.longPressTriggered;
+  clearLongPressTimer();
+
+  if (pointerState.pointers.size >= 2) {
+    beginPinchGesture();
+    return;
   }
-  isBeltDragging = false; beltDragStart = null; isDragging = false;
+  if (pointerState.pointers.size === 1) {
+    const remaining = Array.from(pointerState.pointers.values())[0];
+    pointerState.lastPoint = { x: remaining.x, y: remaining.y };
+    pointerState.dragMoved = false;
+    pointerState.multiTouch = false;
+    pointerState.longPressTriggered = false;
+    return;
+  }
+
+  if (mode === 'placing' && placingState && isBeltDragging && beltDragStart && (!IS_MOBILE_DEVICE || e.pointerType === 'mouse')) {
+    const world = screenToWorld(point.x, point.y);
+    const endCell = worldToCell(world.x, world.y);
+    const line = getBeltDragPath(beltDragStart, endCell);
+    line.cells.forEach(c => { tryPlaceBuilding(placingState.defId, c.col, c.row, line.rot); });
+  } else if (!hadMultiTouch && !moved && !longPressTriggered) {
+    applyPointerClickAction(point.x, point.y, e.pointerType);
+  }
+
+  isBeltDragging = false;
+  beltDragStart = null;
+  pointerState.multiTouch = false;
+  pointerState.longPressTriggered = false;
+  pointerState.dragMoved = false;
+  pointerState.longPressOrigin = null;
+  pointerState.activePointerId = null;
   canvas.classList.remove('dragging');
-});
+}
 
-// Mobile Touch Interactions
-let touchStartDist = 0;
-let lastTouchPos = { x: 0, y: 0 };
-let lastTapTime = 0;
-
-canvas.addEventListener('touchstart', (e) => {
-  if (e.touches.length === 1) {
-    const t = e.touches[0];
-    lastTouchPos = { x: t.clientX, y: t.clientY };
-    mouseScreen = { x: t.clientX, y: t.clientY };
-
-    const now = performance.now();
-    if (now - lastTapTime < 300) {
-      const world = screenToWorld(t.clientX, t.clientY);
-      const cell = worldToCell(world.x, world.y);
-      const b = findBuildingAtCell(cell.col, cell.row);
-      if (b && typeof openContextMenu === 'function') {
-        openContextMenu(b, t.clientX, t.clientY);
-      }
-    }
-    lastTapTime = now;
-
-    if (mode === 'placing' && placingState) {
-      const world = screenToWorld(t.clientX, t.clientY);
-      const cell = worldToCell(world.x, world.y);
-      const def = STATE.defs.buildingDefs[placingState.defId];
-      if (def && def.layer === 'belt') {
-        isBeltDragging = true;
-        beltDragStart = cell;
-      }
-    }
-    isDragging = true; dragMoved = false;
-  } else if (e.touches.length === 2) {
-    const t1 = e.touches[0], t2 = e.touches[1];
-    touchStartDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-  }
-}, { passive: true });
-
-canvas.addEventListener('touchmove', (e) => {
-  if (e.touches.length === 1 && isDragging) {
-    const t = e.touches[0];
-    mouseScreen = { x: t.clientX, y: t.clientY };
-    const dx = t.clientX - lastTouchPos.x, dy = t.clientY - lastTouchPos.y;
-    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragMoved = true;
-
-    if (mode !== 'placing') {
-      STATE.camera.x -= dx / STATE.camera.zoom;
-      STATE.camera.y -= dy / STATE.camera.zoom;
-      clampCamera();
-    }
-    lastTouchPos = { x: t.clientX, y: t.clientY };
-  } else if (e.touches.length === 2 && touchStartDist > 0) {
-    const t1 = e.touches[0], t2 = e.touches[1];
-    const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-    const zoomRatio = currentDist / touchStartDist;
-    STATE.camera.zoom = Math.min(STATE.camera.maxZoom, Math.max(STATE.camera.minZoom, STATE.camera.zoom * (1 + (zoomRatio - 1) * 0.1)));
-    touchStartDist = currentDist;
-    clampCamera();
-  }
-}, { passive: true });
-
-canvas.addEventListener('touchend', (e) => {
-  if (e.touches.length === 0) {
-    if (mode === 'placing' && placingState) {
-      if (isBeltDragging && beltDragStart) {
-        const world = screenToWorld(lastTouchPos.x, lastTouchPos.y);
-        const endCell = worldToCell(world.x, world.y);
-        const line = getBeltDragPath(beltDragStart, endCell);
-        line.cells.forEach(c => { tryPlaceBuilding(placingState.defId, c.col, c.row, line.rot); });
-      } else {
-        handleClickAction(lastTouchPos.x, lastTouchPos.y);
-      }
-    } else if (isDragging && !dragMoved) {
-      handleClickAction(lastTouchPos.x, lastTouchPos.y);
-    }
-    isBeltDragging = false; beltDragStart = null; isDragging = false; touchStartDist = 0;
-  }
-}, { passive: true });
+canvas.addEventListener('pointerup', endPointerInteraction, { passive: false });
+canvas.addEventListener('pointercancel', endPointerInteraction, { passive: false });
 
 // Entity Selection & Inspector Panel
-function selectEntityAt(wx, wy) {
-  const cell = worldToCell(wx, wy);
-  const b = findBuildingAtCell(cell.col, cell.row);
-  if (b) { selectedEntity = { type: 'building', id: b.id }; updateInspectorPanel(); return; }
-  for (let i = STATE.run.ores.length - 1; i >= 0; i--) {
-    const o = STATE.run.ores[i];
-    const dx = o.x - wx, dy = o.y - wy;
-    if (dx * dx + dy * dy <= (o.size / 2) * (o.size / 2)) {
-      selectedEntity = { type: 'ore', id: o.id };
-      updateInspectorPanel(); return;
+function selectEntityAt(wx, wy, hitRadiusPx = MOBILE_HIT_RADIUS) {
+  const centerScreen = worldToScreen(wx, wy);
+  const radius = Math.max(6, hitRadiusPx);
+  let best = null;
+  let bestDist = Infinity;
+  const cs = STATE.config.grid.cellSize;
+
+  for (let i = STATE.run.buildings.length - 1; i >= 0; i--) {
+    const b = STATE.run.buildings[i];
+    const def = STATE.defs.buildingDefs[b.defId];
+    if (!def) continue;
+    const fp = getFootprint(def, b.rot);
+    const p1 = worldToScreen(b.col * cs, b.row * cs);
+    const p2 = worldToScreen((b.col + fp.w) * cs, (b.row + fp.h) * cs);
+    const dx = Math.max(p1.x - centerScreen.x, 0, centerScreen.x - p2.x);
+    const dy = Math.max(p1.y - centerScreen.y, 0, centerScreen.y - p2.y);
+    const dist = Math.hypot(dx, dy);
+    if (dist <= radius && dist < bestDist) {
+      bestDist = dist;
+      best = { type: 'building', id: b.id };
     }
   }
-  selectedEntity = null; updateInspectorPanel();
+
+  for (let i = STATE.run.ores.length - 1; i >= 0; i--) {
+    const o = STATE.run.ores[i];
+    const s = worldToScreen(o.x, o.y);
+    const oreRadius = (o.size / 2) * STATE.camera.zoom;
+    const dist = Math.hypot(s.x - centerScreen.x, s.y - centerScreen.y);
+    if (dist <= oreRadius + radius && dist < bestDist) {
+      bestDist = dist;
+      best = { type: 'ore', id: o.id };
+    }
+  }
+
+  selectedEntity = best;
+  updateInspectorPanel();
+}
+
+function findBuildingNearWorld(wx, wy, hitRadiusPx = MOBILE_HIT_RADIUS) {
+  const centerScreen = worldToScreen(wx, wy);
+  const cs = STATE.config.grid.cellSize;
+  let nearest = null;
+  let nearestDist = Infinity;
+  for (let i = STATE.run.buildings.length - 1; i >= 0; i--) {
+    const b = STATE.run.buildings[i];
+    const def = STATE.defs.buildingDefs[b.defId];
+    if (!def) continue;
+    const fp = getFootprint(def, b.rot);
+    const p1 = worldToScreen(b.col * cs, b.row * cs);
+    const p2 = worldToScreen((b.col + fp.w) * cs, (b.row + fp.h) * cs);
+    const dx = Math.max(p1.x - centerScreen.x, 0, centerScreen.x - p2.x);
+    const dy = Math.max(p1.y - centerScreen.y, 0, centerScreen.y - p2.y);
+    const dist = Math.hypot(dx, dy);
+    if (dist <= hitRadiusPx && dist < nearestDist) {
+      nearest = b;
+      nearestDist = dist;
+    }
+  }
+  return nearest;
 }
 
 function getSelectedEntityObject() {
@@ -1574,6 +1723,14 @@ function currentGhost() {
     const origin = clampedOrigin(fp.w, fp.h, raw.col, raw.row);
     return { def, fp, col: origin.col, row: origin.row };
   }
+
+  function getCurrentPlacementCandidate() {
+    if (mode !== 'placing' || !placingState) return null;
+    const ghost = currentGhost();
+    if (!ghost) return null;
+    const isValid = !wouldOverlapAt(placingState.defId, ghost.col, ghost.row, ghost.fp.w, ghost.fp.h, null);
+    return { ...ghost, isValid };
+  }
   if (mode === 'moving' && movingState) {
     const building = findBuildingById(movingState.buildingId);
     if (!building) return null;
@@ -1606,20 +1763,26 @@ function drawSelectionGlowAndGizmo(p1, p2, rot = 0) {
 }
 
 function drawGhostPreview() {
-  const ghost = currentGhost();
+  const ghost = getCurrentPlacementCandidate();
   if (!ghost) return;
-  const { def, fp, col, row } = ghost;
+  const { def, fp, col, row, isValid } = ghost;
   const cs = STATE.config.grid.cellSize;
   const p1 = worldToScreen(col * cs, row * cs);
   const p2 = worldToScreen((col + fp.w) * cs, (row + fp.h) * cs);
 
   drawSelectionGlowAndGizmo(p1, p2, placingState ? placingState.rot : 0);
-  ctx.fillStyle = hexToRgba(def.color, 0.35);
+  ctx.fillStyle = isValid ? hexToRgba(def.color, 0.35) : 'rgba(239, 68, 68, 0.35)';
   ctx.fillRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
-  ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+  ctx.strokeStyle = isValid ? 'rgba(255,255,255,0.7)' : 'rgba(248,113,113,0.95)';
   ctx.setLineDash([6, 4]);
   ctx.strokeRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
   ctx.setLineDash([]);
+  if (!isValid) {
+    ctx.fillStyle = 'rgba(239, 68, 68, 0.9)';
+    ctx.font = `${Math.max(10, 13 * STATE.camera.zoom)}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText('Invalid Placement', (p1.x + p2.x) / 2, p1.y - 10);
+  }
   drawPorts(fp, col, row);
 }
 
@@ -1735,11 +1898,19 @@ function drawEffects() {
 function drawHUD() {
   const hud = document.getElementById('hud');
   if (!hud) return;
+  if (IS_MOBILE_DEVICE && typeof updateMobileInteractionUI === 'function') updateMobileInteractionUI();
   const money = `$${(STATE.run.money || 0).toLocaleString()}`;
   const lifetime = `$${(STATE.run.lifetimeEarnings || 0).toLocaleString()}`;
   const bldgCount = STATE.run.buildings.length;
   const oreCount = STATE.run.ores.length;
-  let hudText = `Cash: ${money}  |  Lifetime: ${lifetime}\nPoints: 🌟 ${STATE.meta.prestigePoints} | Keys: 🔑 ${STATE.meta.prestigeKeys} | Shards: 💎 ${STATE.meta.shards} | Dust: 🌌 ${STATE.meta.prestigeDust}\nBuildings: ${bldgCount}  |  Active Ores: ${oreCount}/${STATE.config.maxOres}\n[Controls] Click+Drag: Pan | Scroll: Zoom | E: Shop/Inv | R: Rotate | 1-6: Hotbar`;
+  const modeLabel = IS_MOBILE_DEVICE ? `Mode: ${mobileInteractionMode.toUpperCase()}` : `Mode: ${mode.toUpperCase()}`;
+  let hudText = `Cash: ${money}  |  Buildings: ${bldgCount}  |  Ores: ${oreCount}/${STATE.config.maxOres}\n${modeLabel}`;
+  if (!IS_MOBILE_DEVICE || mobileHudExpanded) {
+    hudText += `\nLifetime: ${lifetime}\nPoints: 🌟 ${STATE.meta.prestigePoints} | Keys: 🔑 ${STATE.meta.prestigeKeys} | Shards: 💎 ${STATE.meta.shards} | Dust: 🌌 ${STATE.meta.prestigeDust}`;
+    hudText += `\n[Controls] Click+Drag: Pan | Scroll: Zoom | E: Shop/Inv | R: Rotate | 1-6: Hotbar`;
+  } else {
+    hudText += `\nTap HUD for more details`;
+  }
 
   if (mode === 'placing' && placingState) {
     const def = STATE.defs.buildingDefs[placingState.defId];
@@ -1748,6 +1919,7 @@ function drawHUD() {
   } else if (mode === 'moving') {
     hudText += `\nMOVING BUILDING [R: Rotate | Esc: Cancel]`;
   }
+  hud.classList.toggle('mobile-compact', IS_MOBILE_DEVICE);
   hud.textContent = hudText;
 }
 
@@ -1757,6 +1929,13 @@ function hexToRgba(hex, alpha) {
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+if (IS_MOBILE_DEVICE) {
+  const hudEl = document.getElementById('hud');
+  hudEl?.addEventListener('click', () => {
+    mobileHudExpanded = !mobileHudExpanded;
+  });
 }
 
 // Periodic live save
