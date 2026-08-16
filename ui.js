@@ -35,9 +35,58 @@ function openContextMenu(building, screenX, screenY) {
   } else if (def.category === 'belt') {
     stats.push(`Speed: ${def.speed || 'N/A'}`);
   }
-  document.getElementById('ctxStats').textContent = stats.join(' | ');
-
   const actionsContainer = document.querySelector('.ctx-actions');
+  
+  // Clean up any old gate controls
+  document.getElementById('ctxBtnGateToggle')?.remove();
+
+  if (def.isSwitchGate) {
+    const gateBtn = document.createElement('button');
+    gateBtn.className = 'ctx-btn';
+    gateBtn.id = 'ctxBtnGateToggle';
+    gateBtn.textContent = `Route: ${building.activeBranch === 1 ? 'DIVERT (90°)' : 'STRAIGHT (0°)'}`;
+    gateBtn.style.color = 'var(--accent-amber)';
+    gateBtn.onclick = () => {
+      building.activeBranch = (building.activeBranch === 1 ? 0 : 1);
+      gateBtn.textContent = `Route: ${building.activeBranch === 1 ? 'DIVERT (90°)' : 'STRAIGHT (0°)'}`;
+      showToast(`Switched Route: ${building.activeBranch === 1 ? 'DIVERT' : 'STRAIGHT'}`);
+      triggerSaveState();
+    };
+    actionsContainer.insertBefore(gateBtn, actionsContainer.firstChild);
+  } else if (def.isLoopGate) {
+    const gateBtn = document.createElement('button');
+    gateBtn.className = 'ctx-btn';
+    gateBtn.id = 'ctxBtnGateToggle';
+    const loops = [1, 2, 3, 5, 10];
+    gateBtn.textContent = `Target: ${building.targetLoops || 3} Loops`;
+    gateBtn.style.color = '#34d399';
+    gateBtn.onclick = () => {
+      const cur = building.targetLoops || 3;
+      const nxt = loops[(loops.indexOf(cur) + 1) % loops.length];
+      building.targetLoops = nxt;
+      gateBtn.textContent = `Target: ${nxt} Loops`;
+      showToast(`Loop Gate Target: ${nxt} Loops`);
+      triggerSaveState();
+    };
+    actionsContainer.insertBefore(gateBtn, actionsContainer.firstChild);
+  } else if (def.isFilterSorter) {
+    const gateBtn = document.createElement('button');
+    gateBtn.className = 'ctx-btn';
+    gateBtn.id = 'ctxBtnGateToggle';
+    const modes = ['unrefined', 'valuable', 'wet'];
+    gateBtn.textContent = `Filter: ${(building.filterMode || 'unrefined').toUpperCase()}`;
+    gateBtn.style.color = '#fbbf24';
+    gateBtn.onclick = () => {
+      const cur = building.filterMode || 'unrefined';
+      const nxt = modes[(modes.indexOf(cur) + 1) % modes.length];
+      building.filterMode = nxt;
+      gateBtn.textContent = `Filter: ${nxt.toUpperCase()}`;
+      showToast(`Filter Mode: ${nxt.toUpperCase()}`);
+      triggerSaveState();
+    };
+    actionsContainer.insertBefore(gateBtn, actionsContainer.firstChild);
+  }
+
   let fuelBtn = document.getElementById('ctxBtnFuel');
   if (def.requiresFuel) {
     if (!fuelBtn) {
@@ -782,37 +831,53 @@ function getDefDescription(def) {
     temporalFluxBorer: 'Time-distortion drill. Extracts Time Crystal Ore ($800 base value, Time-Aged).',
     algaeVat: 'Bio-luminescent harvester. Produces Glow Algae Ore ($120 base value, Wet status).',
     voidHarvester: 'Cosmic rift harvester. Extracts rare Void Shard Ore ($12,000 base value).',
+    // Logistics & Gates
     belt: 'Standard industrial conveyor belt (90 speed). Moves ores smoothly along direction.',
     halfBelt: 'Narrow 0.5x1 conveyor belt. Ideal for compact routing and tight spaces.',
     fastBelt: 'High-speed conveyor belt (180 speed, 2x standard).',
+    switchGate: 'Interactive Diverter Gate. Toggles between Straight (0°) and Divert (90°). Click directly on canvas to switch loop paths!',
+    loopGate: 'Loop Counter Gate. Directs ores into the upgrade loop until they reach Target Loops (default 3x), then automatically fires them to the seller! Click to change loops.',
+    filterSorter: 'Smart Sorter Gate. Diverts unrefined, flaming, or radioactive ores to treatment loops while sending clean ores straight. Click to cycle filter mode.',
+    crossoverBelt: 'Cross-Overpass Belt. Allows North-South and East-West conveyor lines to cross each other without mixing!',
+    splitter: 'Directs incoming ores alternatingly between left and right outputs.',
+    tripleSplitter: '3-Way Splitter. Distributes incoming ores sequentially across Left, Straight, and Right outputs.',
+    merger: 'Merges ores from multiple conveyor inputs into a single unified stream.',
+    heavyMerger: 'Heavy 3-Way Merger (200 speed). Merges up to 3 conveyor inputs into 1 boosted output line.',
     ultraBelt: 'Overclocked magnetic conveyor belt (320 speed). Rapid transport.',
     magLevRail: 'Frictionless magnetic levitation rail (450 speed). Instantaneous logistics.',
-    splitter: 'Directs incoming ores alternatingly between left and right outputs.',
-    merger: 'Merges ores from multiple conveyor inputs into a single unified stream.',
     phaseShiftBelt: 'Phase-shifted belt. Allows other machines to overlap and pass through.',
     gravityInverter: 'Inverts ore gravity physics, altering conveyor movement.',
     cryoStorageBelt: 'Deep-freeze conveyor. Slows ore speed (40 speed) and prevents volatile reactions.',
     quantumLink: 'Quantum entanglement terminal. Teleports ores directly to linked exit.',
-    upgrader1x1: 'Compact 2.0x value multiplier with integrated guide walls.',
-    upgraderHalf: 'Space-saving 0.5x1 upgrader. Applies 1.5x value multiplier.',
-    upgrader2x1: 'Wide 2x1 dual-lane upgrader. Applies 3.0x value multiplier.',
+
+    // Upgraders
+    upgrader1x1: 'Compact 2.0x value multiplier with integrated guide walls (Max 1 use).',
+    upgraderHalf: 'Space-saving 0.5x1 upgrader. Applies 1.5x value multiplier (Max 1 use).',
+    upgrader2x1: 'Wide 2x1 dual-lane upgrader. Applies 3.0x value multiplier (Max 1 use).',
     freonSprayer: 'Cryogenic freon spray. Extinguishes flaming ores and applies Wet status.',
     pyroRefiner: 'Blast furnace refiner. Applies 3.5x multiplier and ignites ores with Flaming status.',
     leadDecontaminator: 'Radiation scrubber. Safely cleans Radioactive status and applies 2.5x multiplier.',
-    stellarSparkler: 'Prismatic crystal. Imbues ores with the Sparkling status buff.',
-    upgraderPlasma: 'High-energy plasma injector. Adds +$500 flat bonus value to passing ores.',
+    stellarSparkler: 'Prismatic crystal. Imbues ores with the Sparkling status buff (Max 2 uses).',
+    upgraderPlasma: 'High-energy plasma injector. Adds +$500 flat bonus value to passing ores (Max 2 uses).',
     oreCrystallizer: 'Crystalline resonance chamber. Applies 2.2x multiplier and Crystalline status.',
     probabilityAmp: 'Quantum probability booster. Applies 1.8x multiplier and grants Lucky status.',
     entropyStabilizer: 'Cleanses and neutralizes all negative status effects with 3.0x multiplier.',
     resonanceHarmonizer: 'Harmonic booster. 4.5x multiplier with special synergy on Sparkling ores.',
     matterReplicator: 'Splits passing ores into duplicates, doubling throughput.',
     oreTransmuter: 'Transmutes low-tier mineral ores into high-value exotic ores with 2.5x multiplier.',
-    shardOfLife: 'Mythic aura generator. 6.0x multiplier and empowers adjacent machinery.',
-    seller: 'Standard furnace. Collects and incinerates ores, adding their total value to your funds.',
+    shardOfLife: 'Mythic aura generator. 6.0x multiplier and empowers adjacent machinery (Max 3 uses).',
+
+    // Sellers & Smelters
+    seller: 'Standard furnace (1.0x payout). Collects and incinerates ores, adding their cash value to your funds.',
     blastSmelter: 'High-efficiency industrial smelter. Sells ores with a +100% bonus (2.0x total payout).',
+    cryoSmelter: 'Cryo-Quench Smelter. 3.0x payout for Wet or Extinguished ores. (-50% penalty on Flaming ores).',
+    pyroSmelter: 'Thermobaric Smelter. 4.0x payout for Flaming/Superheated ores. (Wet ores are destroyed).',
     dimensionalVault: 'Stores ores in batches of 5, selling them together with a 3.5x payout bonus.',
     catalyticConverter: 'Chemical furnace. 2.5x base sell payout, boosted to 4.0x for Radioactive ores.',
-    soulForge: 'Forbidden crucible. Massive 8.0x sell payout with high-risk energy fluctuations.'
+    prismaticSmelter: 'Refines mineral crystals into gemstones. Massive 5.5x payout for Sparkling/Crystalline ores.',
+    singularitySmelter: 'Gravitational black hole (7.0x payout). Vacuum field pulls all nearby ores within 1.5 tiles inward.',
+    soulForge: 'Forbidden crucible. Massive 8.0x sell payout with a 10% risk of ore destruction.',
+    supernovaCrucible: 'Stellar fusion crucible. Unlocks massive 12.0x payout for ores over $10,000 with 2+ active status buffs.'
   };
 
   if (specificDescriptions[def.id]) {
@@ -1147,8 +1212,26 @@ window.addEventListener('keydown', (e) => {
   } else if (e.key === 'r' || e.key === 'R') {
     if (mode === 'placing' && placingState) {
       placingState.rot = (placingState.rot + 1) % 4;
+      showToast(`Placing Rotation: ${placingState.rot * 90}°`, 'info');
     } else if (mode === 'moving' && movingState) {
       movingState.rot = (movingState.rot + 1) % 4;
+      showToast(`Moving Rotation: ${movingState.rot * 90}°`, 'info');
+    } else {
+      // Rotate building hovered under mouse cursor, or active selected/context building
+      const world = screenToWorld(mouseScreen.x, mouseScreen.y);
+      const cell = worldToCell(world.x, world.y);
+      const hoveredB = findBuildingAtCell(cell.col, cell.row);
+      const targetB = hoveredB || (selectedEntity && selectedEntity.type === 'building' ? findBuildingById(selectedEntity.id) : null) || activeContextBuilding;
+      if (targetB) {
+        if (rotateBuildingInPlace(targetB)) {
+          const def = STATE.defs.buildingDefs[targetB.defId];
+          showToast(`Rotated ${def ? def.name : 'Machine'} to ${targetB.rot * 90}°`, 'info');
+        } else {
+          showToast('Cannot rotate: footprint obstructed', 'warn');
+        }
+      } else {
+        showToast('Hover over a machine to rotate [R]', 'info');
+      }
     }
   }
 });

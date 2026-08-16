@@ -70,6 +70,11 @@ const STATE = {
       belt: true,
       fastBelt: true,
       halfBelt: true,
+      switchGate: true,
+      loopGate: true,
+      crossoverBelt: true,
+      splitter: true,
+      merger: true,
       upgrader1x1: true,
       upgraderHalf: true,
       seller: true,
@@ -203,17 +208,53 @@ const STATE = {
         tags: ['transport'], attributes: {},
         ports: [{ dx: 0, dy: 0, kind: 'through', color: '#7fd0ff', dropSide: 0 }]
       },
+      switchGate: {
+        id: 'switchGate', name: 'Diverter Switch Gate', category: 'belt', rarity: 'uncommon', cost: 450, priceGrowth: 1.10,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#0284c7', speed: 120,
+        isSwitchGate: true, tags: ['routing', 'interactive', 'gate'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#38bdf8', dropSide: 0 }]
+      },
+      loopGate: {
+        id: 'loopGate', name: 'Loop Counter Gate', category: 'belt', rarity: 'rare', cost: 2200, priceGrowth: 1.11,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#059669', speed: 120,
+        isLoopGate: true, tags: ['routing', 'interactive', 'loop'], attributes: { defaultLoops: 3 },
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#34d399', dropSide: 0 }]
+      },
+      filterSorter: {
+        id: 'filterSorter', name: 'Filter Sorter Gate', category: 'belt', rarity: 'rare', cost: 4500, priceGrowth: 1.11,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#d97706', speed: 120,
+        isFilterSorter: true, tags: ['routing', 'interactive', 'sorter'], attributes: { defaultMode: 'unrefined' },
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#fbbf24', dropSide: 0 }]
+      },
+      crossoverBelt: {
+        id: 'crossoverBelt', name: 'Cross-Overpass Belt', category: 'belt', rarity: 'uncommon', cost: 750, priceGrowth: 1.10,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#64748b', speed: 150,
+        isCrossover: true, tags: ['routing', 'overpass'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#94a3b8', dropSide: 0 }]
+      },
       splitter: {
         id: 'splitter', name: 'Belt Splitter', category: 'belt', rarity: 'rare', cost: 1100, priceGrowth: 1.11,
         unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#e67e22', isSplitter: true, speed: 100,
         tags: ['routing'], attributes: {},
         ports: [{ dx: 0, dy: 0, kind: 'through', color: '#f39c12', dropSide: 0 }]
       },
+      tripleSplitter: {
+        id: 'tripleSplitter', name: 'Triple Splitter', category: 'belt', rarity: 'rare', cost: 3200, priceGrowth: 1.11,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#ea580c', isSplitter3: true, speed: 120,
+        tags: ['routing', 'splitter'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#fb923c', dropSide: 0 }]
+      },
       merger: {
         id: 'merger', name: 'Belt Merger', category: 'belt', rarity: 'rare', cost: 1100, priceGrowth: 1.11,
         unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#27ae60', isMerger: true, speed: 100,
         tags: ['routing'], attributes: {},
         ports: [{ dx: 0, dy: 0, kind: 'through', color: '#2ecc71', dropSide: 0 }]
+      },
+      heavyMerger: {
+        id: 'heavyMerger', name: 'Heavy 3-Way Merger', category: 'belt', rarity: 'rare', cost: 3200, priceGrowth: 1.11,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#16a34a', isMerger: true, speed: 200,
+        tags: ['routing', 'merger'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#4ade80', dropSide: 0 }]
       },
       ultraBelt: {
         id: 'ultraBelt', name: 'Ultra Conveyor', category: 'belt', rarity: 'epic', cost: 8000, priceGrowth: 1.12,
@@ -257,25 +298,25 @@ const STATE = {
       // --- CORE UPGRADERS ---
       upgrader1x1: {
         id: 'upgrader1x1', name: '1x1 Upgrader', category: 'upgrader', rarity: 'common', cost: 300, priceGrowth: 1.10,
-        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#d35400', multiplier: 2.0, energyCost: 10, speed: 90,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#d35400', multiplier: 2.0, energyCost: 10, speed: 90, maxUses: 1,
         tags: ['multiplier'], attributes: {},
         ports: [{ dx: 0, dy: 0, kind: 'through', color: '#e67e22', dropSide: 0 }]
       },
       upgraderHalf: {
         id: 'upgraderHalf', name: 'Half Upgrader', category: 'upgrader', rarity: 'uncommon', cost: 550, priceGrowth: 1.11,
-        unlockMethod: 'shop', size: { w: 0.5, h: 1 }, layer: 'belt', color: '#8e44ad', multiplier: 1.5, energyCost: 5, isHalf: true, speed: 90,
+        unlockMethod: 'shop', size: { w: 0.5, h: 1 }, layer: 'belt', color: '#8e44ad', multiplier: 1.5, energyCost: 5, isHalf: true, speed: 90, maxUses: 1,
         tags: ['multiplier', 'narrow'], attributes: {},
         ports: [{ dx: 0, dy: 0, kind: 'through', color: '#9b59b6', dropSide: 0 }]
       },
       freonSprayer: {
         id: 'freonSprayer', name: 'Freon Cooling Sprayer', category: 'upgrader', rarity: 'uncommon', cost: 2200, priceGrowth: 1.11,
-        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#0284c7', extinguishes: true, appliesWet: 6, cooldownEnergy: 50, speed: 90,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#0284c7', extinguishes: true, appliesWet: 6, cooldownEnergy: 50, speed: 90, maxUses: 1,
         tags: ['cooling', 'extinguisher'], attributes: {},
         ports: [{ dx: 0, dy: 0, kind: 'through', color: '#38bdf8', dropSide: 0 }]
       },
       upgrader2x1: {
         id: 'upgrader2x1', name: '2x1 Wide Upgrader', category: 'upgrader', rarity: 'rare', cost: 8500, priceGrowth: 1.12,
-        unlockMethod: 'shop', size: { w: 2, h: 1 }, layer: 'belt', color: '#c0392b', multiplier: 3.0, energyCost: 20, speed: 90,
+        unlockMethod: 'shop', size: { w: 2, h: 1 }, layer: 'belt', color: '#c0392b', multiplier: 3.0, energyCost: 20, speed: 90, maxUses: 1,
         tags: ['multiplier'], attributes: {},
         ports: [
           { dx: 0, dy: 0, kind: 'through', color: '#e74c3c', dropSide: 0 },
@@ -284,25 +325,25 @@ const STATE = {
       },
       pyroRefiner: {
         id: 'pyroRefiner', name: 'Pyro Blast Furnace', category: 'upgrader', rarity: 'rare', cost: 14000, priceGrowth: 1.12,
-        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#b91c1c', multiplier: 3.5, appliesFlaming: true, speed: 90,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#b91c1c', multiplier: 3.5, appliesFlaming: true, speed: 90, maxUses: 1,
         tags: ['multiplier', 'flaming'], attributes: {},
         ports: [{ dx: 0, dy: 0, kind: 'through', color: '#f87171', dropSide: 0 }]
       },
       leadDecontaminator: {
         id: 'leadDecontaminator', name: 'Lead Decontaminator', category: 'upgrader', rarity: 'epic', cost: 40000, priceGrowth: 1.13,
-        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#475569', removesRadioactive: true, multiplier: 2.5, speed: 90,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#475569', removesRadioactive: true, multiplier: 2.5, speed: 90, maxUses: 1,
         tags: ['decontaminator', 'multiplier'], attributes: {},
         ports: [{ dx: 0, dy: 0, kind: 'through', color: '#94a3b8', dropSide: 0 }]
       },
       stellarSparkler: {
         id: 'stellarSparkler', name: 'Stellar Prism', category: 'upgrader', rarity: 'exotic', cost: 750000, priceGrowth: 1.13,
-        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#eab308', appliesSparkling: true, speed: 90,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#eab308', appliesSparkling: true, speed: 90, maxUses: 2,
         tags: ['sparkles', 'buff'], attributes: {},
         ports: [{ dx: 0, dy: 0, kind: 'through', color: '#fde047', dropSide: 0 }]
       },
       upgraderPlasma: {
         id: 'upgraderPlasma', name: 'Plasma Supercharger', category: 'upgrader', rarity: 'epic', cost: 800000, priceGrowth: 1.14,
-        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#ff0055', flatAdd: 500, energyCost: 35, speed: 100,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#ff0055', flatAdd: 500, energyCost: 35, speed: 100, maxUses: 2,
         tags: ['flat_boost', 'plasma'], attributes: {},
         ports: [{ dx: 0, dy: 0, kind: 'through', color: '#ff0055', dropSide: 0 }]
       },
@@ -310,31 +351,31 @@ const STATE = {
       // --- NEW UPGRADERS & UTILITY MACHINES ---
       oreCrystallizer: {
         id: 'oreCrystallizer', name: 'Ore Crystallizer', category: 'upgrader', rarity: 'rare', cost: 22000, priceGrowth: 1.12,
-        unlockMethod: 'goldenCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#06b6d4', multiplier: 2.2, appliesCrystalline: true, speed: 90,
+        unlockMethod: 'goldenCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#06b6d4', multiplier: 2.2, appliesCrystalline: true, speed: 90, maxUses: 1,
         tags: ['multiplier', 'crystal'], attributes: {},
         ports: [{ dx: 0, dy: 0, kind: 'through', color: '#67e8f9', dropSide: 0 }]
       },
       probabilityAmp: {
         id: 'probabilityAmp', name: 'Probability Amplifier', category: 'upgrader', rarity: 'exotic', cost: 750000, priceGrowth: 1.13,
-        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#f59e0b', multiplier: 1.8, appliesLucky: true, speed: 90,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#f59e0b', multiplier: 1.8, appliesLucky: true, speed: 90, maxUses: 2,
         tags: ['multiplier', 'lucky'], attributes: {},
         ports: [{ dx: 0, dy: 0, kind: 'through', color: '#fbbf24', dropSide: 0 }]
       },
       entropyStabilizer: {
         id: 'entropyStabilizer', name: 'Entropy Stabilizer', category: 'upgrader', rarity: 'epic', cost: 110000, priceGrowth: 1.13,
-        unlockMethod: 'exoticCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#14b8a6', multiplier: 3.0, nullifiesBadStatuses: true, speed: 90,
+        unlockMethod: 'exoticCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#14b8a6', multiplier: 3.0, nullifiesBadStatuses: true, speed: 90, maxUses: 1,
         tags: ['multiplier', 'stabilizer'], attributes: {},
         ports: [{ dx: 0, dy: 0, kind: 'through', color: '#2dd4bf', dropSide: 0 }]
       },
       resonanceHarmonizer: {
         id: 'resonanceHarmonizer', name: 'Resonance Harmonizer', category: 'upgrader', rarity: 'legendary', cost: 1600000, priceGrowth: 1.14,
-        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#eab308', multiplier: 4.5, sparklingSynergy: true, speed: 90,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#eab308', multiplier: 4.5, sparklingSynergy: true, speed: 90, maxUses: 2,
         tags: ['multiplier', 'synergy'], attributes: {},
         ports: [{ dx: 0, dy: 0, kind: 'through', color: '#fde047', dropSide: 0 }]
       },
       matterReplicator: {
         id: 'matterReplicator', name: 'Matter Replicator', category: 'upgrader', rarity: 'mythic', cost: 12000000, priceGrowth: 1.15,
-        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 2, h: 1 }, layer: 'belt', color: '#a855f7', duplicatesOre: true, maxDuplicateCount: 1, speed: 90,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 2, h: 1 }, layer: 'belt', color: '#a855f7', duplicatesOre: true, maxDuplicateCount: 1, speed: 90, maxUses: 1,
         tags: ['duplicator'], attributes: {},
         ports: [
           { dx: 0, dy: 0, kind: 'through', color: '#c084fc', dropSide: 0 },
@@ -343,13 +384,13 @@ const STATE = {
       },
       oreTransmuter: {
         id: 'oreTransmuter', name: 'Ore Transmuter', category: 'upgrader', rarity: 'epic', cost: 250000, priceGrowth: 1.13,
-        unlockMethod: 'exoticCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#f43f5e', multiplier: 2.5, transmutation: true, speed: 90,
+        unlockMethod: 'exoticCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#f43f5e', multiplier: 2.5, transmutation: true, speed: 90, maxUses: 1,
         tags: ['transmuter'], attributes: {},
         ports: [{ dx: 0, dy: 0, kind: 'through', color: '#fb7185', dropSide: 0 }]
       },
       shardOfLife: {
         id: 'shardOfLife', name: 'Shard of Life', category: 'upgrader', rarity: 'mythic', cost: 40000000, priceGrowth: 1.16,
-        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 2, h: 2 }, layer: 'belt', color: '#22c55e', multiplier: 6.0, auraRadius: 2, speed: 90,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 2, h: 2 }, layer: 'belt', color: '#22c55e', multiplier: 6.0, auraRadius: 2, speed: 90, maxUses: 3,
         tags: ['aura', 'multiplier'], attributes: {},
         ports: [
           { dx: 0, dy: 0, kind: 'through', color: '#4ade80', dropSide: 0 },
@@ -357,38 +398,66 @@ const STATE = {
         ]
       },
 
-      // --- CORE SELLERS ---
+      // --- CORE SELLERS & SMELTERS ---
       seller: {
-        id: 'seller', name: 'Seller', category: 'seller', rarity: 'common', cost: 0, priceGrowth: 1.00,
-        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'machine', color: '#7a4fa0', consumes: true,
+        id: 'seller', name: 'Standard Seller', category: 'seller', rarity: 'common', cost: 0, priceGrowth: 1.00,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'machine', color: '#7a4fa0', consumes: true, sellerBonus: 1.0,
         tags: ['furnace', 'starter'], attributes: {},
         ports: [{ dx: 0, dy: 0, kind: 'input', color: '#9ad1ff', dropSide: null }]
       },
       blastSmelter: {
-        id: 'blastSmelter', name: 'Blast Smelter (2.0x)', category: 'seller', rarity: 'exotic', cost: 275000, priceGrowth: 1.14,
+        id: 'blastSmelter', name: 'Blast Smelter (2.0x)', category: 'seller', rarity: 'rare', cost: 45000, priceGrowth: 1.12,
         unlockMethod: 'shop', size: { w: 2, h: 2 }, layer: 'machine', color: '#581c87', consumes: true, sellerBonus: 2.0,
         tags: ['furnace', 'heavy_machinery'], attributes: {},
         ports: [{ dx: 0, dy: 0.5, kind: 'input', color: '#a855f7', dropSide: null }]
       },
-
-      // --- NEW SELLERS ---
+      cryoSmelter: {
+        id: 'cryoSmelter', name: 'Cryo-Quench Smelter (3.0x)', category: 'seller', rarity: 'rare', cost: 120000, priceGrowth: 1.13,
+        unlockMethod: 'shop', size: { w: 2, h: 2 }, layer: 'machine', color: '#0284c7', consumes: true, sellerBonus: 3.0, wetBonus: 3.0, flamePenalty: 0.5,
+        tags: ['furnace', 'cryo'], attributes: {},
+        ports: [{ dx: 0, dy: 0.5, kind: 'input', color: '#38bdf8', dropSide: null }]
+      },
+      pyroSmelter: {
+        id: 'pyroSmelter', name: 'Thermobaric Smelter (4.0x)', category: 'seller', rarity: 'epic', cost: 350000, priceGrowth: 1.13,
+        unlockMethod: 'shop', size: { w: 2, h: 2 }, layer: 'machine', color: '#b91c1c', consumes: true, sellerBonus: 4.0, flameBonus: 4.0, wetDestroys: true,
+        tags: ['furnace', 'pyro'], attributes: {},
+        ports: [{ dx: 0, dy: 0.5, kind: 'input', color: '#f87171', dropSide: null }]
+      },
       dimensionalVault: {
-        id: 'dimensionalVault', name: 'Dimensional Vault', category: 'seller', rarity: 'exotic', cost: 1400000, priceGrowth: 1.14,
+        id: 'dimensionalVault', name: 'Dimensional Vault (3.5x)', category: 'seller', rarity: 'exotic', cost: 1400000, priceGrowth: 1.14,
         unlockMethod: 'exoticCrate', crateOnly: true, size: { w: 2, h: 2 }, layer: 'machine', color: '#4c1d95', consumes: true, sellerBonus: 3.5, batchThreshold: 5,
         tags: ['vault', 'batch_seller'], attributes: {},
         ports: [{ dx: 0, dy: 0.5, kind: 'input', color: '#818cf8', dropSide: null }]
       },
       catalyticConverter: {
-        id: 'catalyticConverter', name: 'Catalytic Converter', category: 'seller', rarity: 'rare', cost: 95000, priceGrowth: 1.12,
+        id: 'catalyticConverter', name: 'Catalytic Converter (4.0x Rad)', category: 'seller', rarity: 'rare', cost: 95000, priceGrowth: 1.12,
         unlockMethod: 'exoticCrate', crateOnly: true, size: { w: 2, h: 1 }, layer: 'machine', color: '#84cc16', consumes: true, sellerBonus: 2.5, radioactiveBonus: 4.0,
         tags: ['furnace', 'radioactive_bonus'], attributes: {},
         ports: [{ dx: 0, dy: 0, kind: 'input', color: '#a3e635', dropSide: null }]
       },
+      prismaticSmelter: {
+        id: 'prismaticSmelter', name: 'Prismatic Refiner Smelter (5.5x)', category: 'seller', rarity: 'exotic', cost: 2200000, priceGrowth: 1.14,
+        unlockMethod: 'goldenCrate', crateOnly: true, size: { w: 2, h: 2 }, layer: 'machine', color: '#eab308', consumes: true, sellerBonus: 2.0, sparklingBonus: 5.5,
+        tags: ['furnace', 'prismatic'], attributes: {},
+        ports: [{ dx: 0, dy: 0.5, kind: 'input', color: '#fde047', dropSide: null }]
+      },
+      singularitySmelter: {
+        id: 'singularitySmelter', name: 'Void Singularity Smelter (7.0x)', category: 'seller', rarity: 'legendary', cost: 18000000, priceGrowth: 1.15,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 3, h: 3 }, layer: 'machine', color: '#312e81', consumes: true, sellerBonus: 7.0, vacuumRadius: 1.5,
+        tags: ['furnace', 'void', 'vacuum'], attributes: {},
+        ports: [{ dx: 0, dy: 1, kind: 'input', color: '#818cf8', dropSide: null }]
+      },
       soulForge: {
-        id: 'soulForge', name: 'Soul Forge', category: 'seller', rarity: 'legendary', cost: 6500000, priceGrowth: 1.15,
+        id: 'soulForge', name: 'Soul Forge (8.0x)', category: 'seller', rarity: 'legendary', cost: 6500000, priceGrowth: 1.15,
         unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 3, h: 2 }, layer: 'machine', color: '#7f1d1d', consumes: true, sellerBonus: 8.0, penaltyRisk: 0.10,
         tags: ['furnace', 'high_risk'], attributes: {},
         ports: [{ dx: 0, dy: 0.5, kind: 'input', color: '#f87171', dropSide: null }]
+      },
+      supernovaCrucible: {
+        id: 'supernovaCrucible', name: 'Supernova Crucible (12.0x)', category: 'seller', rarity: 'mythic', cost: 80000000, priceGrowth: 1.16,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 3, h: 2 }, layer: 'machine', color: '#ea580c', consumes: true, sellerBonus: 3.0, supernovaBonus: 12.0, minSupernovaValue: 10000,
+        tags: ['furnace', 'mythic'], attributes: {},
+        ports: [{ dx: 0, dy: 0.5, kind: 'input', color: '#ffedd5', dropSide: null }]
       }
     },
 
@@ -821,7 +890,7 @@ function migrateSavedState(savedState) {
   }
 
   // Ensure default unlocks exist
-  ['extractor', 'belt', 'fastBelt', 'halfBelt', 'upgrader1x1', 'upgraderHalf', 'seller', 'coalExtractor'].forEach(id => {
+  ['extractor', 'belt', 'fastBelt', 'halfBelt', 'switchGate', 'loopGate', 'crossoverBelt', 'splitter', 'merger', 'upgrader1x1', 'upgraderHalf', 'seller', 'coalExtractor'].forEach(id => {
     STATE.meta.blueprintUnlocks[id] = true;
   });
 }
@@ -1178,6 +1247,39 @@ function handleClickAction(screenX, screenY) {
     cancelMode();
   } else if (mode === 'inspecting') {
     selectEntityAt(world.x, world.y);
+  } else if (mode === 'idle') {
+    // Interactive in-world machine clicking
+    const cell = worldToCell(world.x, world.y);
+    const b = findBuildingAtCell(cell.col, cell.row);
+    if (b) {
+      const def = STATE.defs.buildingDefs[b.defId];
+      if (def) {
+        if (def.isSwitchGate) {
+          b.activeBranch = (b.activeBranch === 1 ? 0 : 1);
+          showToast(`Switch Gate: ${b.activeBranch === 0 ? 'STRAIGHT (0°)' : 'DIVERT (90°)'}`, 'info');
+          triggerSaveState();
+          return;
+        }
+        if (def.isLoopGate) {
+          const loopSteps = [1, 2, 3, 5, 10];
+          const cur = b.targetLoops || 3;
+          const nxt = loopSteps[(loopSteps.indexOf(cur) + 1) % loopSteps.length];
+          b.targetLoops = nxt;
+          showToast(`Loop Gate: Target ${nxt} Loops`, 'info');
+          triggerSaveState();
+          return;
+        }
+        if (def.isFilterSorter) {
+          const modes = ['unrefined', 'valuable', 'wet'];
+          const cur = b.filterMode || 'unrefined';
+          const nxt = modes[(modes.indexOf(cur) + 1) % modes.length];
+          b.filterMode = nxt;
+          showToast(`Filter Sorter: ${nxt.toUpperCase()}`, 'info');
+          triggerSaveState();
+          return;
+        }
+      }
+    }
   }
 }
 
@@ -1558,10 +1660,15 @@ function updateOrePhysics(dt) {
       }
 
       if (!ore.upgradersPassed) ore.upgradersPassed = [];
-      if (!ore.upgradersPassed.includes(b.id)) {
-        ore.upgradersPassed.push(b.id);
+      ore.upgraderUses = ore.upgraderUses || {};
+      const currentUses = ore.upgraderUses[def.id] || 0;
+      const maxAllowed = def.maxUses || 1;
 
-        if (def.extinguishes) { ore.status.flaming = false; ore.status.flameTime = 0; ore.energy = 0; }
+      if (!ore.upgradersPassed.includes(b.id) && currentUses < maxAllowed) {
+        ore.upgradersPassed.push(b.id);
+        ore.upgraderUses[def.id] = currentUses + 1;
+
+        if (def.extinguishes) { ore.status.flaming = false; ore.status.flameTime = 0; ore.energy = 0; ore.extinguished = true; }
         if (def.appliesWet) { ore.status.wet = def.appliesWet; ore.status.flaming = false; }
         if (def.appliesFlaming && !ore.status.wet) { ore.status.flaming = true; ore.status.flameTime = 0; }
         if (def.removesRadioactive) { ore.status.radioactive = false; }
@@ -1571,6 +1678,15 @@ function updateOrePhysics(dt) {
         if (def.nullifiesBadStatuses) {
           ore.status.flaming = false;
           ore.status.radioactive = false;
+        }
+
+        // Elemental synergy reactions
+        if (ore.status.flaming && ore.status.radioactive) {
+          ore.value += 2500; // Supercritical bonus
+          ore.status.supercritical = true;
+        }
+        if (ore.status.sparkling && ore.status.crystalline) {
+          ore.value = Math.round(ore.value * 1.5); // Resonant matrix
         }
 
         // Multiplier & Lucky Calculation
@@ -1601,13 +1717,48 @@ function updateOrePhysics(dt) {
             value: ore.value,
             energy: ore.energy,
             status: { ...ore.status, duplicated: true },
-            upgradersPassed: [...ore.upgradersPassed]
+            upgradersPassed: [...ore.upgradersPassed],
+            upgraderUses: { ...ore.upgraderUses }
           });
         }
       }
 
       let currentDropSide = transport.port.dropSide;
-      if (def.isSplitter) {
+      if (def.isSwitchGate) {
+        currentDropSide = (b.activeBranch === 1 ? (b.rot + 1) % 4 : b.rot);
+      } else if (def.isLoopGate) {
+        ore.loopCounts = ore.loopCounts || {};
+        if (ore.lastLoopGate !== b.id) {
+          ore.lastLoopGate = b.id;
+          ore.loopCounts[b.id] = (ore.loopCounts[b.id] || 0) + 1;
+        }
+        const targetLoops = b.targetLoops || 3;
+        if ((ore.loopCounts[b.id] || 1) < targetLoops) {
+          currentDropSide = (b.rot + 1) % 4; // Loop back
+        } else {
+          currentDropSide = b.rot; // Exit straight to seller
+        }
+      } else if (def.isFilterSorter) {
+        const fMode = b.filterMode || 'unrefined';
+        let match = false;
+        if (fMode === 'unrefined') match = !!(ore.status && (ore.status.flaming || ore.status.radioactive));
+        else if (fMode === 'valuable') match = (ore.value >= 1000);
+        else if (fMode === 'wet') match = !!(ore.status && ore.status.wet > 0);
+        currentDropSide = match ? (b.rot + 1) % 4 : b.rot;
+      } else if (def.isCrossover) {
+        if (Math.abs(ore.vx) > Math.abs(ore.vy)) {
+          currentDropSide = ore.vx >= 0 ? 0 : 2;
+        } else {
+          currentDropSide = ore.vy >= 0 ? 1 : 3;
+        }
+      } else if (def.isSplitter3) {
+        if (ore.splitter3Id !== b.id) {
+          ore.splitter3Id = b.id;
+          b.splitCount = (b.splitCount || 0) + 1;
+        }
+        const branches = [(b.rot + 3) % 4, b.rot, (b.rot + 1) % 4];
+        currentDropSide = branches[(b.splitCount || 0) % 3];
+      } else if (def.isSplitter) {
         if (ore.splitterBuildingId !== b.id) {
           ore.splitterBuildingId = b.id; b.splitCount = (b.splitCount || 0) + 1;
           currentDropSide = (b.rot + (b.splitCount % 2 === 0 ? 0 : 1)) % 4;
@@ -1634,6 +1785,22 @@ function updateOrePhysics(dt) {
         ore.destroyed = true; continue;
       }
       blend = 1 - Math.exp(-cfg.groundFriction * dt);
+    }
+
+    // Void Singularity gravitational pull
+    for (const b of STATE.run.buildings) {
+      const bDef = STATE.defs.buildingDefs[b.defId];
+      if (bDef && bDef.vacuumRadius) {
+        const centerX = (b.col + bDef.size.w / 2) * cs;
+        const centerY = (b.row + bDef.size.h / 2) * cs;
+        const dx = centerX - ore.x, dy = centerY - ore.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < bDef.vacuumRadius * cs * 2 && dist > 1) {
+          const pull = (1 - dist / (bDef.vacuumRadius * cs * 2)) * 140 * dt;
+          ore.x += (dx / dist) * pull;
+          ore.y += (dy / dist) * pull;
+        }
+      }
     }
 
     ore.vx += (targetVx - ore.vx) * blend;
@@ -1673,8 +1840,12 @@ function resolveOreCollisions() {
   }
 }
 
+const salesHistory = [];
+
 function processConsumption() {
   const cs = STATE.config.grid.cellSize;
+  const now = performance.now();
+
   for (const ore of STATE.run.ores) {
     if (ore.destroyed) continue;
     const cell = worldToCell(ore.x, ore.y);
@@ -1682,19 +1853,57 @@ function processConsumption() {
     const sellerAcc = occupants.find(o => o.def.consumes && o.isPort && o.port.kind === 'input');
     if (sellerAcc) {
       let soldVal = ore.value;
-      if (sellerAcc.def.sellerBonus) soldVal = Math.round(soldVal * sellerAcc.def.sellerBonus);
-      if (sellerAcc.def.radioactiveBonus && ore.status && ore.status.radioactive) {
-        soldVal = Math.round(soldVal * sellerAcc.def.radioactiveBonus);
+      const sDef = sellerAcc.def;
+
+      if (sDef.sellerBonus) soldVal = Math.round(soldVal * sDef.sellerBonus);
+      
+      // Special Smelter condition payouts
+      if (sDef.wetBonus && ore.status && (ore.status.wet > 0 || ore.extinguished)) {
+        soldVal = Math.round(soldVal * sDef.wetBonus);
       }
-      if (sellerAcc.def.penaltyRisk && Math.random() < sellerAcc.def.penaltyRisk) {
+      if (sDef.flamePenalty && ore.status && ore.status.flaming) {
+        soldVal = Math.round(soldVal * sDef.flamePenalty);
+      }
+      if (sDef.flameBonus && ore.status && ore.status.flaming) {
+        soldVal = Math.round(soldVal * sDef.flameBonus);
+      }
+      if (sDef.wetDestroys && ore.status && ore.status.wet > 0) {
+        soldVal = 0;
+        showToast('Thermobaric Smelter vaporized wet ore!', 'warn');
+      }
+      if (sDef.radioactiveBonus && ore.status && ore.status.radioactive) {
+        soldVal = Math.round(soldVal * sDef.radioactiveBonus);
+      }
+      if (sDef.sparklingBonus && ore.status && (ore.status.sparkling || ore.status.crystalline)) {
+        soldVal = Math.round(soldVal * sDef.sparklingBonus);
+      }
+      if (sDef.supernovaBonus && ore.value >= (sDef.minSupernovaValue || 10000)) {
+        const effects = Object.keys(ore.status || {}).filter(k => ore.status[k]).length;
+        if (effects >= 2) {
+          soldVal = Math.round(soldVal * sDef.supernovaBonus);
+          showToast(`Supernova Fusion! Sold for $${soldVal.toLocaleString()}!`, 'success');
+        }
+      }
+      if (sDef.penaltyRisk && Math.random() < sDef.penaltyRisk) {
         soldVal = 0; // Soul Forge penalty reset
-        showToast('Soul Forge destroyed an ore!');
+        showToast('Soul Forge consumed ore with no payout!', 'warn');
       }
 
       STATE.run.money += soldVal;
       STATE.run.lifetimeEarnings += soldVal;
       ore.destroyed = true;
+
+      salesHistory.push({ t: now, val: soldVal });
+      if (!STATE.run.bestOreSold || soldVal > STATE.run.bestOreSold) {
+        STATE.run.bestOreSold = soldVal;
+      }
+      STATE.run.totalOresSold = (STATE.run.totalOresSold || 0) + 1;
     }
+  }
+
+  // Purge old sales history (> 3 seconds)
+  while (salesHistory.length > 0 && now - salesHistory[0].t > 3000) {
+    salesHistory.shift();
   }
 }
 
@@ -1846,10 +2055,10 @@ function drawPorts(fp, col, row) {
 let beltAnimTick = 0;
 
 function drawBeltPaths() {
-  // Draw directional arrows on belt cells
   const cs = STATE.config.grid.cellSize;
   const zoom = STATE.camera.zoom;
-  if (zoom < 0.35) return;
+  if (zoom < 0.25) return;
+  beltAnimTick = (performance.now() / 400) % 1;
 
   for (const b of STATE.run.buildings) {
     const def = STATE.defs.buildingDefs[b.defId];
@@ -1857,36 +2066,148 @@ function drawBeltPaths() {
     const fp = getFootprint(def, b.rot);
     const p1 = worldToScreen(b.col * cs, b.row * cs);
     const p2 = worldToScreen((b.col + fp.w) * cs, (b.row + fp.h) * cs);
+    const w = p2.x - p1.x, h = p2.y - p1.y;
     const cx = (p1.x + p2.x) / 2, cy = (p1.y + p2.y) / 2;
-    const port = fp.ports[0];
-    if (!port || port.dropSide === null || port.dropSide === undefined) continue;
-
-    // Draw animated stripe
-    const side = port.dropSide;
-    const stripeSpacing = 14 * zoom;
-    const stripeOffset = (beltAnimTick * stripeSpacing) % stripeSpacing;
+    const isSelected = selectedEntity && selectedEntity.type === 'building' && selectedEntity.id === b.id;
 
     ctx.save();
-    ctx.globalAlpha = 0.22;
-    ctx.fillStyle = def.color;
-    ctx.fillRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
-    ctx.globalAlpha = 0.7;
-    ctx.restore();
 
-    // Small direction arrow in center
-    if (zoom > 0.5) {
-      ctx.save();
-      ctx.globalAlpha = 0.5;
-      ctx.fillStyle = def.color;
-      ctx.beginPath();
-      const aw = 5 * zoom, ah = 7 * zoom;
-      if (side === 0) { ctx.moveTo(cx - aw, cy - ah/2); ctx.lineTo(cx + aw, cy); ctx.lineTo(cx - aw, cy + ah/2); }
-      else if (side === 1) { ctx.moveTo(cx - ah/2, cy - aw); ctx.lineTo(cx, cy + aw); ctx.lineTo(cx + ah/2, cy - aw); }
-      else if (side === 2) { ctx.moveTo(cx + aw, cy - ah/2); ctx.lineTo(cx - aw, cy); ctx.lineTo(cx + aw, cy + ah/2); }
-      else { ctx.moveTo(cx - ah/2, cy + aw); ctx.lineTo(cx, cy - aw); ctx.lineTo(cx + ah/2, cy + aw); }
-      ctx.closePath(); ctx.fill();
-      ctx.restore();
+    // 1. Base Belt Plate
+    ctx.fillStyle = def.color || '#2b353e';
+    ctx.fillRect(p1.x, p1.y, w, h);
+
+    // Lateral guide rails
+    ctx.strokeStyle = '#1a2228';
+    ctx.lineWidth = Math.max(1, 2 * zoom);
+    ctx.strokeRect(p1.x, p1.y, w, h);
+
+    // 2. Animated Directional Flow Chevrons
+    let primaryDir = b.rot;
+    const port = fp.ports && fp.ports[0];
+    if (port && port.dropSide !== null && port.dropSide !== undefined) {
+      primaryDir = port.dropSide;
     }
+
+    const drawChevron = (x, y, dir, size, col, alpha = 0.85) => {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(dir * Math.PI / 2);
+      ctx.strokeStyle = col;
+      ctx.lineWidth = Math.max(1.5, 2.5 * zoom);
+      ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.7, -size * 0.6);
+      ctx.lineTo(size * 0.4, 0);
+      ctx.lineTo(-size * 0.7, size * 0.6);
+      ctx.stroke();
+      ctx.restore();
+    };
+
+    if (def.isCrossover) {
+      // Draw horizontal track & vertical track crossing
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.fillRect(p1.x, p1.y, w, h);
+
+      // Horizontal track
+      for (let k = 0; k < 2; k++) {
+        const offset = ((k / 2 + beltAnimTick) % 1) - 0.5;
+        drawChevron(cx + offset * w, cy, 0, Math.min(w, h) * 0.35, '#94a3b8', 0.8);
+      }
+      // Vertical track overpass
+      for (let k = 0; k < 2; k++) {
+        const offset = ((k / 2 + beltAnimTick) % 1) - 0.5;
+        drawChevron(cx, cy + offset * h, 1, Math.min(w, h) * 0.35, '#38bdf8', 0.9);
+      }
+    } else if (def.isSwitchGate) {
+      // Diverter switch: straight (0) + 90 deg turn
+      const straightDir = b.rot;
+      const divertDir = (b.rot + 1) % 4;
+      const isDiverted = b.activeBranch === 1;
+
+      // Inactive path (dim)
+      const inactDir = isDiverted ? straightDir : divertDir;
+      drawChevron(cx, cy, inactDir, Math.min(w, h) * 0.28, 'rgba(255,255,255,0.2)', 0.3);
+
+      // Active path (bright glowing amber with moving chevrons)
+      const actDir = isDiverted ? divertDir : straightDir;
+      for (let k = 0; k < 2; k++) {
+        const offset = ((k / 2 + beltAnimTick) % 1) - 0.5;
+        const dv = dirVector(actDir);
+        drawChevron(cx + dv.x * offset * w * 0.6, cy + dv.y * offset * h * 0.6, actDir, Math.min(w, h) * 0.4, '#e8a030', 1.0);
+      }
+
+      // Interactive on-sprite Toggle Pill
+      if (zoom > 0.45) {
+        ctx.fillStyle = isDiverted ? '#0284c7' : '#e8a030';
+        ctx.beginPath();
+        roundRect(ctx, cx - 18 * zoom, p1.y + 2, 36 * zoom, 10 * zoom, 2);
+        ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.font = `800 ${Math.max(6, 7 * zoom)}px JetBrains Mono, monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText(isDiverted ? 'DIVERT' : 'STRAIGHT', cx, p1.y + 9 * zoom);
+      }
+    } else if (def.isLoopGate) {
+      const straightDir = b.rot;
+      const loopDir = (b.rot + 1) % 4;
+
+      // Draw both paths
+      for (let k = 0; k < 2; k++) {
+        const offset = ((k / 2 + beltAnimTick) % 1) - 0.5;
+        const dv = dirVector(loopDir);
+        drawChevron(cx + dv.x * offset * w * 0.6, cy + dv.y * offset * h * 0.6, loopDir, Math.min(w, h) * 0.32, '#34d399', 0.85);
+      }
+      drawChevron(cx, cy, straightDir, Math.min(w, h) * 0.32, '#fbbf24', 0.7);
+
+      // Interactive Loop Target Pill
+      if (zoom > 0.45) {
+        ctx.fillStyle = '#059669';
+        ctx.beginPath();
+        roundRect(ctx, cx - 20 * zoom, p1.y + 2, 40 * zoom, 10 * zoom, 2);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.font = `800 ${Math.max(6, 7 * zoom)}px JetBrains Mono, monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText(`${b.targetLoops || 3}x LOOP`, cx, p1.y + 9 * zoom);
+      }
+    } else if (def.isFilterSorter) {
+      const straightDir = b.rot;
+      const divertDir = (b.rot + 1) % 4;
+
+      drawChevron(cx, cy, straightDir, Math.min(w, h) * 0.3, '#38bdf8', 0.75);
+      drawChevron(cx, cy, divertDir, Math.min(w, h) * 0.3, '#f59e0b', 0.75);
+
+      // Interactive Filter Mode Pill
+      if (zoom > 0.45) {
+        ctx.fillStyle = '#d97706';
+        ctx.beginPath();
+        roundRect(ctx, cx - 24 * zoom, p1.y + 2, 48 * zoom, 10 * zoom, 2);
+        ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.font = `800 ${Math.max(6, 6.5 * zoom)}px JetBrains Mono, monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText((b.filterMode || 'unrefined').toUpperCase(), cx, p1.y + 9 * zoom);
+      }
+    } else {
+      // Standard / Fast / Ultra Belts & Splitters / Mergers
+      const numChevrons = def.id === 'ultraBelt' ? 4 : (def.id === 'fastBelt' || def.id === 'magLevRail' ? 3 : 2);
+      const chevronColor = def.id === 'ultraBelt' ? '#fbbf24' : (def.id === 'fastBelt' ? '#7fd0ff' : '#e8edf0');
+
+      for (let k = 0; k < numChevrons; k++) {
+        const offset = ((k / numChevrons + beltAnimTick) % 1) - 0.5;
+        const dv = dirVector(primaryDir);
+        drawChevron(
+          cx + dv.x * offset * w * 0.8,
+          cy + dv.y * offset * h * 0.8,
+          primaryDir,
+          Math.min(w, h) * 0.38,
+          chevronColor,
+          0.85
+        );
+      }
+    }
+
+    ctx.restore();
   }
 }
 
@@ -1900,7 +2221,7 @@ const CATEGORY_ICONS = {
     ctx.moveTo(cx, cy - s*0.35); ctx.lineTo(cx, cy + s*0.35);
     ctx.stroke();
   },
-  upgrader: (ctx, cy, s, col) => {
+  upgrader: (cx, cy, s, col) => {
     ctx.strokeStyle = col; ctx.lineWidth = s * 0.08;
     ctx.beginPath();
     ctx.moveTo(cx - s*0.25, cy + s*0.2); ctx.lineTo(cx, cy - s*0.25); ctx.lineTo(cx + s*0.25, cy + s*0.2);
@@ -1919,18 +2240,49 @@ const CATEGORY_ICONS = {
 const SPRITE_RENDERERS = {
   extractor: (ctx, x, y, w, h, def, zoom, rot) => {
     ctx.save();
-    ctx.globalAlpha = 0.7;
     const cx = x + w/2, cy = y + h/2;
-    const r = Math.min(w, h) * 0.3;
+    const r = Math.min(w, h) * 0.28;
     const lighter = hexShift(def.color, 50);
 
+    // Ejection nozzle pointing toward output direction
+    const fp = getFootprint(def, rot);
+    const outPort = fp.ports.find(p => p.kind === 'output');
+    if (outPort) {
+      const portDir = rot;
+      const dv = dirVector(portDir);
+      const nozzleX = cx + dv.x * (w * 0.42);
+      const nozzleY = cy + dv.y * (h * 0.42);
+
+      // Draw ejection nozzle chute
+      ctx.fillStyle = '#1e293b';
+      ctx.strokeStyle = '#e8a030';
+      ctx.lineWidth = Math.max(1.5, 2 * zoom);
+      ctx.beginPath();
+      ctx.arc(nozzleX, nozzleY, Math.min(w, h) * 0.16, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Pulsing ejector chevron
+      const pTick = (performance.now() / 300) % 1;
+      ctx.strokeStyle = '#ffcf5c';
+      ctx.lineWidth = 2 * zoom;
+      ctx.save();
+      ctx.translate(nozzleX + dv.x * (pTick * 8 * zoom), nozzleY + dv.y * (pTick * 8 * zoom));
+      ctx.rotate(portDir * Math.PI / 2);
+      ctx.beginPath();
+      ctx.moveTo(-4 * zoom, -4 * zoom); ctx.lineTo(4 * zoom, 0); ctx.lineTo(-4 * zoom, 4 * zoom);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Drill core
     ctx.strokeStyle = lighter;
-    ctx.lineWidth = Math.max(1, Math.min(w, h) * 0.05);
+    ctx.lineWidth = Math.max(1.2, Math.min(w, h) * 0.05);
 
     if (def.id === 'coalExtractor') {
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.fillRect(x + w - w*0.3, y + h*0.1, w*0.15, h*0.4);
-      ctx.fillRect(x + w - w*0.25, y + h*0.05, w*0.05, h*0.1);
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(x + w - w*0.3, y + h*0.1, w*0.18, h*0.4);
+      ctx.fillRect(x + w - w*0.26, y + h*0.04, w*0.08, h*0.12);
     } else if (def.id === 'thermalExtractor') {
       ctx.fillStyle = '#f97316';
       ctx.beginPath();
@@ -1957,135 +2309,139 @@ const SPRITE_RENDERERS = {
     ctx.stroke();
     ctx.beginPath(); ctx.arc(cx, cy, r*0.4, 0, Math.PI*2); ctx.stroke();
 
-    const t = performance.now() / 50;
-    const vib = (Math.sin(t) > 0) ? 2 * zoom : -2 * zoom;
-    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(x + w*0.1 + vib, y + h*0.2); ctx.lineTo(x + w*0.1 + vib, y + h*0.8);
-    ctx.moveTo(x + w*0.9 + vib, y + h*0.2); ctx.lineTo(x + w*0.9 + vib, y + h*0.8);
-    ctx.stroke();
-    ctx.restore();
-  },
-  belt: (ctx, x, y, w, h, def, zoom, rot, b) => {
-    ctx.save();
-    ctx.globalAlpha = 0.7;
-    const cx = x + w/2, cy = y + h/2;
-    const lighter = hexShift(def.color, 50);
-    ctx.fillStyle = lighter;
-    
-    let dir = b ? b.rot : rot;
-    const fp = getFootprint(def, dir);
-    if (fp.ports && fp.ports[0] && fp.ports[0].dropSide !== null && fp.ports[0].dropSide !== undefined) {
-      dir = fp.ports[0].dropSide;
-    }
-    if (def.isSplitter && b) {
-       dir = (b.rot + ((b.splitCount||0) % 2 === 0 ? 0 : 1)) % 4;
-    }
-    
-    const drawArrow = (ax, ay, size, angle) => {
-      ctx.save();
-      ctx.translate(ax, ay);
-      ctx.rotate(angle * Math.PI / 2);
-      ctx.beginPath();
-      ctx.moveTo(-size, -size); ctx.lineTo(size, 0); ctx.lineTo(-size, size);
-      ctx.fill();
-      ctx.restore();
-    };
-
-    const asize = Math.min(w, h) * 0.2;
-    
-    if (def.id === 'fastBelt') {
-      drawArrow(cx - w*0.2, cy, asize, dir);
-      drawArrow(cx, cy, asize, dir);
-      drawArrow(cx + w*0.2, cy, asize, dir);
-    } else if (def.id === 'ultraBelt') {
-      ctx.fillStyle = '#fbbf24';
-      drawArrow(cx - w*0.3, cy, asize, dir);
-      drawArrow(cx - w*0.1, cy, asize, dir);
-      drawArrow(cx + w*0.1, cy, asize, dir);
-      drawArrow(cx + w*0.3, cy, asize, dir);
-    } else if (def.isSplitter) {
-      ctx.save();
-      ctx.translate(cx, cy); ctx.rotate(dir * Math.PI / 2);
-      ctx.beginPath();
-      ctx.moveTo(-asize*1.5, -asize*0.5); ctx.lineTo(0, -asize*0.5);
-      ctx.lineTo(asize, -asize*1.5); ctx.lineTo(asize*1.5, -asize);
-      ctx.lineTo(0, 0); ctx.lineTo(asize*1.5, asize); ctx.lineTo(asize, asize*1.5);
-      ctx.lineTo(0, asize*0.5); ctx.lineTo(-asize*1.5, asize*0.5);
-      ctx.fill();
-      ctx.restore();
-    } else if (def.isMerger) {
-      ctx.save();
-      ctx.translate(cx, cy); ctx.rotate(dir * Math.PI / 2);
-      ctx.beginPath();
-      ctx.moveTo(asize*1.5, 0); ctx.lineTo(0, -asize); ctx.lineTo(0, asize);
-      ctx.fill();
-      ctx.restore();
-    } else {
-      drawArrow(cx - w*0.15, cy, asize, dir);
-      drawArrow(cx + w*0.15, cy, asize, dir);
-    }
     ctx.restore();
   },
   upgrader: (ctx, x, y, w, h, def, zoom, rot) => {
     ctx.save();
-    ctx.globalAlpha = 0.7;
     const cx = x + w/2, cy = y + h/2;
-    const asize = Math.min(w, h) * 0.3;
     const lighter = hexShift(def.color, 50);
-    ctx.fillStyle = lighter;
-    
+    const flowDir = rot;
+
+    // Upgrader Entrance Bracket (Intake - Cyan)
+    const dv = dirVector(flowDir);
+    const inX = cx - dv.x * (w * 0.42);
+    const inY = cy - dv.y * (h * 0.42);
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = Math.max(1.5, 2.5 * zoom);
+    ctx.beginPath();
+    if (flowDir === 0 || flowDir === 2) {
+      ctx.moveTo(inX, cy - h * 0.35); ctx.lineTo(inX, cy + h * 0.35);
+    } else {
+      ctx.moveTo(cx - w * 0.35, inY); ctx.lineTo(cx + w * 0.35, inY);
+    }
+    ctx.stroke();
+
+    // Upgrader Exit Bracket (Output - Amber)
+    const outX = cx + dv.x * (w * 0.42);
+    const outY = cy + dv.y * (h * 0.42);
+    ctx.strokeStyle = '#e8a030';
+    ctx.beginPath();
+    if (flowDir === 0 || flowDir === 2) {
+      ctx.moveTo(outX, cy - h * 0.35); ctx.lineTo(outX, cy + h * 0.35);
+    } else {
+      ctx.moveTo(cx - w * 0.35, outY); ctx.lineTo(cx + w * 0.35, outY);
+    }
+    ctx.stroke();
+
+    // Animated Flow Arrows through the machine
+    const uTick = (performance.now() / 350) % 1;
+    ctx.strokeStyle = lighter;
+    ctx.lineWidth = Math.max(1.5, 2 * zoom);
+    for (let k = -1; k <= 1; k++) {
+      const step = ((k + uTick + 2) % 3) - 1;
+      const ax = cx + dv.x * step * (w * 0.3);
+      const ay = cy + dv.y * step * (h * 0.3);
+      ctx.save();
+      ctx.translate(ax, ay);
+      ctx.rotate(flowDir * Math.PI / 2);
+      ctx.beginPath();
+      ctx.moveTo(-5 * zoom, -5 * zoom); ctx.lineTo(5 * zoom, 0); ctx.lineTo(-5 * zoom, 5 * zoom);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     if (def.id === 'freonSprayer') {
-      ctx.strokeStyle = lighter; ctx.lineWidth = Math.max(1, w*0.05);
+      ctx.strokeStyle = '#67e8f9'; ctx.lineWidth = Math.max(1, w*0.05);
+      const asize = Math.min(w, h) * 0.25;
       for (let i=0; i<6; i++) {
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
+        ctx.beginPath(); ctx.moveTo(cx, cy);
         ctx.lineTo(cx + Math.cos(i*Math.PI/3) * asize, cy + Math.sin(i*Math.PI/3) * asize);
         ctx.stroke();
       }
     } else if (def.id === 'pyroRefiner') {
+      ctx.fillStyle = '#ef4444';
       ctx.beginPath();
-      ctx.moveTo(cx, cy - asize);
-      ctx.quadraticCurveTo(cx + asize, cy + asize, cx, cy + asize);
-      ctx.quadraticCurveTo(cx - asize, cy + asize, cx, cy - asize);
-      ctx.fill();
-    } else if (def.id === 'leadDecontaminator') {
-      ctx.beginPath();
-      ctx.moveTo(cx - asize, cy - asize*0.5); ctx.lineTo(cx + asize, cy - asize*0.5);
-      ctx.lineTo(cx + asize, cy + asize*0.2); ctx.lineTo(cx, cy + asize);
-      ctx.lineTo(cx - asize, cy + asize*0.2); ctx.closePath();
-      ctx.fill();
-    } else {
-      ctx.beginPath();
-      ctx.moveTo(cx, cy - asize); ctx.lineTo(cx + asize, cy + asize); ctx.lineTo(cx - asize, cy + asize);
+      ctx.arc(cx, cy, Math.min(w, h) * 0.2, 0, Math.PI * 2);
       ctx.fill();
     }
+
     ctx.restore();
   },
   seller: (ctx, x, y, w, h, def, zoom, rot) => {
     ctx.save();
-    ctx.globalAlpha = 0.7;
     const cx = x + w/2, cy = y + h/2;
     const lighter = hexShift(def.color, 50);
-    const aw = w * 0.2, ah = h * 0.3;
-    
-    ctx.strokeStyle = lighter;
-    ctx.lineWidth = Math.max(1, w*0.05);
 
-    if (def.id === 'blastSmelter') {
-      ctx.fillStyle = 'rgba(255, 100, 0, 0.5)';
-      ctx.fillRect(cx - aw*1.5, cy, aw*3, ah);
-      ctx.beginPath(); ctx.moveTo(cx-aw, cy); ctx.lineTo(cx-aw, cy-ah); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy-ah*1.2); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(cx+aw, cy); ctx.lineTo(cx+aw, cy-ah); ctx.stroke();
+    // Intake Hopper Mouth with inward-pointing vacuum chevrons
+    const inDir = rot;
+    const dv = dirVector(inDir);
+    const mouthX = cx - dv.x * (w * 0.38);
+    const mouthY = cy - dv.y * (h * 0.38);
+
+    // Vacuum hopper bracket
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = Math.max(1.5, 3 * zoom);
+    ctx.beginPath();
+    if (inDir === 0 || inDir === 2) {
+      ctx.moveTo(mouthX, cy - h * 0.38); ctx.lineTo(mouthX, cy + h * 0.38);
     } else {
-      ctx.beginPath();
-      ctx.moveTo(cx - aw, cy - ah); ctx.lineTo(cx + aw, cy - ah);
-      ctx.lineTo(cx + aw*0.3, cy + ah); ctx.lineTo(cx - aw*0.3, cy + ah);
-      ctx.closePath();
-      ctx.stroke();
+      ctx.moveTo(cx - w * 0.38, mouthY); ctx.lineTo(cx + w * 0.38, mouthY);
     }
+    ctx.stroke();
+
+    // Inward vacuum pulsing chevrons into core
+    const vTick = (performance.now() / 300) % 1;
+    const vPos = ((1 - vTick) - 0.5) * (w * 0.4);
+    ctx.save();
+    ctx.translate(cx + dv.x * vPos, cy + dv.y * vPos);
+    ctx.rotate(inDir * Math.PI / 2);
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = Math.max(1.5, 2 * zoom);
+    ctx.beginPath();
+    ctx.moveTo(-4 * zoom, -5 * zoom); ctx.lineTo(5 * zoom, 0); ctx.lineTo(-4 * zoom, 5 * zoom);
+    ctx.stroke();
+    ctx.restore();
+
+    // Furnace Core
+    if (def.id === 'cryoSmelter') {
+      ctx.fillStyle = '#0284c7';
+      ctx.beginPath(); ctx.arc(cx, cy, Math.min(w, h) * 0.24, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#67e8f9'; ctx.stroke();
+    } else if (def.id === 'pyroSmelter') {
+      ctx.fillStyle = '#dc2626';
+      ctx.beginPath(); ctx.arc(cx, cy, Math.min(w, h) * 0.24, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#f59e0b'; ctx.stroke();
+    } else if (def.id === 'prismaticSmelter') {
+      ctx.fillStyle = '#eab308';
+      ctx.beginPath(); ctx.arc(cx, cy, Math.min(w, h) * 0.24, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#fef08a'; ctx.stroke();
+    } else if (def.id === 'singularitySmelter') {
+      // Swirling black hole
+      ctx.fillStyle = '#000';
+      ctx.beginPath(); ctx.arc(cx, cy, Math.min(w, h) * 0.28, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#a855f7';
+      ctx.lineWidth = 2 * zoom;
+      ctx.stroke();
+    } else if (def.id === 'supernovaCrucible') {
+      ctx.fillStyle = '#ea580c';
+      ctx.beginPath(); ctx.arc(cx, cy, Math.min(w, h) * 0.28, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#fed7aa'; ctx.lineWidth = 3 * zoom; ctx.stroke();
+    } else {
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.beginPath(); ctx.arc(cx, cy, Math.min(w, h) * 0.22, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = lighter; ctx.stroke();
+    }
+
     ctx.restore();
   }
 };
@@ -2097,7 +2453,7 @@ function drawBuildings() {
   for (const b of STATE.run.buildings) {
     const def = STATE.defs.buildingDefs[b.defId];
     if (!def) continue;
-    if (def.layer === 'belt') continue; // drawn by drawBeltPaths, below we draw machines
+    if (def.category === 'belt') continue; // Belts rendered by drawBeltPaths
     const fp = getFootprint(def, b.rot);
     const p1 = worldToScreen(b.col * cs, b.row * cs);
     const p2 = worldToScreen((b.col + fp.w) * cs, (b.row + fp.h) * cs);
@@ -2170,43 +2526,12 @@ function drawBuildings() {
       ctx.textAlign = 'center';
       ctx.shadowColor = 'rgba(0,0,0,0.8)';
       ctx.shadowBlur = 3;
-      // Truncate name to fit
       let label = def.name;
       while (ctx.measureText(label).width > w - 8 && label.length > 4) label = label.slice(0, -1);
       if (label !== def.name) label += '…';
       ctx.fillText(label, p1.x + w/2, p2.y + fontSize + 2);
       ctx.shadowBlur = 0;
     }
-    ctx.restore();
-  }
-
-  // Draw belt machines on top
-  for (const b of STATE.run.buildings) {
-    const def = STATE.defs.buildingDefs[b.defId];
-    if (!def || def.layer !== 'belt') continue;
-    const fp = getFootprint(def, b.rot);
-    const p1 = worldToScreen(b.col * cs, b.row * cs);
-    const p2 = worldToScreen((b.col + fp.w) * cs, (b.row + fp.h) * cs);
-    const w = p2.x - p1.x, h = p2.y - p1.y;
-    const isSelected = selectedEntity && selectedEntity.type === 'building' && selectedEntity.id === b.id;
-    const isMoving = movingState && movingState.buildingId === b.id;
-
-    ctx.save();
-    if (isMoving) ctx.globalAlpha = 0.45;
-    if (isSelected) drawSelectionGlowAndGizmo(p1, p2, b.rot);
-
-    ctx.fillStyle = hexToRgba(def.color, 0.35);
-    ctx.fillRect(p1.x, p1.y, w, h);
-
-    ctx.strokeStyle = isSelected ? '#e8a030' : hexToRgba(def.color, 0.5);
-    ctx.lineWidth = isSelected ? 2 * zoom : 0.8 * zoom;
-    ctx.strokeRect(p1.x, p1.y, w, h);
-
-    const renderer = SPRITE_RENDERERS[def.id] || SPRITE_RENDERERS[def.category];
-    if (renderer) renderer(ctx, p1.x, p1.y, w, h, def, zoom, b.rot, b);
-
-    ctx.globalAlpha = isMoving ? 0.45 : 1;
-    drawPorts(fp, b.col, b.row);
     ctx.restore();
   }
 }
@@ -2345,17 +2670,39 @@ function drawEffects() {
   ctx.restore();
 }
 
+function getLifeLevel(lifetime) {
+  if (lifetime < 25000) return 1;
+  if (lifetime < 100000) return 2;
+  if (lifetime < 500000) return 3;
+  if (lifetime < 2500000) return 4;
+  if (lifetime < 10000000) return 5;
+  if (lifetime < 50000000) return 6;
+  if (lifetime < 250000000) return 7;
+  return 8 + Math.floor(Math.log10(lifetime / 250000000));
+}
+
 function updateHUD() {
   // Update HUD data elements
   const hudCash = document.getElementById('hudCash');
+  const hudRate = document.getElementById('hudRate');
+  const hudLife = document.getElementById('hudLife');
   const hudLifetime = document.getElementById('hudLifetime');
   const hudBuildings = document.getElementById('hudBuildings');
   const hudOres = document.getElementById('hudOres');
   const hudModeBadge = document.getElementById('hudModeBadge');
   const hudTips = document.getElementById('hudTips');
 
+  const lifetime = STATE.run.lifetimeEarnings || 0;
+  const currentLife = getLifeLevel(lifetime);
+
+  // Calculate moving average $/s over last 3 seconds
+  const rateSum = salesHistory.reduce((acc, cur) => acc + cur.val, 0);
+  const incomeRate = Math.round(rateSum / 3);
+
   if (hudCash) hudCash.textContent = `$${(STATE.run.money || 0).toLocaleString()}`;
-  if (hudLifetime) hudLifetime.textContent = `$${(STATE.run.lifetimeEarnings || 0).toLocaleString()}`;
+  if (hudRate) hudRate.textContent = `+$${incomeRate.toLocaleString()} / s`;
+  if (hudLife) hudLife.textContent = `Life ${currentLife}`;
+  if (hudLifetime) hudLifetime.textContent = `$${lifetime.toLocaleString()}`;
   if (hudBuildings) hudBuildings.textContent = STATE.run.buildings.length;
   const oreCount = STATE.run.ores.length;
   const maxOres = STATE.config.maxOres;
@@ -2390,7 +2737,7 @@ function updateHUD() {
     } else if (mode === 'moving') {
       hudTips.textContent = 'Click destination  |  R: Rotate  |  Esc: Cancel';
     } else {
-      hudTips.textContent = 'Drag: Pan  |  Scroll: Zoom  |  E: Shop  |  Dbl-Click: Inspect  |  1-6: Hotbar';
+      hudTips.textContent = 'Drag: Pan  |  Scroll: Zoom  |  E: Shop  |  R: Rotate Hovered  |  Click Gate: Toggle';
     }
   }
 }
