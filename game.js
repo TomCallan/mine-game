@@ -1861,7 +1861,7 @@ class FactoryScene extends Phaser.Scene {
     this.previewGfx = this.add.graphics();
     this.effectsGfx = this.add.graphics();
 
-    this.nextCrateSpawnTime = performance.now() + 10000;
+    this.nextCrateSpawnTime = performance.now() + 180000;
 
     // 3. Floating Text Group
     this.floatingTexts = [];
@@ -2104,10 +2104,11 @@ class FactoryScene extends Phaser.Scene {
 
   updateWorldCrates(time, dt) {
     if (!STATE.run.spawnedCrates) STATE.run.spawnedCrates = [];
-    if (!this.nextCrateSpawnTime) this.nextCrateSpawnTime = time + 10000;
+    if (!this.nextCrateSpawnTime) this.nextCrateSpawnTime = time + 180000;
 
     if (time >= this.nextCrateSpawnTime) {
-      this.nextCrateSpawnTime = time + Phaser.Math.Between(20000, 35000);
+      // 4.5 to 5.5 minute cooldown (~5 minutes)
+      this.nextCrateSpawnTime = time + Phaser.Math.Between(270000, 330000);
 
       if (STATE.run.spawnedCrates.length < 6) {
         const grid = STATE.config.grid;

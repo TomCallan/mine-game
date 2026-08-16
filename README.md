@@ -1,138 +1,124 @@
-# 🏭 Miner's Haven Clone — Major Progression & Metagame Overhaul
+# 🏭 Miner's Haven — Factory Idle Simulation & Economy Tycoon
 
-A high-performance, real-time 2D factory building game built with HTML5 Canvas, Vanilla CSS, and Modular JavaScript. Inspired by *Miner's Haven*, players build automated production lines using **Extractors (Mines)**, **Conveyors**, **Upgraders**, **Decontaminators/Coolers**, **Crates**, **Relics**, and **Sellers/Smelters**.
-
----
-
-## 🚀 Key Features
-
-* **3 Progression Layers**: Explicit separation of **Run State** (cash, placed buildings, ores), **Inventory** (purchased stock & permanent crate unlocks), and **Meta Progression** (Prestige Points, Prestige Keys, Blueprints, Relics, Shards, Dust).
-* **Shop vs. Inventory Separation**: Buy items from the shop with cash to store in inventory. Placing on the canvas consumes inventory stock; demolishing returns items to inventory.
-* **Prestige Metagame Engine**: Prestige at $\ge \$10\text{B}$ lifetime earnings to earn permanent **Prestige Points** and **Prestige Keys**.
-  - $\text{Prestige Points} = \lfloor (\frac{\text{Lifetime Earnings}}{10^{10}})^{0.5} \rfloor$
-  - $\text{Prestige Keys} = \max(1, 1 + \lfloor \log_{10}(\frac{\text{Lifetime Earnings}}{10^{10}}) \rfloor)$
-* **4-Tiered Crate Unboxing**: Unbox **Regular** ($250), **Golden** ($1,000), **Exotic** ($5,000), and **Prestige** (1 Key) Crates via an animated roulette wheel.
-  - Duplicate standard blueprints convert to **Shards**.
-  - Duplicate prestige rewards convert to **Prestige Dust**.
-* **20 New Objects & Status Mechanics**:
-  - **Ore Statuses**: `flaming`, `wet`, `radioactive`, `sparkling`, `lucky` (2x next upgrade multiplier), `crystalline` (+0.75x upgrader buff), `nullified` (cleanses hazards), `duplicated` (anti-infinite duplication loop flag), `timeAged` (travel time scaling).
-  - **New Extractors**: Crystal Geode Driller, Antimatter Siphon, Temporal Flux Borer, Bioluminescent Algae Vat, Void Fragment Harvester.
-  - **New Logistics**: MagLev Rail, Phase-Shift Conveyor, Gravity Inverter Belt, Cryo-Storage Conveyor, Quantum Entanglement Link.
-  - **New Upgraders & Sellers**: Ore Crystallizer, Probability Amplifier, Entropy Stabilizer, Resonance Harmonizer, Matter Replicator, Ore Transmuter, Shard of Life, Dimensional Vault, Catalytic Converter, Soul Forge.
-* **Passive Relic System**: Collect account-wide passive relics (`warehouseCharter`, `starterBelts`, `sellerPermit`, `crateMagnet`, `salvageToolkit`, `insuranceSeal`, `exoticPermit`, `vaultArchivist`) displayed in a dedicated UI tab.
-* **Mobile-First Touch Architecture**:
-  - **48x48 CSS px** minimum touch targets with `touch-action: manipulation`.
-  - **Full-Screen Mobile Panels & Tall Bottom Sheets** (`overscroll-behavior: contain`) preventing nested scrolling conflicts.
-  - **Tap-to-Select & Tap-to-Place** placement model with on-screen mobile toolbar controls (Rotate, Inspect, Zoom, Cancel).
-  - Bottom-heavy thumb-friendly HUD.
-* **Interactive Custom Object Creator**: Integrated 12x12 pixel art sprite editor and configurator to create custom Extractors, Belts, Upgraders, and Sellers directly in-game.
-* **Live Save & Migration Engine**: Saves game state asynchronously to `savegame.json` on disk and `localStorage`. Includes backward-compatibility migration for older save formats (`STATE.world.*`).
+A high-performance, real-time 2D industrial factory automation game built with **Phaser 3**, **Vanilla CSS**, and **Modular JavaScript**. Inspired by the beloved mechanics of *Miner's Haven*, players design complex, automated production loops using **Extractors**, **Conveyors**, **Multi-Pass Upgraders**, **Side-Mounted Tesla & Laser Beam Emitters**, **Status Sorters & Loop Gates**, **Orbital Supply Crates**, and **Multi-Status Supernova Smelters**.
 
 ---
 
-## 🧠 Data Structure Architecture
+## 🌟 Highlights & Core Mechanics
 
-Everything in the simulation is managed inside a central, JSON-serializable `STATE` object defined in [`game.js`](file:///home/administrator/mine-game/game.js):
+### 🚀 1. Phaser 3 Simulation & Multi-Layer Vector Engine
+* **Camera Controls**: Ultra-smooth cursor-anchored mouse wheel zoom (`0.25x` to `3.0x`) and delta drag-panning across an infinite factory floor (`-4000` to `+8000`).
+* **Pre-Placement Directional Indicators**:
+  * **Conveyors**: Continuous chevron arrows (`>>>`) animated in the drop direction on every tile during drag placement.
+  * **Extractors**: High-contrast ejection nozzle with outward-firing trajectory arrows into neighboring cells.
+  * **Inline Upgraders**: Cyan intake bracket `[`, amber exit bracket `]`, and internal flow direction arrows.
+  * **Side-Mounted Beams**: Turret emitter with projected scanning beam line and impact scan circles on target belt tiles.
+  * **Smelters / Furnaces**: Suction hoppers with inward vacuum chevrons and glowing thermal cores.
 
-```js
-const STATE = {
-  config: {
-    grid: { cols: 24, rows: 24, cellSize: 64 },
-    maxOres: 300,
-    beltAcceleration: 3,
-    groundFriction: 2.5,
-    oreGroundLifespan: 3,
-    prestigeThresholdLifetime: 1e10,
-    prestigeKeyLogBase: 10,
-    inventoryBaseCapacity: 40
-  },
+---
 
-  run: {
-    money: 1000,
-    lifetimeEarnings: 0,
-    buildings: [],
-    ores: [],
-    timeScale: 1.0,
-    isPaused: false
-  },
+### 🗺️ 2. Four-Tier Progression Roadmap & Economy Curve
 
-  shop: { stock: {}, dynamicPriceLevel: {} },
+```
+[ Tier 1: Starter Industrial ] ──▶ [ Tier 2: Chemical & Thermal ] ──▶ [ Tier 3: Nuclear & Sub-Atomic ] ──▶ [ Tier 4: Cosmic Singularity ]
+      $0 – $50,000                       $50,000 – $10,000,000              $10,000,000 – $1,000,000,000          $1B – $10B+ (Rebirth Ready)
+```
 
-  inventory: {
-    capacity: 40,
-    items: {},
-    permanentItems: {},
-    consumables: {}
-  },
+1. **Tier 1: Starter Industrial ($0 – $50K)**:
+   * Starter Iron & Coal extraction, 2-pass refiner loops, fast conveyors, directional switch gates, and basic blast furnaces.
+2. **Tier 2: Chemical & Thermal ($50K – $10M)**:
+   * Coal-fueled Thermal Mines, Freon Cooling Chambers, Pyro Superheaters, side-mounted Tesla Induction Beams, and Cryo-Quench Smelters.
+3. **Tier 3: Nuclear & Sub-Atomic ($10M – $1B)**:
+   * Uranium Centrifuges, Lead Radiation Scrubbers, Precision Laser Scanners, Neutron Collimators, 20-pass Quantum Loop Colliders, and Prismatic Gem Smelters.
+4. **Tier 4: Cosmic Singularity ($1B – $10B+ / Rebirth)**:
+   * Antimatter Siphons, Cosmic Void Harvesters, Celestial Prism Refineries, Shards of Life, Singularity Vacuum Smelters, and 12.0x Supernova Fusion Crucibles.
 
-  meta: {
-    prestigePoints: 0,
-    prestigeKeys: 0,
-    blueprintUnlocks: {},
-    relics: {},
-    shards: 0,
-    prestigeDust: 0,
-    collection: {}
-  },
+---
 
-  defs: { itemDefs: {}, buildingDefs: {}, relicDefs: {}, crateDefs: {} }
-};
+### ⚡ 3. Multi-Pass Upgrader Traversal & Side-Mounted Beams
+* **Full-Length Traversal Requirement**:
+  * Ores must travel the complete internal distance through multi-tile machines (`upgrader2x1`, `freonSprayer`, `quantumLooper`, `celestialRefinery`, `shardOfLife`) before receiving an upgrade.
+* **Exit-and-Re-Entry Loop Stacking**:
+  * Ores can loop through the same machine up to its maximum allowance (5x–10x for standard/exotic, 20x for Quantum Loop Colliders), exponentially compounding value with every loop cycle.
+* **Side-Mounted Upgrader Cannons**:
+  * **Tesla Induction Beam** (`teslaBeam`): 3.2x multiplier + Sparkling status.
+  * **Plasma Arc Injector** (`plasmaArc`): +$1,000 flat addition + 1.5x multiplier.
+  * **Precision Laser Scanner** (`laserScanner`): 4.0x multiplier + Crystalline status.
+  * **Neutron Collimator** (`neutronCollimator`): 5.5x multiplier + Sparkling status.
+
+---
+
+### 🧪 4. Status Effects & Multiplier Synergy Matrix
+
+* **🔥 Flaming**: Applied by Pyro Superheaters & Volcano Mines. Grants **4.0x payout** in Thermobaric Smelters.
+* **💧 Wet / Quenched**: Applied by Freon Sprayers & Algae Vats. Grants **3.0x payout** in Cryo-Quench Smelters and protects high-value ores from thermal destruction.
+* **☢️ Radioactive**: Applied by Uranium Centrifuges. Grants **4.0x payout** in Catalytic Converters or can be scrubbed by Lead Scrubbers into pure metal (+2.5x).
+* **✨ Sparkling & 💎 Crystalline Resonance**:
+  * **Sparkling**: +0.5x to all subsequent machines.
+  * **Crystalline**: +0.75x to all subsequent machines.
+  * **Prismatic Synergy**: When both are active, `prismaticSmelter` pays out **5.5x**, and `resonanceHarmonizer` multiplies by **4.5x with a 1.5x resonance bonus**!
+* **🌟 Supernova Multi-Status Fusion**:
+  * When an ore carrying 2 or more distinct status effects enters the `supernovaCrucible`, it triggers a **12.0x Supernova Fusion Payout**!
+
+---
+
+### 📦 5. Orbital Supply Crates (World Spawning)
+* **No Paywall Storefront**: Crates are free mystery supply drops that parachute from orbit onto open factory tiles every **~5 minutes**.
+* **4 Rarity Tiers**:
+  * 🔘 **Regular Crate** (60% spawn chance): Starter blueprints & `$500 – $2,500` bonus cash.
+  * 🟡 **Golden Crate** (24% spawn chance): Rare/Epic blueprints & `$5,000 – $25,000` bonus cash.
+  * 🟣 **Exotic Crate** (12% spawn chance): Exotic blueprints & `$50,000 – $250,000` bonus cash.
+  * 🔵 **Prestige Crate** (4% rare spawn): Mythic blueprints, `$500K – $2.5M` bonus cash, and **+1 Prestige Key**!
+* **Interactive World Sprites**: Rendered with shimmering vertical celestial beacon pillars, pulsing ground target rings, and 3D hovering metallic crate boxes. Simply click on a crate in the world to open it!
+
+---
+
+### 💾 6. Named Save Slot Manager & Auto-Save
+* **3 Dedicated Save Slots** with editable custom names and timestamps.
+* **Dual-Layer Persistence**: Saves synchronously to browser `localStorage` and disk (`/api/save/:slot`).
+* **Auto-Save**: Debounced background persistence ensures zero progress loss.
+
+---
+
+## 🎮 Controls & Shortcuts
+
+| Action | Control / Shortcut |
+| :--- | :--- |
+| **Pan Camera** | Click & Drag canvas (Middle/Right click or Left click while idle) |
+| **Zoom In / Out** | Mouse Wheel Scroll (cursor-anchored) |
+| **Rotate Building** | `R` key (during placement or when inspecting a placed machine) |
+| **Open Shop & Inventory** | `E` key |
+| **Hotbar Selection** | `1` – `9` keys |
+| **Cancel Placement / Move** | `Escape` or Right-Click |
+| **Toggle Switch / Loop Gates** | Left-Click directly on the placed gate in the world |
+| **Open World Crates** | Left-Click directly on any landed supply crate |
+
+---
+
+## 🏗️ Architecture & Project Structure
+
+```
+mine-game/
+├── index.html        # Clean HTML5 layout, HUD milestone tracker, modals
+├── styles.css        # Satisfactory engineering corporate dark theme (#0a0c0f, #e8a030)
+├── game.js           # Phaser 3 FactoryScene, physics loop, status synergies, saving
+├── ui.js             # Hotbar, shop batch buying (1x/10x/100x), inspector, save manager
+├── data.json         # Standalone definitions (ores, machines, relics, progression tiers)
+├── data.js           # Async data repository loader with fallback
+├── server.js         # Node.js HTTP server with save slots API & hot reload
+├── task_plan.md      # Manus-style task planning and progress ledger
+├── findings.md       # Economy balance curve and status synergy matrix
+└── progress.md       # Session history log
 ```
 
 ---
 
-## 📦 Objects & Machines Catalog
-
-| Object Name | Category | Rarity | Size | Cost | Growth Rate | Mechanics & Attributes |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Standard Extractor** | Extractor | ⚪ Common | 3x1 | $100 | 1.10x | Mines Standard Ore ($5 base value) |
-| **Coal Mine** | Extractor | ⚪ Common | 3x1 | $450 | 1.10x | Mines Coal Fuel Ore |
-| **2x2 Mega Extractor** | Extractor | 🔵 Rare | 2x2 | $4,500 | 1.12x | Mines Mega Ore ($25 base value) |
-| **Volcano Mine** | Extractor | 🟣 Epic | 3x1 | $18,000 | 1.13x | Mines Magma Ore (drops **🔥 Flaming**) |
-| **Crystal Geode Driller** | Extractor | 🔵 Rare | 3x2 | $9,000 | 1.12x | Crate-only; mines Crystal Ore |
-| **Fueled Thermal Mine** | Extractor | 🟣 Epic | 3x2 | $85,000 | 1.14x | Consumes Coal to mine Super Diamond Ore ($300 value) |
-| **Bioluminescent Algae Vat** | Extractor | 🟣 Epic | 2x1 | $65,000 | 1.13x | Crate-only; produces Glow Algae Ore |
-| **Uranium Centrifuge** | Extractor | 🟡 Exotic | 2x2 | $350,000 | 1.15x | Prestige Crate; mines Uranium Ore (**☢️ Radioactive**) |
-| **Temporal Flux Borer** | Extractor | 🟡 Exotic | 3x3 | $1,400,000 | 1.14x | Prestige Crate; produces Time Crystal Ore (**⏳ Time-Aged**) |
-| **Antimatter Siphon** | Extractor | 🔴 Legendary | 2x2 | $2,500,000 | 1.15x | Prestige Crate; produces Antimatter Pellets |
-| **Void Fragment Harvester** | Extractor | 🔮 Mythic | 4x2 | $25,000,000 | 1.16x | Prestige Crate; produces Void Shard Ore |
-| **Conveyor Belt** | Conveyor | ⚪ Common | 1x1 | $15 | 1.08x | 90 px/s standard transport speed |
-| **Half-Width Belt** | Conveyor | 🟢 Uncommon | 0.5x1 | $35 | 1.09x | 90 px/s half-tile conveyor |
-| **Fast Conveyor** | Conveyor | 🟢 Uncommon | 1x1 | $120 | 1.10x | 180 px/s high-speed conveyor |
-| **Gravity Inverter Belt** | Conveyor | 🔵 Rare | 1x1 | $4,500 | 1.11x | Crate-only; inverts ore exit direction |
-| **Cryo-Storage Conveyor** | Conveyor | 🔵 Rare | 1x1 | $7,500 | 1.11x | Crate-only; buffers/freezes ores |
-| **Belt Splitter / Merger** | Routing | 🔵 Rare | 1x1 | $1,100 | 1.11x | Alternates / merges ore paths |
-| **Ultra Conveyor** | Conveyor | 🟣 Epic | 1x1 | $8,000 | 1.12x | 320 px/s ultra-fast conveyor |
-| **Magnetic Levitation Rail**| Conveyor | 🟣 Epic | 1x1 | $30,000 | 1.12x | 450 px/s maglev conveyor |
-| **Phase-Shift Conveyor** | Conveyor | 🟡 Exotic | 1x1 | $220,000 | 1.13x | Prestige Crate; ores pass through intangibly |
-| **Quantum Entanglement Link**| Utility | 🔴 Legendary | 1x1 | $1,800,000 | 1.14x | Prestige Crate; teleport link pair system |
-| **1x1 Upgrader** | Upgrader | ⚪ Common | 1x1 | $300 | 1.10x | 2.0x multiplier (+10 energy) |
-| **Half Upgrader** | Upgrader | 🟢 Uncommon | 0.5x1 | $550 | 1.11x | 1.5x multiplier (+5 energy) |
-| **Freon Cooling Sprayer** | Upgrader | 🟢 Uncommon | 1x1 | $2,200 | 1.11x | Extinguishes fire, grants **💧 Wet** |
-| **2x1 Wide Upgrader** | Upgrader | 🔵 Rare | 2x1 | $8,500 | 1.12x | 3.0x multiplier (+20 energy) |
-| **Pyro Blast Furnace** | Upgrader | 🔵 Rare | 1x1 | $14,000 | 1.12x | 3.5x multiplier, sets ore **🔥 Flaming** |
-| **Ore Crystallizer** | Upgrader | 🔵 Rare | 1x1 | $22,000 | 1.12x | 2.2x multiplier, grants **💎 Crystalline** |
-| **Lead Decontaminator** | Upgrader | 🟣 Epic | 1x1 | $40,000 | 1.13x | Cleanses **☢️ Radioactive** status, 2.5x multiplier |
-| **Entropy Stabilizer** | Upgrader | 🟣 Epic | 1x1 | $110,000 | 1.13x | Cleanses bad statuses, 3.0x multiplier |
-| **Ore Transmuter** | Upgrader | 🟣 Epic | 1x1 | $250,000 | 1.13x | Transmutes ore types, 2.5x multiplier |
-| **Probability Amplifier** | Upgrader | 🟡 Exotic | 1x1 | $750,000 | 1.13x | 1.8x multiplier, grants **🍀 Lucky** (2x next upgrade) |
-| **Stellar Prism** | Upgrader | 🟡 Exotic | 1x1 | $750,000 | 1.13x | Grants **✨ Sparkling** status (+0.5x upgrader buff) |
-| **Plasma Supercharger** | Upgrader | 🟣 Epic | 1x1 | $800,000 | 1.14x | +$500 flat value boost |
-| **Resonance Harmonizer** | Upgrader | 🔴 Legendary | 1x1 | $1,600,000 | 1.14x | 4.5x multiplier with Sparkling synergy |
-| **Matter Replicator** | Upgrader | 🔮 Mythic | 2x1 | $12,000,000 | 1.15x | Duplicates ores safely (**👯 Duplicated** flag) |
-| **Shard of Life** | Upgrader | 🔮 Mythic | 2x2 | $40,000,000 | 1.16x | 6.0x multiplier aura support upgrader |
-| **Seller** | Seller | ⚪ Common | 1x1 | $0 | 1.00x | Standard selling furnace |
-| **Catalytic Converter** | Seller | 🔵 Rare | 2x1 | $95,000 | 1.12x | 2.5x bonus (4.0x on Radioactive ores) |
-| **Blast Smelter** | Seller | 🟡 Exotic | 2x2 | $275,000 | 1.14x | Heavy smelter with 2.0x sale bonus |
-| **Dimensional Vault** | Seller | 🟡 Exotic | 2x2 | $1,400,000 | 1.14x | Batch seller (3.5x bonus after batch threshold) |
-| **Soul Forge** | Seller | 🔴 Legendary | 3x2 | $6,500,000 | 1.15x | 8.0x sale bonus with high risk of ore loss |
-
----
-
-## 🛠️ Local Development & Server Setup
+## 🚀 Running Locally
 
 ```bash
-# Start dev server
+# 1. Start the game server
 node server.js
+
+# 2. Open in your browser
+http://localhost:8080
 ```
-Open **`http://localhost:8080`** in your browser.
