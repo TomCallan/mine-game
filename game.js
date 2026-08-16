@@ -989,58 +989,66 @@ function updateOrePhysics(dt) {
         continue;
       }
 
-      // Upgrader processing with maxUses limit
-      if (!ore.upgradersPassed) ore.upgradersPassed = [];
-      ore.upgraderUses = ore.upgraderUses || {};
-      const currentUses = ore.upgraderUses[def.id] || 0;
-      const maxAllowed = def.maxUses || 1;
+      // Upgrader processing with maxUses limit allowing loops on the same machine
+      if (def.category === 'upgrader') {
+        ore.upgraderBuildingUses = ore.upgraderBuildingUses || {};
+        const currentUses = ore.upgraderBuildingUses[b.id] || 0;
+        const maxAllowed = def.maxUses || 5;
 
-      if (!ore.upgradersPassed.includes(b.id) && currentUses < maxAllowed) {
-        ore.upgradersPassed.push(b.id);
-        ore.upgraderUses[def.id] = currentUses + 1;
+        if (ore.lastUpgraderBuildingId !== b.id && currentUses < maxAllowed) {
+          ore.lastUpgraderBuildingId = b.id;
+          ore.upgraderBuildingUses[b.id] = currentUses + 1;
 
-        if (def.extinguishes) { ore.status.flaming = false; ore.status.flameTime = 0; ore.energy = 0; ore.extinguished = true; }
-        if (def.appliesWet) { ore.status.wet = def.appliesWet; ore.status.flaming = false; }
-        if (def.appliesFlaming && !ore.status.wet) { ore.status.flaming = true; ore.status.flameTime = 0; }
-        if (def.removesRadioactive) { ore.status.radioactive = false; }
-        if (def.appliesSparkling) { ore.status.sparkling = true; }
-        if (def.appliesCrystalline) { ore.status.crystalline = true; }
-        if (def.appliesLucky) { ore.status.lucky = true; }
-        if (def.nullifiesBadStatuses) {
-          ore.status.flaming = false;
-          ore.status.radioactive = false;
+          if (def.extinguishes) { ore.status.flaming = false; ore.status.flameTime = 0; ore.energy = 0; ore.extinguished = true; }
+          if (def.appliesWet) { ore.status.wet = def.appliesWet; ore.status.flaming = false; }
+          if (def.appliesFlaming && !ore.status.wet) { ore.status.flaming = true; ore.status.flameTime = 0; }
+          if (def.removesRadioactive) { ore.status.radioactive = false; }
+          if (def.appliesSparkling) { ore.status.sparkling = true; }
+          if (def.appliesCrystalline) { ore.status.crystalline = true; }
+          if (def.appliesLucky) { ore.status.lucky = true; }
+          if (def.nullifiesBadStatuses) {
+            ore.status.flaming = false;
+            ore.status.radioactive = false;
+          }
+
+          let effectiveMulti = def.multiplier || 1.0;
+          if (def.multiplier && ore.status.sparkling) effectiveMulti += 0.5;
+          if (def.multiplier && ore.status.crystalline) effectiveMulti += 0.75;
+          if (def.multiplier && def.sparklingSynergy && ore.status.sparkling) effectiveMulti *= 1.5;
+
+          if (ore.status.lucky && def.multiplier) {
+            effectiveMulti *= 2.0;
+            ore.status.lucky = false;
+          }
+
+          if (def.multiplier) {
+            ore.value = Math.round(ore.value * effectiveMulti);
+            ore.upgraded = true;
+          }
+          if (def.flatAdd) {
+            ore.value += def.flatAdd;
+            ore.upgraded = true;
+          }
+
+          if (def.duplicatesOre && !ore.status.duplicated && STATE.run.ores.length < STATE.config.maxOres) {
+            ore.status.duplicated = true;
+            STATE.run.ores.push({
+              id: genId('ore'),
+              itemType: ore.itemType,
+              x: ore.x + 12, y: ore.y + 12,
+              vx: ore.vx * 0.8, vy: ore.vy * 0.8,
+              size: ore.size,
+              color: ore.color,
+              shape: ore.shape,
+              value: ore.value,
+              energy: ore.energy,
+              status: { ...ore.status, duplicated: true },
+              upgraderBuildingUses: { ...ore.upgraderBuildingUses }
+            });
+          }
         }
-
-        let effectiveMulti = def.multiplier || 1.0;
-        if (def.multiplier && ore.status.sparkling) effectiveMulti += 0.5;
-        if (def.multiplier && ore.status.crystalline) effectiveMulti += 0.75;
-        if (def.multiplier && def.sparklingSynergy && ore.status.sparkling) effectiveMulti *= 1.5;
-
-        if (ore.status.lucky && def.multiplier) {
-          effectiveMulti *= 2.0;
-          ore.status.lucky = false;
-        }
-
-        if (def.multiplier) { ore.value = Math.round(ore.value * effectiveMulti); ore.upgraded = true; }
-        if (def.flatAdd) { ore.value += def.flatAdd; ore.upgraded = true; }
-
-        if (def.duplicatesOre && !ore.status.duplicated && STATE.run.ores.length < STATE.config.maxOres) {
-          ore.status.duplicated = true;
-          STATE.run.ores.push({
-            id: genId('ore'),
-            itemType: ore.itemType,
-            x: ore.x + 12, y: ore.y + 12,
-            vx: ore.vx * 0.8, vy: ore.vy * 0.8,
-            size: ore.size,
-            color: ore.color,
-            shape: ore.shape,
-            value: ore.value,
-            energy: ore.energy,
-            status: { ...ore.status, duplicated: true },
-            upgradersPassed: [...ore.upgradersPassed],
-            upgraderUses: { ...ore.upgraderUses }
-          });
-        }
+      } else if (ore.lastUpgraderBuildingId) {
+        ore.lastUpgraderBuildingId = null;
       }
 
       // Conveyor & Gate Routing
@@ -1151,14 +1159,33 @@ function processConsumption() {
   const cs = STATE.config.grid.cellSize;
   const now = performance.now();
 
-  for (const ore of STATE.run.ores) {
-    if (ore.destroyed) continue;
-    const cell = worldToCell(ore.x, ore.y);
-    const occupants = getCellOccupants(cell.col, cell.row);
-    const sellerAcc = occupants.find(o => o.def.consumes && o.isPort && o.port.kind === 'input');
-    if (sellerAcc) {
+  for (let i = STATE.run.ores.length - 1; i >= 0; i--) {
+    const ore = STATE.run.ores[i];
+    if (!ore || ore.destroyed) continue;
+
+    let sellerBuilding = null;
+    let sDef = null;
+
+    // Check direct collision with any placed seller (entire footprint + 8px suction margin)
+    for (const b of STATE.run.buildings) {
+      const def = STATE.defs.buildingDefs[b.defId];
+      if (!def || def.category !== 'seller') continue;
+
+      const fp = getFootprint(def, b.rot);
+      const minX = b.col * cs;
+      const maxX = (b.col + fp.w) * cs;
+      const minY = b.row * cs;
+      const maxY = (b.row + fp.h) * cs;
+
+      if (ore.x >= minX - 8 && ore.x <= maxX + 8 && ore.y >= minY - 8 && ore.y <= maxY + 8) {
+        sellerBuilding = b;
+        sDef = def;
+        break;
+      }
+    }
+
+    if (sellerBuilding && sDef) {
       let soldVal = ore.value;
-      const sDef = sellerAcc.def;
 
       if (sDef.sellerBonus) soldVal = Math.round(soldVal * sDef.sellerBonus);
       if (sDef.wetBonus && ore.status && (ore.status.wet > 0 || ore.extinguished)) {
@@ -1180,7 +1207,7 @@ function processConsumption() {
       if (sDef.sparklingBonus && ore.status && (ore.status.sparkling || ore.status.crystalline)) {
         soldVal = Math.round(soldVal * sDef.sparklingBonus);
       }
-      if (sDef.supernovaBonus && ore.value >= (sDef.minSupernovaValue || 10000)) {
+      if (sDef.supernovaBonus && ore.value >= (sDef.minSupernovaValue || 5000)) {
         const effects = Object.keys(ore.status || {}).filter(k => ore.status[k]).length;
         if (effects >= 2) {
           soldVal = Math.round(soldVal * sDef.supernovaBonus);
@@ -1191,6 +1218,10 @@ function processConsumption() {
         soldVal = 0;
         showToast('Soul Forge destroyed ore with no payout!', 'warn');
       }
+
+      // Life level & permanent upgrades bonus
+      const lifeBonus = 1 + (STATE.meta.prestigeCount || 0) * 0.05;
+      soldVal = Math.round(soldVal * lifeBonus);
 
       STATE.run.money += soldVal;
       STATE.run.lifetimeEarnings += soldVal;
@@ -1208,6 +1239,8 @@ function processConsumption() {
       }
     }
   }
+
+  STATE.run.ores = STATE.run.ores.filter(o => !o.destroyed);
 
   while (salesHistory.length > 0 && now - salesHistory[0].t > 3000) {
     salesHistory.shift();
@@ -1459,7 +1492,7 @@ function buyShopItem(defId, qty = 1) {
 
 const CRATES_CONFIG = {
   regular: {
-    name: 'Regular Crate', cost: 1500,
+    name: 'Regular Crate', cost: 250,
     pool: [
       { id: 'fastBelt', weight: 40 },
       { id: 'upgrader1x1', weight: 30 },
@@ -1468,7 +1501,7 @@ const CRATES_CONFIG = {
     ]
   },
   golden: {
-    name: 'Golden Crate', cost: 25000,
+    name: 'Golden Crate', cost: 1000,
     pool: [
       { id: 'stellarSparkler', weight: 25, permanent: true },
       { id: 'oreCrystallizer', weight: 25, permanent: true },
@@ -1477,7 +1510,7 @@ const CRATES_CONFIG = {
     ]
   },
   exotic: {
-    name: 'Exotic Crate', cost: 150000,
+    name: 'Exotic Crate', cost: 5000,
     pool: [
       { id: 'singularitySmelter', weight: 30, permanent: true },
       { id: 'antimatterSiphon', weight: 30, permanent: true },
@@ -1486,7 +1519,7 @@ const CRATES_CONFIG = {
     ]
   },
   prestige: {
-    name: 'Prestige Crate', costKeys: 5,
+    name: 'Prestige Crate', costKeys: 1,
     pool: [
       { id: 'shardOfLife', weight: 35, permanent: true },
       { id: 'supernovaCrucible', weight: 35, permanent: true },
