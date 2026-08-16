@@ -2,9 +2,8 @@
 // MINER'S HAVEN - UI INTERACTION, SHOP, CRATES & METAGAME ENGINE
 // ===========================================================
 
-let activeContextBuilding = null;
 let currentMainTab = 'shop'; // 'shop' | 'inventory' | 'relics' | 'meta'
-currentCategory = 'all';
+let currentCategory = 'all';
 
 // Context Menu Card
 function openContextMenu(building, screenX, screenY) {
@@ -203,17 +202,6 @@ function initContextMenuListeners() {
       closeContextMenu();
     }
   });
-}
-
-// Mode Placers
-function enterPlacingMode(defId) {
-  if (!STATE.defs.buildingDefs[defId]) return;
-  placingState = { defId, rot: 0 };
-  setMode('placing');
-}
-function enterMovingMode(building) {
-  movingState = { buildingId: building.id, rot: building.rot };
-  setMode('moving');
 }
 
 // Meta Currency Header Updating
@@ -587,8 +575,8 @@ function closeCrateModal() {
   document.getElementById('crateModal')?.classList.remove('open');
 }
 
-function buyAndOpenCrate(crateTier) {
-  const reward = openCrate(crateTier);
+function buyAndOpenCrateUI(crateTier) {
+  const reward = buyAndOpenCrate(crateTier);
   if (!reward) return;
 
   renderInventoryGrid();
@@ -1161,7 +1149,7 @@ function initHotbarAndInventory() {
   document.querySelectorAll('.crate-buy-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const crateKey = e.target.getAttribute('data-crate');
-      buyAndOpenCrate(crateKey);
+      buyAndOpenCrateUI(crateKey);
     });
   });
 
