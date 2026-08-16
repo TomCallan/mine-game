@@ -1165,7 +1165,7 @@ function initHotbarAndInventory() {
   initContextMenuListeners();
   initCustomObjectCreator();
   initMobileToolbarListeners();
-  loadSavedGame();
+  if (typeof loadSavedState === 'function') loadSavedState();
 
   // Tab Listeners for Main Tabs
   document.querySelectorAll('#invMainTabs .inv-main-tab').forEach(tabBtn => {

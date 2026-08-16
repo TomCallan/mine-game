@@ -1365,6 +1365,10 @@ function loadSavedState() {
     .catch(() => {});
 }
 
+function loadSavedGame() {
+  return loadSavedState();
+}
+
 function migrateSavedState(saved) {
   if (!saved) return;
   if (saved.run) {
@@ -2173,45 +2177,164 @@ class FactoryScene extends Phaser.Scene {
       const def = STATE.defs.buildingDefs[placingState.defId];
       if (!def) return;
       const worldPoint = this.cameras.main.getWorldPoint(mouseScreen.x, mouseScreen.y);
-      const fp = getFootprint(def, placingState.rot);
+      const rot = placingState.rot || 0;
+      const fp = getFootprint(def, rot);
       const raw = worldToCell(worldPoint.x, worldPoint.y);
       const origin = clampedOrigin(fp.w, fp.h, raw.col, raw.row);
 
       const px = origin.col * cs, py = origin.row * cs;
       const pw = fp.w * cs, ph = fp.h * cs;
+      const cx = px + pw / 2, cy = py + ph / 2;
 
-      // Ghost Box
-      this.previewGfx.fillStyle(hexToNumber(def.color || '#38bdf8'), 0.35);
-      this.previewGfx.fillRect(px, py, pw, ph);
-      this.previewGfx.lineStyle(2, 0xffffff, 0.8);
-      this.previewGfx.strokeRect(px, py, pw, ph);
+      // 1. Ghost Bounding Box
+      this.previewGfx.fillStyle(hexToNumber(def.color || '#38bdf8'), 0.4);
+      this.previewGfx.fillRoundedRect(px, py, pw, ph, 4);
+      this.previewGfx.lineStyle(2, 0xe8a030, 0.9);
+      this.previewGfx.strokeRoundedRect(px, py, pw, ph, 4);
 
-      // Port markers
+      // Helper to draw pre-placement direction chevron
+      const drawGhostChevron = (gx, gy, gDir, size, colorHex = 0xffcf5c, alpha = 0.95) => {
+        const dv = dirVector(gDir);
+        const p1x = gx - dv.x * (size * 0.5) - dv.y * (size * 0.4);
+        const p1y = gy - dv.y * (size * 0.5) + dv.x * (size * 0.4);
+        const p2x = gx + dv.x * (size * 0.5);
+        const p2y = gy + dv.y * (size * 0.5);
+        const p3x = gx - dv.x * (size * 0.5) + dv.y * (size * 0.4);
+        const p3y = gy - dv.y * (size * 0.5) - dv.x * (size * 0.4);
+
+        this.previewGfx.lineStyle(2.5, colorHex, alpha);
+        this.previewGfx.beginPath();
+        this.previewGfx.moveTo(p1x, p1y);
+        this.previewGfx.lineTo(p2x, p2y);
+        this.previewGfx.lineTo(p3x, p3y);
+        this.previewGfx.strokePath();
+      };
+
+      // 2. High-Contrast Direction of Travel Previews
+      if (def.category === 'belt') {
+        let beltDir = rot;
+        const port = fp.ports && fp.ports[0];
+        if (port && port.dropSide !== null && port.dropSide !== undefined) {
+          beltDir = port.dropSide;
+        }
+
+        if (def.isCrossover) {
+          drawGhostChevron(cx - 10, cy, 0, 16, 0xffffff, 0.9);
+          drawGhostChevron(cx + 10, cy, 0, 16, 0xffffff, 0.9);
+          drawGhostChevron(cx, cy - 10, 1, 16, 0x38bdf8, 0.9);
+          drawGhostChevron(cx, cy + 10, 1, 16, 0x38bdf8, 0.9);
+        } else if (def.isSwitchGate || def.isLoopGate || def.isFilterSorter) {
+          drawGhostChevron(cx, cy, rot, 22, 0xe8a030, 1.0);
+          drawGhostChevron(cx, cy, (rot + 1) % 4, 18, 0x38bdf8, 0.8);
+        } else if (def.isSplitter || def.isSplitter3) {
+          drawGhostChevron(cx, cy, rot, 20, 0xc084fc, 1.0);
+          drawGhostChevron(cx, cy, (rot + 1) % 4, 18, 0xc084fc, 0.8);
+        } else {
+          for (let k = -1; k <= 1; k++) {
+            const dv = dirVector(beltDir);
+            drawGhostChevron(cx + dv.x * k * 14, cy + dv.y * k * 14, beltDir, 22, 0xfbbf24, 1.0);
+          }
+        }
+      } else if (def.category === 'extractor') {
+        const dv = dirVector(rot);
+        const nozzleX = cx + dv.x * (pw * 0.42);
+        const nozzleY = cy + dv.y * (ph * 0.42);
+
+        // Highlight output ejection nozzle
+        this.previewGfx.fillStyle(0x1e293b, 1);
+        this.previewGfx.fillCircle(nozzleX, nozzleY, 12);
+        this.previewGfx.lineStyle(2.5, 0xe8a030, 1);
+        this.previewGfx.strokeCircle(nozzleX, nozzleY, 12);
+
+        // Large animated outward ejection arrow firing into neighboring cell
+        const outTargetX = nozzleX + dv.x * 20;
+        const outTargetY = nozzleY + dv.y * 20;
+        drawGhostChevron(outTargetX, outTargetY, rot, 24, 0xffcf5c, 1.0);
+      } else if (def.category === 'upgrader') {
+        const flowDir = rot;
+        const dv = dirVector(flowDir);
+
+        // Cyan intake bracket [
+        const inX = cx - dv.x * (pw * 0.42);
+        const inY = cy - dv.y * (ph * 0.42);
+        this.previewGfx.lineStyle(3.5, 0x38bdf8, 1);
+        if (flowDir === 0 || flowDir === 2) {
+          this.previewGfx.lineBetween(inX, cy - ph * 0.38, inX, cy + ph * 0.38);
+        } else {
+          this.previewGfx.lineBetween(cx - pw * 0.38, inY, cx + pw * 0.38, inY);
+        }
+
+        // Amber output bracket ]
+        const outX = cx + dv.x * (pw * 0.42);
+        const outY = cy + dv.y * (ph * 0.42);
+        this.previewGfx.lineStyle(3.5, 0xe8a030, 1);
+        if (flowDir === 0 || flowDir === 2) {
+          this.previewGfx.lineBetween(outX, cy - ph * 0.38, outX, cy + ph * 0.38);
+        } else {
+          this.previewGfx.lineBetween(cx - pw * 0.38, outY, cx + pw * 0.38, outY);
+        }
+
+        // Center forward throughput flow arrows
+        drawGhostChevron(cx - dv.x * 12, cy - dv.y * 12, flowDir, 20, 0x38bdf8, 0.9);
+        drawGhostChevron(cx + dv.x * 12, cy + dv.y * 12, flowDir, 20, 0xe8a030, 1.0);
+      } else if (def.category === 'seller') {
+        const inDir = rot;
+        const dv = dirVector(inDir);
+        const mouthX = cx - dv.x * (pw * 0.4);
+        const mouthY = cy - dv.y * (ph * 0.4);
+
+        // Suction Hopper Bracket
+        this.previewGfx.lineStyle(3.5, 0x38bdf8, 1);
+        if (inDir === 0 || inDir === 2) {
+          this.previewGfx.lineBetween(mouthX, cy - ph * 0.4, mouthX, cy + ph * 0.4);
+        } else {
+          this.previewGfx.lineBetween(cx - pw * 0.4, mouthY, cx + pw * 0.4, mouthY);
+        }
+
+        // Inward suction chevrons pulling into core
+        drawGhostChevron(cx - dv.x * 16, cy - dv.y * 16, inDir, 22, 0x38bdf8, 1.0);
+
+        // Furnace core indicator
+        this.previewGfx.fillStyle(0xdc2626, 0.9);
+        this.previewGfx.fillCircle(cx, cy, 14);
+      }
+
+      // 3. Port Markers with In/Out Indicators
       for (const p of fp.ports) {
         const portX = (origin.col + p.dx + 0.5) * cs;
         const portY = (origin.row + p.dy + 0.5) * cs;
-        this.previewGfx.fillStyle(hexToNumber(p.color || '#ffcf5c'), 0.8);
+        const isOut = p.kind === 'output';
+
+        this.previewGfx.fillStyle(isOut ? 0xffcf5c : 0x38bdf8, 0.9);
         this.previewGfx.fillCircle(portX, portY, 8);
-        this.previewGfx.lineStyle(2, 0xffffff, 0.9);
+        this.previewGfx.lineStyle(2, 0xffffff, 1);
         this.previewGfx.strokeCircle(portX, portY, 8);
       }
 
-      // Multi-tile drag preview
+      // 4. Multi-tile Belt Drag Line Preview with Direction on Every Tile
       if (isBeltDragging && beltDragStart) {
         const curCell = worldToCell(worldPoint.x, worldPoint.y);
         const dc = curCell.col - beltDragStart.col;
         const dr = curCell.row - beltDragStart.row;
         const steps = Math.max(Math.abs(dc), Math.abs(dr));
         const isHorizontal = Math.abs(dc) >= Math.abs(dr);
+        const lineRot = isHorizontal ? (dc >= 0 ? 0 : 2) : (dr >= 0 ? 1 : 3);
         const stepC = isHorizontal ? (dc > 0 ? 1 : -1) : 0;
         const stepR = !isHorizontal ? (dr > 0 ? 1 : -1) : 0;
 
         let c = beltDragStart.col, r = beltDragStart.row;
         for (let i = 0; i <= steps; i++) {
-          this.previewGfx.fillStyle(0xe8a030, 0.3);
-          this.previewGfx.fillRect(c * cs, r * cs, cs, cs);
-          this.previewGfx.lineStyle(1.5, 0xe8a030, 0.7);
-          this.previewGfx.strokeRect(c * cs, r * cs, cs, cs);
+          const tileX = c * cs, tileY = r * cs;
+          const tileCenterX = tileX + cs / 2, tileCenterY = tileY + cs / 2;
+
+          this.previewGfx.fillStyle(0x059669, 0.35);
+          this.previewGfx.fillRect(tileX, tileY, cs, cs);
+          this.previewGfx.lineStyle(2, 0x34d399, 0.9);
+          this.previewGfx.strokeRect(tileX, tileY, cs, cs);
+
+          // Draw direction arrow inside each tile of the line
+          drawGhostChevron(tileCenterX, tileCenterY, lineRot, 22, 0xffffff, 1.0);
+
           c += stepC; r += stepR;
         }
       }
