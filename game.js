@@ -730,6 +730,10 @@ async function deleteSlot(slot) {
   await fetch(`/api/save/${slot}`, { method: 'DELETE' });
 }
 async function newGame() {
+  if (typeof cancelMode === 'function') cancelMode();
+  selectedEntity = null;
+
+  // Reset active run state & factory layout
   STATE.run.money = 1000;
   STATE.run.lifetimeEarnings = 0;
   STATE.run.buildings = [];
@@ -737,15 +741,46 @@ async function newGame() {
   STATE.run.timeScale = 1.0;
   STATE.run.isPaused = false;
   
+  // Reset shop dynamic inflation
   STATE.shop.stock = {};
   STATE.shop.dynamicPriceLevel = {};
   
+  // Reset standard and permanent inventory
+  STATE.inventory.capacity = STATE.config.inventoryBaseCapacity || 40;
   STATE.inventory.items = {
     extractor: { qty: 2, permanent: false, source: 'starter' },
     belt: { qty: 10, permanent: false, source: 'starter' },
     upgrader1x1: { qty: 1, permanent: false, source: 'starter' },
     seller: { qty: 1, permanent: false, source: 'starter' }
   };
+  STATE.inventory.permanentItems = {};
+  STATE.inventory.consumables = {};
+
+  // Complete wipe of all meta progression
+  STATE.meta.prestigePoints = 0;
+  STATE.meta.prestigeKeys = 0;
+  STATE.meta.shards = 0;
+  STATE.meta.prestigeDust = 0;
+  STATE.meta.relics = {};
+  STATE.meta.collection = {};
+  STATE.meta.blueprintUnlocks = {
+    extractor: true,
+    belt: true,
+    fastBelt: true,
+    halfBelt: true,
+    upgrader1x1: true,
+    upgraderHalf: true,
+    seller: true,
+    coalExtractor: true
+  };
+
+  hotbarItems = ['extractor', 'belt', 'fastBelt', 'upgrader1x1', 'freonSprayer', 'seller'];
+
+  // Recenter camera
+  const cs = STATE.config.grid.cellSize;
+  STATE.camera.x = (STATE.config.grid.cols * cs) / 2;
+  STATE.camera.y = (STATE.config.grid.rows * cs) / 2;
+  STATE.camera.zoom = 1;
   
   if (typeof renderHotbar === 'function') renderHotbar();
   if (typeof renderInventoryGrid === 'function') renderInventoryGrid();

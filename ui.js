@@ -750,10 +750,10 @@ async function renderSaveSlots() {
 document.getElementById('openSavesBtn')?.addEventListener('click', openSavesModal);
 document.getElementById('closeSavesBtn')?.addEventListener('click', closeSavesModal);
 document.getElementById('btnNewGame')?.addEventListener('click', async () => {
-  if (confirm('Start a new game? You will keep meta progression (Keys, Permanent Unlocks).')) {
+  if (confirm('Start a fresh new game? This will reset all layouts, money, inventory, and ALL meta progression (keys, points, relics, and unlocks).')) {
     await newGame();
     closeSavesModal();
-    showToast('Started New Game');
+    showToast('Started Fresh New Game');
   }
 });
 
