@@ -774,17 +774,6 @@ function startUnboxingAnimation(reward) {
 }
 
 // Save Slots UI
-async function openSavesModal() {
-  closeInventoryModal();
-  closeCrateModal();
-  document.getElementById('savesModal')?.classList.add('open');
-  await renderSaveSlots();
-}
-
-function closeSavesModal() {
-  document.getElementById('savesModal')?.classList.remove('open');
-}
-
 async function renderSaveSlots() {
   const grid = document.getElementById('savesGrid');
   if (!grid) return;

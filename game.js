@@ -1252,15 +1252,47 @@ function processConsumption() {
 // ===========================================================
 
 async function fetchSaveSlots() {
-  try {
-    const res = await fetch('/api/saves');
-    if (res.ok) return await res.json();
-  } catch (e) {}
-  return [
+  const slots = [
     { slot: 0, name: 'Save Slot 1', timestamp: null, exists: false },
     { slot: 1, name: 'Save Slot 2', timestamp: null, exists: false },
     { slot: 2, name: 'Save Slot 3', timestamp: null, exists: false }
   ];
+
+  try {
+    const res = await fetch('/api/saves');
+    if (res.ok) {
+      const serverSlots = await res.json();
+      if (Array.isArray(serverSlots)) {
+        serverSlots.forEach(s => {
+          if (slots[s.slot]) {
+            slots[s.slot] = s;
+          }
+        });
+      }
+    }
+  } catch (e) {}
+
+  // Check localStorage for offline / fallback slots
+  for (let i = 0; i < 3; i++) {
+    try {
+      const localData = localStorage.getItem(`miners_haven_save_slot_${i}`);
+      if (localData) {
+        const parsed = JSON.parse(localData);
+        if (parsed && parsed.savedAt) {
+          if (!slots[i].exists || new Date(parsed.savedAt) > new Date(slots[i].timestamp || 0)) {
+            slots[i] = {
+              slot: i,
+              name: parsed.slotName || `Save Slot ${i + 1}`,
+              timestamp: parsed.savedAt,
+              exists: true
+            };
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  return slots;
 }
 
 async function saveToSlot(slot, name) {
@@ -1271,33 +1303,58 @@ async function saveToSlot(slot, name) {
       savedAt: new Date().toISOString(),
       state: STATE
     };
-    const res = await fetch(`/api/save/${slot}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (res.ok) {
-      showToast(`Saved to Slot ${slot + 1}!`);
-      return true;
-    }
+
+    // 1. Instant local persistence
+    try {
+      localStorage.setItem(`miners_haven_save_slot_${slot}`, JSON.stringify(payload));
+      localStorage.setItem('miners_haven_active_slot', String(slot));
+    } catch (e) {}
+
+    // 2. Server file persistence
+    try {
+      await fetch(`/api/save/${slot}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } catch (e) {}
+
+    showToast(`Saved to Slot ${slot + 1} (${payload.slotName})!`, 'success');
+    return true;
   } catch (e) {
-    showToast('Failed to save', 'warn');
+    showToast('Failed to save slot', 'warn');
   }
   return false;
 }
 
 async function loadFromSlot(slot) {
   try {
-    const res = await fetch(`/api/load/${slot}`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.state) {
-        migrateSavedState(data.state);
-        STATE.activeSaveSlot = slot;
-        showToast(`Loaded Slot ${slot + 1}!`);
-        if (typeof renderHotbar === 'function') renderHotbar();
-        return true;
+    let data = null;
+
+    // 1. Try server first
+    try {
+      const res = await fetch(`/api/load/${slot}`);
+      if (res.ok) {
+        data = await res.json();
       }
+    } catch (e) {}
+
+    // 2. Fallback to localStorage
+    if (!data || !data.state) {
+      try {
+        const local = localStorage.getItem(`miners_haven_save_slot_${slot}`);
+        if (local) data = JSON.parse(local);
+      } catch (e) {}
+    }
+
+    if (data && data.state) {
+      migrateSavedState(data.state);
+      STATE.activeSaveSlot = slot;
+      try { localStorage.setItem('miners_haven_active_slot', String(slot)); } catch (e) {}
+      showToast(`Loaded Slot ${slot + 1} (${data.slotName || 'Save'})!`, 'success');
+      if (typeof renderHotbar === 'function') renderHotbar();
+      if (typeof renderInventoryGrid === 'function') renderInventoryGrid();
+      return true;
     }
   } catch (e) {
     showToast('Failed to load slot', 'warn');
@@ -1307,11 +1364,10 @@ async function loadFromSlot(slot) {
 
 async function deleteSlot(slot) {
   try {
-    const res = await fetch(`/api/save/${slot}`, { method: 'DELETE' });
-    if (res.ok) {
-      showToast(`Slot ${slot + 1} deleted`);
-      return true;
-    }
+    try { localStorage.removeItem(`miners_haven_save_slot_${slot}`); } catch (e) {}
+    try { await fetch(`/api/save/${slot}`, { method: 'DELETE' }); } catch (e) {}
+    showToast(`Slot ${slot + 1} deleted`, 'info');
+    return true;
   } catch (e) {
     showToast('Failed to delete slot', 'warn');
   }
@@ -1368,34 +1424,44 @@ function newGame() {
 
   selectedEntity = null;
   cancelMode();
-  showToast('Started a fresh new game!');
+  showToast('Started a fresh new game!', 'info');
   if (typeof renderHotbar === 'function') renderHotbar();
+  if (typeof renderInventoryGrid === 'function') renderInventoryGrid();
   triggerSaveState();
 }
 
+let autoSaveDebounce = null;
 function triggerSaveState() {
-  const slot = STATE.activeSaveSlot || 0;
-  fetch(`/api/save/${slot}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  clearTimeout(autoSaveDebounce);
+  autoSaveDebounce = setTimeout(() => {
+    const slot = STATE.activeSaveSlot || 0;
+    const payload = {
       slotName: `Slot ${slot + 1}`,
       savedAt: new Date().toISOString(),
       state: STATE
-    })
-  }).catch(() => {});
+    };
+
+    try {
+      localStorage.setItem(`miners_haven_save_slot_${slot}`, JSON.stringify(payload));
+    } catch (e) {}
+
+    fetch(`/api/save/${slot}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).catch(() => {});
+  }, 400);
 }
 
 function loadSavedState() {
-  fetch('/api/load/0')
-    .then(r => r.json())
-    .then(data => {
-      if (data && data.state) {
-        migrateSavedState(data.state);
-        if (typeof renderHotbar === 'function') renderHotbar();
-      }
-    })
-    .catch(() => {});
+  const activeSlot = parseInt(localStorage.getItem('miners_haven_active_slot') || '0', 10);
+  STATE.activeSaveSlot = activeSlot;
+
+  loadFromSlot(activeSlot).then(loaded => {
+    if (!loaded && activeSlot !== 0) {
+      loadFromSlot(0);
+    }
+  });
 }
 
 function loadSavedGame() {

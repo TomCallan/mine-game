@@ -197,7 +197,7 @@ const server = http.createServer((req, res) => {
 // File watcher for hot reloading
 let debounceTimer = null;
 fs.watch(ROOT, { recursive: true }, (eventType, filename) => {
-  if (!filename || filename === 'server.js' || filename === 'savegame.json' || filename.startsWith('.')) return;
+  if (!filename || filename === 'server.js' || filename.startsWith('savegame') || filename.startsWith('.')) return;
   
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
