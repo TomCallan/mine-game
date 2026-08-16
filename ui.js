@@ -4,6 +4,50 @@
 
 let currentMainTab = 'shop'; // 'shop' | 'inventory' | 'relics' | 'meta'
 let currentCategory = 'all';
+let hotbarItems = ['extractor', 'belt', 'fastBelt', 'upgrader1x1', 'switchGate', 'seller'];
+
+function getSelectedEntityObject() {
+  if (!selectedEntity) return null;
+  if (selectedEntity.type === 'ore') return STATE.run.ores.find(o => o.id === selectedEntity.id) || null;
+  return findBuildingById(selectedEntity.id);
+}
+
+function updateInspectorPanel() {
+  const panel = document.getElementById('inspectorPanel');
+  const title = document.getElementById('inspectorTitle');
+  const body = document.getElementById('inspectorBody');
+  if (!panel || !title || !body) return;
+
+  if (mode !== 'inspecting' || !selectedEntity) { panel.classList.remove('open'); return; }
+  const obj = getSelectedEntityObject();
+  if (!obj) { selectedEntity = null; panel.classList.remove('open'); return; }
+  panel.classList.add('open');
+
+  const typeLabel = selectedEntity.type === 'ore' ? 'Ore' : (STATE.defs.buildingDefs[obj.defId] ? STATE.defs.buildingDefs[obj.defId].name : 'Building');
+  title.textContent = `${typeLabel} — ${obj.id}`;
+
+  if (selectedEntity.type === 'ore') {
+    let activeEffects = [];
+    if (obj.status) {
+      if (obj.status.flaming) activeEffects.push('Flaming');
+      if (obj.status.radioactive) activeEffects.push('Radioactive');
+      if (obj.status.wet > 0) activeEffects.push(`Wet (${Math.ceil(obj.status.wet)}s)`);
+      if (obj.status.sparkling) activeEffects.push('Sparkling');
+      if (obj.status.crystalline) activeEffects.push('Crystalline');
+      if (obj.status.lucky) activeEffects.push('Lucky (2x Next Upgrade)');
+      if (obj.status.duplicated) activeEffects.push('Duplicated');
+      if (obj.status.timeAged) activeEffects.push('Time-Aged');
+    }
+    const inspectData = {
+      id: obj.id, itemType: obj.itemType, value: `$${obj.value.toLocaleString()}`,
+      statusEffects: activeEffects.length ? activeEffects : ['Normal'],
+      position: { x: Math.round(obj.x), y: Math.round(obj.y) }
+    };
+    body.textContent = JSON.stringify(inspectData, null, 2);
+  } else {
+    body.textContent = JSON.stringify(obj, null, 2);
+  }
+}
 
 // Context Menu Card
 function openContextMenu(building, screenX, screenY) {
@@ -1090,15 +1134,17 @@ function initMobileToolbarListeners() {
   });
 
   document.getElementById('mobileZoomInBtn')?.addEventListener('click', () => {
-    const cam = STATE.camera;
-    cam.zoom = Math.min(cam.maxZoom, cam.zoom * 1.25);
-    clampCamera();
+    if (sceneInstance && sceneInstance.cameras && sceneInstance.cameras.main) {
+      const cur = sceneInstance.cameras.main.zoom;
+      sceneInstance.cameras.main.setZoom(Math.min(2.5, cur * 1.25));
+    }
   });
 
   document.getElementById('mobileZoomOutBtn')?.addEventListener('click', () => {
-    const cam = STATE.camera;
-    cam.zoom = Math.max(cam.minZoom, cam.zoom / 1.25);
-    clampCamera();
+    if (sceneInstance && sceneInstance.cameras && sceneInstance.cameras.main) {
+      const cur = sceneInstance.cameras.main.zoom;
+      sceneInstance.cameras.main.setZoom(Math.max(0.35, cur / 1.25));
+    }
   });
 
   document.getElementById('mobileCancelBtn')?.addEventListener('click', () => {

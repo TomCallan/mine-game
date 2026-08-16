@@ -1535,6 +1535,38 @@ function buyAndOpenCrate(tier) {
 // PRESTIGE & CUSTOM CREATOR
 // ===========================================================
 
+function calculatePrestigePayout(lifetimeEarnings) {
+  const threshold = STATE.config.prestigeThresholdLifetime || 1e10;
+  if (lifetimeEarnings < threshold) {
+    return { canPrestige: false, pointsGained: 0, keysGained: 0 };
+  }
+  const pointsGained = Math.floor(Math.pow(lifetimeEarnings / threshold, 0.5));
+  const keysGained = Math.max(1, 1 + Math.floor(Math.log10(lifetimeEarnings / threshold)));
+  return { canPrestige: true, pointsGained, keysGained };
+}
+
+function executePrestigeReset() {
+  const payout = calculatePrestigePayout(STATE.run.lifetimeEarnings || 0);
+  if (!payout.canPrestige) {
+    showToast('Lifetime earnings requirement not met for Prestige ($10B)', 'warn');
+    return false;
+  }
+
+  STATE.meta.prestigePoints += payout.pointsGained;
+  STATE.meta.prestigeKeys += payout.keysGained;
+
+  STATE.run.money = 1000;
+  STATE.run.lifetimeEarnings = 0;
+  STATE.run.buildings = [];
+  STATE.run.ores = [];
+  STATE.run.timeScale = 1.0;
+  STATE.run.isPaused = false;
+
+  showToast(`Prestige Complete! +${payout.pointsGained} Points & +${payout.keysGained} Keys!`, 'success');
+  triggerSaveState();
+  return true;
+}
+
 function buyPrestigeUpgrade(id) {
   showToast('Prestige upgrade unlocked!');
 }
