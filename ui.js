@@ -296,10 +296,8 @@ function renderInventoryGrid() {
 
       const desc = document.createElement('div');
       desc.className = 'inv-card-desc';
-      let stats = `Owned in Stock: ${ownedQty}`;
-      if (def.multiplier) stats += ` | ${def.multiplier}x Multiplier`;
-      if (def.produces) stats += ` | Produces ${def.produces.item}`;
-      desc.textContent = stats;
+      const descText = getDefDescription(def);
+      desc.textContent = descText;
       card.appendChild(desc);
 
       const priceTag = document.createElement('div');
@@ -388,6 +386,11 @@ function renderInventoryGrid() {
 
       top.appendChild(titleBox);
       card.appendChild(top);
+
+      const desc = document.createElement('div');
+      desc.className = 'inv-card-desc';
+      desc.textContent = getDefDescription(def);
+      card.appendChild(desc);
 
       const actions = document.createElement('div');
       actions.className = 'inv-card-actions';
@@ -544,45 +547,54 @@ function startUnboxingAnimation(reward) {
   const track = document.getElementById('rouletteTrack');
   if (!overlay || !track) return;
 
-  const ITEM_W = 90; // px per roulette item
-  const WIN_INDEX = 22; // which slot holds the winner
-  const TOTAL = 30;
+  const ITEM_W = 100; // px per roulette item (must match .roulette-item width in CSS)
+  const WIN_INDEX = 24; // which slot holds the winner
+  const TOTAL = 32;
 
   track.innerHTML = '';
   track.style.transition = 'none';
   track.style.transform = 'translateX(0)';
 
-  // Build pool of visually plausible filler items (not everything)
+  // Build pool of visually plausible filler items
   const allDefs = Object.values(STATE.defs.buildingDefs);
-  const winDef = reward.id ? STATE.defs.buildingDefs[reward.id] : null;
+  const winDef = reward.id && STATE.defs.buildingDefs[reward.id] ? STATE.defs.buildingDefs[reward.id] : null;
 
-  function makeItem(def, isWinner) {
+  function makeItem(def, isWinner, customLabel, customColor) {
     const el = document.createElement('div');
     el.className = 'roulette-item';
     if (isWinner) el.classList.add('roulette-winner');
 
     const swatch = document.createElement('div');
     swatch.className = 'roulette-item-swatch';
-    swatch.style.background = def.color;
+    swatch.style.background = def ? def.color : (customColor || '#e8a030');
     el.appendChild(swatch);
 
     const name = document.createElement('div');
     name.className = 'roulette-item-name';
-    name.textContent = def.name;
+    name.textContent = def ? def.name : (customLabel || 'Reward');
     el.appendChild(name);
 
     const rarity = document.createElement('div');
     rarity.className = 'roulette-item-rarity';
-    rarity.textContent = (def.rarity || 'COMMON').toUpperCase();
-    rarity.style.color = getRarityColor(def.rarity);
+    const r = def ? (def.rarity || 'common') : 'exotic';
+    rarity.textContent = r.toUpperCase();
+    rarity.style.color = getRarityColor(r);
     el.appendChild(rarity);
     return el;
   }
 
   for (let i = 0; i < TOTAL; i++) {
-    const isWinner = (i === WIN_INDEX) && winDef;
-    const def = isWinner ? winDef : allDefs[Math.floor(Math.random() * allDefs.length)];
-    track.appendChild(makeItem(def, isWinner));
+    const isWinner = (i === WIN_INDEX);
+    if (isWinner) {
+      if (winDef) {
+        track.appendChild(makeItem(winDef, true));
+      } else {
+        track.appendChild(makeItem(null, true, reward.label, '#e8a030'));
+      }
+    } else {
+      const def = allDefs[Math.floor(Math.random() * allDefs.length)];
+      track.appendChild(makeItem(def, false));
+    }
   }
 
   overlay.classList.add('open');
@@ -754,31 +766,75 @@ function getRarityColor(rarity) {
 }
 
 function getDefDescription(def) {
+  if (!def) return '';
   const parts = [];
+
+  // Machine-specific overrides
+  const specificDescriptions = {
+    extractor: 'Extracts Standard Ore ($5 base value) onto conveyor networks.',
+    coalExtractor: 'Mines Coal Fuel Ore ($15 base value). Provides fuel for fueled machines.',
+    megaExtractor: 'Heavy 2x2 drill. Produces high-density Mega Ore ($25 base value).',
+    volcanoDropper: 'Volcanic thermal vent. Spawns superheated Magma Ore ($50 base value, Flaming status).',
+    thermalExtractor: 'High-tech fueled drill. Consumes Coal to extract lucrative Super Diamond Ore ($300 base value, Sparkling).',
+    uraniumMine: 'Centrifuge drill. Extracts unstable Uranium Ore ($150 base value, Radioactive status).',
+    geodeDriller: 'Crystalline bore. Extracts Crystal Ore ($200 base value, Sparkling & Crystalline).',
+    antimatterSiphon: 'Particle collider siphon. Extracts Antimatter Pellets ($1,500 base value).',
+    temporalFluxBorer: 'Time-distortion drill. Extracts Time Crystal Ore ($800 base value, Time-Aged).',
+    algaeVat: 'Bio-luminescent harvester. Produces Glow Algae Ore ($120 base value, Wet status).',
+    voidHarvester: 'Cosmic rift harvester. Extracts rare Void Shard Ore ($12,000 base value).',
+    belt: 'Standard industrial conveyor belt (90 speed). Moves ores smoothly along direction.',
+    halfBelt: 'Narrow 0.5x1 conveyor belt. Ideal for compact routing and tight spaces.',
+    fastBelt: 'High-speed conveyor belt (180 speed, 2x standard).',
+    ultraBelt: 'Overclocked magnetic conveyor belt (320 speed). Rapid transport.',
+    magLevRail: 'Frictionless magnetic levitation rail (450 speed). Instantaneous logistics.',
+    splitter: 'Directs incoming ores alternatingly between left and right outputs.',
+    merger: 'Merges ores from multiple conveyor inputs into a single unified stream.',
+    phaseShiftBelt: 'Phase-shifted belt. Allows other machines to overlap and pass through.',
+    gravityInverter: 'Inverts ore gravity physics, altering conveyor movement.',
+    cryoStorageBelt: 'Deep-freeze conveyor. Slows ore speed (40 speed) and prevents volatile reactions.',
+    quantumLink: 'Quantum entanglement terminal. Teleports ores directly to linked exit.',
+    upgrader1x1: 'Compact 2.0x value multiplier with integrated guide walls.',
+    upgraderHalf: 'Space-saving 0.5x1 upgrader. Applies 1.5x value multiplier.',
+    upgrader2x1: 'Wide 2x1 dual-lane upgrader. Applies 3.0x value multiplier.',
+    freonSprayer: 'Cryogenic freon spray. Extinguishes flaming ores and applies Wet status.',
+    pyroRefiner: 'Blast furnace refiner. Applies 3.5x multiplier and ignites ores with Flaming status.',
+    leadDecontaminator: 'Radiation scrubber. Safely cleans Radioactive status and applies 2.5x multiplier.',
+    stellarSparkler: 'Prismatic crystal. Imbues ores with the Sparkling status buff.',
+    upgraderPlasma: 'High-energy plasma injector. Adds +$500 flat bonus value to passing ores.',
+    oreCrystallizer: 'Crystalline resonance chamber. Applies 2.2x multiplier and Crystalline status.',
+    probabilityAmp: 'Quantum probability booster. Applies 1.8x multiplier and grants Lucky status.',
+    entropyStabilizer: 'Cleanses and neutralizes all negative status effects with 3.0x multiplier.',
+    resonanceHarmonizer: 'Harmonic booster. 4.5x multiplier with special synergy on Sparkling ores.',
+    matterReplicator: 'Splits passing ores into duplicates, doubling throughput.',
+    oreTransmuter: 'Transmutes low-tier mineral ores into high-value exotic ores with 2.5x multiplier.',
+    shardOfLife: 'Mythic aura generator. 6.0x multiplier and empowers adjacent machinery.',
+    seller: 'Standard furnace. Collects and incinerates ores, adding their total value to your funds.',
+    blastSmelter: 'High-efficiency industrial smelter. Sells ores with a +100% bonus (2.0x total payout).',
+    dimensionalVault: 'Stores ores in batches of 5, selling them together with a 3.5x payout bonus.',
+    catalyticConverter: 'Chemical furnace. 2.5x base sell payout, boosted to 4.0x for Radioactive ores.',
+    soulForge: 'Forbidden crucible. Massive 8.0x sell payout with high-risk energy fluctuations.'
+  };
+
+  if (specificDescriptions[def.id]) {
+    return specificDescriptions[def.id];
+  }
+
+  // Dynamic fallback for custom/generated machines
   if (def.produces) parts.push(`Produces ${def.produces.item.replace(/([A-Z])/g, ' $1').trim()} every ${def.produces.rate || 1000}ms`);
-  if (def.multiplier) parts.push(`${def.multiplier}x ore value multiplier`);
-  if (def.flatAdd) parts.push(`+$${def.flatAdd.toLocaleString()} flat bonus per ore`);
-  if (def.sellerBonus) parts.push(`${def.sellerBonus}x sell bonus`);
-  if (def.speed) parts.push(`Belt speed: ${def.speed}`);
-  if (def.extinguishes) parts.push('Extinguishes flaming ores');
-  if (def.appliesWet) parts.push(`Applies Wet for ${def.appliesWet}s`);
-  if (def.appliesFlaming) parts.push('Applies Flaming status');
-  if (def.removesRadioactive) parts.push('Removes Radioactive status');
-  if (def.appliesSparkling) parts.push('Applies Sparkling bonus');
-  if (def.duplicatesOre) parts.push('Duplicates ores passing through');
-  if (def.requiresFuel) parts.push('Requires fuel ore input');
-  if (def.isSplitter) parts.push('Splits ore flow between outputs');
-  if (def.isMerger) parts.push('Merges multiple belt inputs');
-  if (def.freezesOres) parts.push('Freezes ores (slow but safe)');
-  if (def.passesThrough) parts.push('Passes through other machines');
-  if (def.gravityInvert) parts.push('Reverses ore gravity effects');
-  if (def.isTeleporter) parts.push('Teleports ores to linked exit');
-  if (def.nullifiesBadStatuses) parts.push('Removes all negative status effects');
-  if (def.transmutation) parts.push('Converts low-value ores to higher tier');
-  if (def.auraRadius) parts.push(`Buffs nearby machines within ${def.auraRadius} tiles`);
-  if (def.consumes && def.category === 'seller') parts.push('Collects and sells ores for cash');
-  if (parts.length === 0) parts.push(def.category.charAt(0).toUpperCase() + def.category.slice(1));
-  return parts.join(' \u2022 ');
+  if (def.multiplier) parts.push(`${def.multiplier}x multiplier`);
+  if (def.flatAdd) parts.push(`+$${def.flatAdd.toLocaleString()} flat bonus`);
+  if (def.sellerBonus) parts.push(`${def.sellerBonus}x sell payout`);
+  if (def.speed) parts.push(`${def.speed} speed`);
+  if (def.extinguishes) parts.push('Extinguishes fire');
+  if (def.appliesWet) parts.push(`Applies Wet (${def.appliesWet}s)`);
+  if (def.appliesFlaming) parts.push('Ignites Flaming');
+  if (def.removesRadioactive) parts.push('Decontaminates radiation');
+  if (def.appliesSparkling) parts.push('Grants Sparkling');
+  if (def.duplicatesOre) parts.push('Duplicates ores');
+  if (def.requiresFuel) parts.push('Requires Coal fuel');
+  if (def.consumes && def.category === 'seller') parts.push('Sells ores for cash');
+  
+  return parts.length > 0 ? parts.join(' \u2022 ') : `${def.category.toUpperCase()} machine`;
 }
 
 

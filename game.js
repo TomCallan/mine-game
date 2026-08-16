@@ -1029,13 +1029,13 @@ function triggerPlacementFlash(col, row, fp, success) {
 function tryPlaceBuilding(defId, col, row, rot) {
   const def = STATE.defs.buildingDefs[defId];
   if (!def) return false;
-  if (!STATE.meta.blueprintUnlocks[defId]) {
-    showToast(`${def.name} blueprint is locked.`, 'error');
-    return false;
-  }
   if (!canPlaceFromInventory(defId)) {
     showToast(`No ${def.name} in inventory — buy from Shop.`, 'warn');
     return false;
+  }
+  // If player owns the item, auto-unlock blueprint
+  if (!STATE.meta.blueprintUnlocks[defId]) {
+    STATE.meta.blueprintUnlocks[defId] = true;
   }
   const fp = getFootprint(def, rot);
   if (wouldOverlapAt(defId, col, row, fp.w, fp.h, null)) {
