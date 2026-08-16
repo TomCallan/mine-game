@@ -1644,10 +1644,14 @@ class FactoryScene extends Phaser.Scene {
     const worldW = STATE.config.grid.cols * cs;
     const worldH = STATE.config.grid.rows * cs;
 
-    // 1. Phaser Camera & Bounds
-    this.cameras.main.setBounds(-200, -200, worldW + 400, worldH + 400);
-    this.cameras.main.setScroll(worldW / 2 - window.innerWidth / 2, worldH / 2 - window.innerHeight / 2);
+    // 1. Phaser Camera Setup (Generous bounds for free panning)
+    this.cameras.main.setBounds(-4000, -4000, worldW + 8000, worldH + 8000);
+    this.cameras.main.centerOn(worldW / 2, worldH / 2);
     this.cameras.main.setZoom(1.0);
+
+    STATE.camera.x = this.cameras.main.scrollX;
+    STATE.camera.y = this.cameras.main.scrollY;
+    STATE.camera.zoom = 1.0;
 
     // 2. Phaser Graphics Layers
     this.gridGfx = this.add.graphics();
@@ -1660,17 +1664,20 @@ class FactoryScene extends Phaser.Scene {
     // 3. Floating Text Group
     this.floatingTexts = [];
 
-    // 4. Input & Panning Setup
-    this.isDragging = false;
-    this.dragStart = { x: 0, y: 0 };
-    this.cameraStart = { x: 0, y: 0 };
-    this.dragMoved = false;
+    // 4. Reliable Camera Drag-to-Pan & Placement Interaction
+    this.isPointerDown = false;
+    this.hasDragged = false;
+    this.pointerDownPos = { x: 0, y: 0 };
 
     this.input.on('pointerdown', (pointer) => {
       if (pointer.rightButtonDown()) {
         if (mode !== 'idle') cancelMode();
         return;
       }
+
+      this.isPointerDown = true;
+      this.hasDragged = false;
+      this.pointerDownPos = { x: pointer.x, y: pointer.y };
 
       const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
       const cell = worldToCell(worldPoint.x, worldPoint.y);
@@ -1682,66 +1689,85 @@ class FactoryScene extends Phaser.Scene {
           beltDragStart = cell;
         }
       }
-
-      this.isDragging = true;
-      this.dragMoved = false;
-      this.dragStart = { x: pointer.x, y: pointer.y };
-      this.cameraStart = { x: this.cameras.main.scrollX, y: this.cameras.main.scrollY };
     });
 
     this.input.on('pointermove', (pointer) => {
       mouseScreen = { x: pointer.x, y: pointer.y };
+
+      if (this.isPointerDown) {
+        const dist = Phaser.Math.Distance.Between(this.pointerDownPos.x, this.pointerDownPos.y, pointer.x, pointer.y);
+        if (dist > 4) {
+          this.hasDragged = true;
+        }
+
+        // Camera panning: pan if not belt-dragging or if using middle/right button
+        const isMiddleOrRight = pointer.middleButtonDown() || pointer.rightButtonDown();
+        const canPan = (!isBeltDragging && mode !== 'placing') || isMiddleOrRight || mode === 'idle' || mode === 'inspecting';
+
+        if (canPan) {
+          const dx = (pointer.x - pointer.prevPosition.x) / this.cameras.main.zoom;
+          const dy = (pointer.y - pointer.prevPosition.y) / this.cameras.main.zoom;
+          this.cameras.main.scrollX -= dx;
+          this.cameras.main.scrollY -= dy;
+        }
+      }
+
       STATE.camera.x = this.cameras.main.scrollX;
       STATE.camera.y = this.cameras.main.scrollY;
       STATE.camera.zoom = this.cameras.main.zoom;
-
-      if (!this.isDragging) return;
-
-      const dx = pointer.x - this.dragStart.x;
-      const dy = pointer.y - this.dragStart.y;
-      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) this.dragMoved = true;
-
-      if (mode !== 'placing' || !isBeltDragging) {
-        this.cameras.main.setScroll(
-          this.cameraStart.x - dx / this.cameras.main.zoom,
-          this.cameraStart.y - dy / this.cameras.main.zoom
-        );
-      }
     });
 
     this.input.on('pointerup', (pointer) => {
-      if (!this.isDragging) return;
-      this.isDragging = false;
+      if (!this.isPointerDown) return;
+      this.isPointerDown = false;
 
       const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
 
       if (isBeltDragging && beltDragStart && placingState) {
         const cell = worldToCell(worldPoint.x, worldPoint.y);
-        this.placeBeltLine(beltDragStart, cell, placingState.defId);
+        if (this.hasDragged) {
+          this.placeBeltLine(beltDragStart, cell, placingState.defId);
+        } else {
+          tryPlaceBuilding(placingState.defId, beltDragStart.col, beltDragStart.row, placingState.rot || 0);
+        }
         isBeltDragging = false;
         beltDragStart = null;
+        this.hasDragged = false;
         return;
       }
 
-      if (!this.dragMoved) {
+      // If it was a click (not a drag-pan), execute in-world click action
+      if (!this.hasDragged) {
         handleClickAction(worldPoint.x, worldPoint.y);
       }
+      this.hasDragged = false;
     });
 
-    // Mouse Wheel Zoom
+    // 5. Cursor-Anchored Smooth Mouse Wheel Zoom
     this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY) => {
-      const zoomFactor = deltaY > 0 ? 0.9 : 1.1;
-      const newZoom = Phaser.Math.Clamp(this.cameras.main.zoom * zoomFactor, 0.35, 2.5);
-      this.cameras.main.setZoom(newZoom);
+      const zoomFactor = deltaY > 0 ? 0.88 : 1.14;
+      const curZoom = this.cameras.main.zoom;
+      const newZoom = Phaser.Math.Clamp(curZoom * zoomFactor, 0.25, 3.0);
+
+      if (newZoom !== curZoom) {
+        const worldPointBefore = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+        this.cameras.main.setZoom(newZoom);
+        const worldPointAfter = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+        this.cameras.main.scrollX += (worldPointBefore.x - worldPointAfter.x);
+        this.cameras.main.scrollY += (worldPointBefore.y - worldPointAfter.y);
+      }
+
       STATE.camera.zoom = newZoom;
+      STATE.camera.x = this.cameras.main.scrollX;
+      STATE.camera.y = this.cameras.main.scrollY;
     });
 
-    // Mobile Window Resize
+    // Mobile / Window Resize
     this.scale.on('resize', (gameSize) => {
       this.cameras.main.setSize(gameSize.width, gameSize.height);
     });
 
-    // Initial State Loading
+    // Load initial save
     loadSavedState();
   }
 
