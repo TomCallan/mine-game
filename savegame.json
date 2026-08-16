@@ -20,8 +20,8 @@
     }
   },
   "run": {
-    "money": 13211,
-    "lifetimeEarnings": 10229,
+    "money": 10035,
+    "lifetimeEarnings": 23713,
     "buildings": [
       {
         "id": "bldg_1",
@@ -31,7 +31,7 @@
         "rot": 0,
         "y": 0,
         "lastProduced": 4942.799999982119,
-        "prodTimer": 315.70000000005984
+        "prodTimer": 107.70000000004177
       },
       {
         "id": "bldg_6",
@@ -98,7 +98,7 @@
         "rot": 1,
         "fuelTimer": 0,
         "lastProduced": 15001.09999999404,
-        "prodTimer": 961.4000000000408
+        "prodTimer": 753.4000000000226
       },
       {
         "id": "bldg_19",
@@ -108,7 +108,7 @@
         "rot": 1,
         "fuelTimer": 0,
         "lastProduced": 16335.40000000596,
-        "prodTimer": 626.1000000000415
+        "prodTimer": 418.1000000000232
       },
       {
         "id": "bldg_51",
@@ -127,42 +127,61 @@
         "rot": 1,
         "fuelTimer": 0,
         "lastProduced": 33478.5
+      },
+      {
+        "id": "bldg_80",
+        "defId": "belt",
+        "col": 11,
+        "row": 12,
+        "rot": 0,
+        "fuelTimer": 0,
+        "lastProduced": 26912
+      },
+      {
+        "id": "bldg_86",
+        "defId": "belt",
+        "col": 12,
+        "row": 12,
+        "rot": 0,
+        "fuelTimer": 0,
+        "lastProduced": 28587.5
+      },
+      {
+        "id": "bldg_87",
+        "defId": "belt",
+        "col": 13,
+        "row": 12,
+        "rot": 0,
+        "fuelTimer": 0,
+        "lastProduced": 28593
+      },
+      {
+        "id": "bldg_88",
+        "defId": "belt",
+        "col": 14,
+        "row": 12,
+        "rot": 0,
+        "fuelTimer": 0,
+        "lastProduced": 28597
+      },
+      {
+        "id": "bldg_89",
+        "defId": "belt",
+        "col": 15,
+        "row": 12,
+        "rot": 0,
+        "fuelTimer": 0,
+        "lastProduced": 28603.399999976158
       }
     ],
     "ores": [
       {
-        "id": "ore_24",
+        "id": "ore_159",
         "itemType": "ore",
-        "x": 1143.2397510609421,
-        "y": 850.9833049080479,
-        "vx": 1.91758252640179,
-        "vy": 133.34287856361937,
-        "size": 14,
-        "color": "#ffb03b",
-        "shape": "circle",
-        "value": 8,
-        "energy": 0,
-        "maxEnergy": 100,
-        "isFuel": false,
-        "status": {},
-        "upgradersPassed": [
-          "bldg_6",
-          "bldg_7",
-          "bldg_13",
-          "bldg_14",
-          "bldg_72",
-          "bldg_16"
-        ],
-        "groundTime": 0,
-        "upgraded": true
-      },
-      {
-        "id": "ore_25",
-        "itemType": "ore",
-        "x": 1138.4443923478477,
-        "y": 807.5650213769138,
-        "vx": 5.799306924620698,
-        "vy": 124.12322220284484,
+        "x": 1142.7783366599467,
+        "y": 827.1373382771636,
+        "vx": 3.502063195358553,
+        "vy": 109.49010627089133,
         "size": 14,
         "color": "#ffb03b",
         "shape": "circle",
@@ -182,12 +201,37 @@
         "upgraded": true
       },
       {
-        "id": "ore_26",
+        "id": "ore_160",
         "itemType": "ore",
-        "x": 1133.28494197579,
-        "y": 821.0959422083696,
-        "vx": 3.323236701965833,
-        "vy": 113.79476634753144,
+        "x": 1136.8730739995533,
+        "y": 780.4121650181726,
+        "vx": 10.57283344463715,
+        "vy": 152.21388183854916,
+        "size": 14,
+        "color": "#ffb03b",
+        "shape": "circle",
+        "value": 10,
+        "energy": 0,
+        "maxEnergy": 100,
+        "isFuel": false,
+        "status": {},
+        "upgradersPassed": [
+          "bldg_6",
+          "bldg_7",
+          "bldg_13",
+          "bldg_14",
+          "bldg_72"
+        ],
+        "groundTime": 0,
+        "upgraded": true
+      },
+      {
+        "id": "ore_161",
+        "itemType": "ore",
+        "x": 1132.593546555416,
+        "y": 796.5573380925287,
+        "vx": 6.0830046878736805,
+        "vy": 133.41969781631317,
         "size": 14,
         "color": "#ffb03b",
         "shape": "circle",
@@ -206,35 +250,12 @@
         "upgraded": true
       },
       {
-        "id": "ore_27",
+        "id": "ore_162",
         "itemType": "ore",
-        "x": 1131.3207443407978,
-        "y": 714.3069615043959,
-        "vx": 38.6935219340276,
-        "vy": 137.86170905779522,
-        "size": 14,
-        "color": "#ffb03b",
-        "shape": "circle",
-        "value": 5,
-        "energy": 0,
-        "maxEnergy": 100,
-        "isFuel": false,
-        "status": {},
-        "upgradersPassed": [
-          "bldg_6",
-          "bldg_7",
-          "bldg_13",
-          "bldg_14"
-        ],
-        "groundTime": 0
-      },
-      {
-        "id": "ore_28",
-        "itemType": "ore",
-        "x": 1102.3776717702958,
-        "y": 674.5443741293731,
-        "vx": 116.84651311319868,
-        "vy": 53.28292430598823,
+        "x": 1120.912115815146,
+        "y": 689.5038771984605,
+        "vx": 70.62366537012156,
+        "vy": 103.0806976481885,
         "size": 14,
         "color": "#ffb03b",
         "shape": "circle",
@@ -251,37 +272,58 @@
         "groundTime": 0
       },
       {
-        "id": "ore_29",
+        "id": "ore_163",
         "itemType": "ore",
-        "x": 1112.4570464526978,
-        "y": 684.260659737143,
-        "vx": 67.02992880565589,
-        "vy": 86.12568145437164,
-        "size": 14,
-        "color": "#ffb03b",
-        "shape": "circle",
-        "value": 4,
-        "energy": 0,
-        "maxEnergy": 100,
-        "isFuel": false,
-        "status": {},
-        "upgradersPassed": [
-          "bldg_7",
-          "bldg_13"
-        ],
-        "groundTime": 0
-      },
-      {
-        "id": "ore_30",
-        "itemType": "ore",
-        "x": 1013.1665835956991,
-        "y": 672,
-        "vx": 110.47705437985036,
+        "x": 1076.5456080885028,
+        "y": 671.9968134193675,
+        "vx": 161.99846826093795,
         "vy": 0,
         "size": 14,
         "color": "#ffb03b",
         "shape": "circle",
+        "value": 6,
+        "energy": 0,
+        "maxEnergy": 100,
+        "isFuel": false,
+        "status": {},
+        "upgradersPassed": [
+          "bldg_6",
+          "bldg_7"
+        ],
+        "groundTime": 0
+      },
+      {
+        "id": "ore_164",
+        "itemType": "ore",
+        "x": 1090.5448945268909,
+        "y": 672.1381612738493,
+        "vx": 122.50345311026761,
+        "vy": 8.435918326049148,
+        "size": 14,
+        "color": "#ffb03b",
+        "shape": "circle",
         "value": 5,
+        "energy": 0,
+        "maxEnergy": 100,
+        "isFuel": false,
+        "status": {},
+        "upgradersPassed": [
+          "bldg_7",
+          "bldg_13"
+        ],
+        "groundTime": 0
+      },
+      {
+        "id": "ore_165",
+        "itemType": "ore",
+        "x": 995.7228098214712,
+        "y": 672,
+        "vx": 53.16882760205004,
+        "vy": 0,
+        "size": 14,
+        "color": "#ffb03b",
+        "shape": "circle",
+        "value": 6,
         "energy": 0,
         "maxEnergy": 100,
         "isFuel": false,
@@ -296,7 +338,13 @@
     "isPaused": false
   },
   "shop": {
-    "stock": {},
+    "stock": {
+      "upgraderHalf": {
+        "defId": "upgraderHalf",
+        "currentPrice": 550,
+        "ownedCount": 11
+      }
+    },
     "dynamicPriceLevel": {}
   },
   "inventory": {
@@ -308,7 +356,7 @@
         "source": "starter"
       },
       "belt": {
-        "qty": 12,
+        "qty": 7,
         "permanent": false,
         "source": "starter"
       },
@@ -326,10 +374,25 @@
         "qty": 1,
         "permanent": false,
         "source": "salvage"
+      },
+      "upgraderHalf": {
+        "qty": 11,
+        "permanent": false,
+        "source": "shop"
       }
     },
     "permanentItems": {
       "merger": {
+        "qty": 1,
+        "permanent": true,
+        "source": "crate"
+      },
+      "entropyStabilizer": {
+        "qty": 1,
+        "permanent": true,
+        "source": "crate"
+      },
+      "catalyticConverter": {
         "qty": 1,
         "permanent": true,
         "source": "crate"
@@ -348,7 +411,8 @@
       "upgrader1x1": true,
       "upgraderHalf": true,
       "seller": true,
-      "coalExtractor": true
+      "coalExtractor": true,
+      "catalyticConverter": true
     },
     "relics": {},
     "shards": 0,
@@ -1974,7 +2038,7 @@
     }
   },
   "world": {
-    "money": 13211,
+    "money": 10035,
     "buildings": [
       {
         "id": "bldg_1",
@@ -1984,7 +2048,7 @@
         "rot": 0,
         "y": 0,
         "lastProduced": 4942.799999982119,
-        "prodTimer": 315.70000000005984
+        "prodTimer": 107.70000000004177
       },
       {
         "id": "bldg_6",
@@ -2051,7 +2115,7 @@
         "rot": 1,
         "fuelTimer": 0,
         "lastProduced": 15001.09999999404,
-        "prodTimer": 961.4000000000408
+        "prodTimer": 753.4000000000226
       },
       {
         "id": "bldg_19",
@@ -2061,7 +2125,7 @@
         "rot": 1,
         "fuelTimer": 0,
         "lastProduced": 16335.40000000596,
-        "prodTimer": 626.1000000000415
+        "prodTimer": 418.1000000000232
       },
       {
         "id": "bldg_51",
@@ -2080,42 +2144,61 @@
         "rot": 1,
         "fuelTimer": 0,
         "lastProduced": 33478.5
+      },
+      {
+        "id": "bldg_80",
+        "defId": "belt",
+        "col": 11,
+        "row": 12,
+        "rot": 0,
+        "fuelTimer": 0,
+        "lastProduced": 26912
+      },
+      {
+        "id": "bldg_86",
+        "defId": "belt",
+        "col": 12,
+        "row": 12,
+        "rot": 0,
+        "fuelTimer": 0,
+        "lastProduced": 28587.5
+      },
+      {
+        "id": "bldg_87",
+        "defId": "belt",
+        "col": 13,
+        "row": 12,
+        "rot": 0,
+        "fuelTimer": 0,
+        "lastProduced": 28593
+      },
+      {
+        "id": "bldg_88",
+        "defId": "belt",
+        "col": 14,
+        "row": 12,
+        "rot": 0,
+        "fuelTimer": 0,
+        "lastProduced": 28597
+      },
+      {
+        "id": "bldg_89",
+        "defId": "belt",
+        "col": 15,
+        "row": 12,
+        "rot": 0,
+        "fuelTimer": 0,
+        "lastProduced": 28603.399999976158
       }
     ],
     "ores": [
       {
-        "id": "ore_24",
+        "id": "ore_159",
         "itemType": "ore",
-        "x": 1143.2397510609421,
-        "y": 850.9833049080479,
-        "vx": 1.91758252640179,
-        "vy": 133.34287856361937,
-        "size": 14,
-        "color": "#ffb03b",
-        "shape": "circle",
-        "value": 8,
-        "energy": 0,
-        "maxEnergy": 100,
-        "isFuel": false,
-        "status": {},
-        "upgradersPassed": [
-          "bldg_6",
-          "bldg_7",
-          "bldg_13",
-          "bldg_14",
-          "bldg_72",
-          "bldg_16"
-        ],
-        "groundTime": 0,
-        "upgraded": true
-      },
-      {
-        "id": "ore_25",
-        "itemType": "ore",
-        "x": 1138.4443923478477,
-        "y": 807.5650213769138,
-        "vx": 5.799306924620698,
-        "vy": 124.12322220284484,
+        "x": 1142.7783366599467,
+        "y": 827.1373382771636,
+        "vx": 3.502063195358553,
+        "vy": 109.49010627089133,
         "size": 14,
         "color": "#ffb03b",
         "shape": "circle",
@@ -2135,12 +2218,37 @@
         "upgraded": true
       },
       {
-        "id": "ore_26",
+        "id": "ore_160",
         "itemType": "ore",
-        "x": 1133.28494197579,
-        "y": 821.0959422083696,
-        "vx": 3.323236701965833,
-        "vy": 113.79476634753144,
+        "x": 1136.8730739995533,
+        "y": 780.4121650181726,
+        "vx": 10.57283344463715,
+        "vy": 152.21388183854916,
+        "size": 14,
+        "color": "#ffb03b",
+        "shape": "circle",
+        "value": 10,
+        "energy": 0,
+        "maxEnergy": 100,
+        "isFuel": false,
+        "status": {},
+        "upgradersPassed": [
+          "bldg_6",
+          "bldg_7",
+          "bldg_13",
+          "bldg_14",
+          "bldg_72"
+        ],
+        "groundTime": 0,
+        "upgraded": true
+      },
+      {
+        "id": "ore_161",
+        "itemType": "ore",
+        "x": 1132.593546555416,
+        "y": 796.5573380925287,
+        "vx": 6.0830046878736805,
+        "vy": 133.41969781631317,
         "size": 14,
         "color": "#ffb03b",
         "shape": "circle",
@@ -2159,35 +2267,12 @@
         "upgraded": true
       },
       {
-        "id": "ore_27",
+        "id": "ore_162",
         "itemType": "ore",
-        "x": 1131.3207443407978,
-        "y": 714.3069615043959,
-        "vx": 38.6935219340276,
-        "vy": 137.86170905779522,
-        "size": 14,
-        "color": "#ffb03b",
-        "shape": "circle",
-        "value": 5,
-        "energy": 0,
-        "maxEnergy": 100,
-        "isFuel": false,
-        "status": {},
-        "upgradersPassed": [
-          "bldg_6",
-          "bldg_7",
-          "bldg_13",
-          "bldg_14"
-        ],
-        "groundTime": 0
-      },
-      {
-        "id": "ore_28",
-        "itemType": "ore",
-        "x": 1102.3776717702958,
-        "y": 674.5443741293731,
-        "vx": 116.84651311319868,
-        "vy": 53.28292430598823,
+        "x": 1120.912115815146,
+        "y": 689.5038771984605,
+        "vx": 70.62366537012156,
+        "vy": 103.0806976481885,
         "size": 14,
         "color": "#ffb03b",
         "shape": "circle",
@@ -2204,37 +2289,58 @@
         "groundTime": 0
       },
       {
-        "id": "ore_29",
+        "id": "ore_163",
         "itemType": "ore",
-        "x": 1112.4570464526978,
-        "y": 684.260659737143,
-        "vx": 67.02992880565589,
-        "vy": 86.12568145437164,
-        "size": 14,
-        "color": "#ffb03b",
-        "shape": "circle",
-        "value": 4,
-        "energy": 0,
-        "maxEnergy": 100,
-        "isFuel": false,
-        "status": {},
-        "upgradersPassed": [
-          "bldg_7",
-          "bldg_13"
-        ],
-        "groundTime": 0
-      },
-      {
-        "id": "ore_30",
-        "itemType": "ore",
-        "x": 1013.1665835956991,
-        "y": 672,
-        "vx": 110.47705437985036,
+        "x": 1076.5456080885028,
+        "y": 671.9968134193675,
+        "vx": 161.99846826093795,
         "vy": 0,
         "size": 14,
         "color": "#ffb03b",
         "shape": "circle",
+        "value": 6,
+        "energy": 0,
+        "maxEnergy": 100,
+        "isFuel": false,
+        "status": {},
+        "upgradersPassed": [
+          "bldg_6",
+          "bldg_7"
+        ],
+        "groundTime": 0
+      },
+      {
+        "id": "ore_164",
+        "itemType": "ore",
+        "x": 1090.5448945268909,
+        "y": 672.1381612738493,
+        "vx": 122.50345311026761,
+        "vy": 8.435918326049148,
+        "size": 14,
+        "color": "#ffb03b",
+        "shape": "circle",
         "value": 5,
+        "energy": 0,
+        "maxEnergy": 100,
+        "isFuel": false,
+        "status": {},
+        "upgradersPassed": [
+          "bldg_7",
+          "bldg_13"
+        ],
+        "groundTime": 0
+      },
+      {
+        "id": "ore_165",
+        "itemType": "ore",
+        "x": 995.7228098214712,
+        "y": 672,
+        "vx": 53.16882760205004,
+        "vy": 0,
+        "size": 14,
+        "color": "#ffb03b",
+        "shape": "circle",
+        "value": 6,
         "energy": 0,
         "maxEnergy": 100,
         "isFuel": false,
@@ -2254,7 +2360,8 @@
     "upgrader1x1",
     "upgraderHalf",
     "seller",
-    "coalExtractor"
+    "coalExtractor",
+    "catalyticConverter"
   ],
   "buildingDefs": {
     "extractor": {
@@ -3783,5 +3890,5 @@
     "minZoom": 0.25,
     "maxZoom": 4
   },
-  "nextId": 31
+  "nextId": 166
 }

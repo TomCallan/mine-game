@@ -9,6 +9,129 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
+  --bg-dark: #0f172a;
+  --bg-panel: #1e293b;
+  --border-dim: rgba(148, 163, 184, 0.2);
+  --accent-amber: #f59e0b;
+}
+
+#savesModal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 1000;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(4px);
+}
+#savesModal.open {
+  display: flex;
+}
+.saves-window {
+  background: var(--bg-panel);
+  width: 600px;
+  max-width: 95vw;
+  border-radius: 12px;
+  border: 1px solid var(--border-dim);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+  display: flex;
+  flex-direction: column;
+}
+.saves-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-dim);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.saves-title {
+  color: #fff;
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 0.05em;
+}
+.saves-close {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 24px;
+  cursor: pointer;
+}
+.saves-close:hover { color: #ef4444; }
+.saves-body {
+  padding: 20px;
+}
+.saves-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.save-slot-card {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid var(--border-dim);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.save-slot-card:hover {
+  border-color: var(--accent-amber);
+}
+.save-slot-number {
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+}
+.save-slot-name-input {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #fff;
+  padding: 8px;
+  border-radius: 4px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.save-slot-time {
+  font-size: 11px;
+  color: #64748b;
+  min-height: 14px;
+}
+.save-btn-row {
+  display: flex;
+  gap: 8px;
+  flex-direction: column;
+}
+.save-btn {
+  background: #334155;
+  color: #fff;
+  border: none;
+  padding: 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 12px;
+}
+.save-btn:hover { background: #475569; }
+.save-btn.load { background: #10b981; }
+.save-btn.load:hover { background: #059669; }
+.save-btn.del { background: transparent; color: #ef4444; border: 1px solid #ef4444; }
+.save-btn.del:hover { background: rgba(239, 68, 68, 0.1); }
+.new-game-btn {
+  width: 100%;
+  padding: 12px;
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #60a5fa;
+  border-radius: 6px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.new-game-btn:hover { background: rgba(59, 130, 246, 0.25); }
+
+
   --bg-deep:      #0a0c0f;
   --bg-panel:     #111418;
   --bg-surface:   #141a1f;

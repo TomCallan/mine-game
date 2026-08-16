@@ -579,11 +579,13 @@ function openCrate(tier) {
       const ids = ['extractor', 'belt', 'fastBelt', 'upgrader1x1', 'freonSprayer'];
       const id = ids[Math.floor(Math.random() * ids.length)];
       addToInventory(id, 2, false, 'crate');
+      STATE.meta.blueprintUnlocks[id] = true;
       reward = { type: 'item', id, qty: 2, label: `2x ${STATE.defs.buildingDefs[id].name}` };
     } else if (rand < 0.92) {
       const ids = ['halfBelt', 'splitter', 'merger', 'upgraderHalf'];
       const id = ids[Math.floor(Math.random() * ids.length)];
       addToInventory(id, 1, true, 'crate');
+      STATE.meta.blueprintUnlocks[id] = true;
       reward = { type: 'permanent', id, qty: 1, label: `1x Permanent ${STATE.defs.buildingDefs[id].name}` };
     } else if (rand < 0.99) {
       const ids = ['coalExtractor', 'megaExtractor', 'pyroRefiner'];
@@ -605,6 +607,7 @@ function openCrate(tier) {
       const ids = ['geodeDriller', 'magLevRail', 'gravityInverter', 'cryoStorageBelt', 'oreCrystallizer'];
       const id = ids[Math.floor(Math.random() * ids.length)];
       addToInventory(id, 1, true, 'crate');
+      STATE.meta.blueprintUnlocks[id] = true;
       reward = { type: 'permanent', id, qty: 1, label: `1x Permanent ${STATE.defs.buildingDefs[id].name}` };
     } else if (rand < 0.80) {
       const ids = ['volcanoDropper', 'thermalExtractor', 'upgrader2x1', 'geodeDriller'];
@@ -629,6 +632,7 @@ function openCrate(tier) {
       const ids = ['algaeVat', 'entropyStabilizer', 'oreTransmuter', 'dimensionalVault', 'catalyticConverter'];
       const id = ids[Math.floor(Math.random() * ids.length)];
       addToInventory(id, 1, true, 'crate');
+      STATE.meta.blueprintUnlocks[id] = true;
       reward = { type: 'permanent', id, qty: 1, label: `1x Permanent ${STATE.defs.buildingDefs[id].name}` };
     } else if (rand < 0.70) {
       const ids = ['algaeVat', 'entropyStabilizer', 'oreTransmuter', 'dimensionalVault', 'catalyticConverter'];
@@ -663,6 +667,7 @@ function openCrate(tier) {
       const ids = ['antimatterSiphon', 'quantumLink', 'matterReplicator', 'soulForge', 'shardOfLife'];
       const id = ids[Math.floor(Math.random() * ids.length)];
       addToInventory(id, 1, true, 'crate');
+      STATE.meta.blueprintUnlocks[id] = true;
       reward = { type: 'permanent', id, qty: 1, label: `1x Mythic Copy: ${STATE.defs.buildingDefs[id].name}` };
     } else if (rand < 0.90) {
       const rIds = ['insuranceSeal', 'exoticPermit', 'vaultArchivist'];
@@ -700,14 +705,64 @@ function cancelMode() {
 }
 
 // Save & Migration System
+STATE.activeSaveSlot = 0;
+
+async function fetchSaveSlots() {
+  const res = await fetch('/api/saves');
+  return res.json();
+}
+async function saveToSlot(slot, name) {
+  STATE.activeSaveSlot = slot;
+  const data = { slotName: name, savedAt: new Date().toISOString(), state: STATE };
+  await fetch(`/api/save/${slot}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+}
+async function loadFromSlot(slot) {
+  const res = await fetch(`/api/load/${slot}`);
+  const data = await res.json();
+  if (data.state) {
+    STATE.activeSaveSlot = slot;
+    migrateSavedState(data.state);
+    if (typeof renderHotbar === 'function') renderHotbar();
+    if (typeof renderInventoryGrid === 'function') renderInventoryGrid();
+  }
+}
+async function deleteSlot(slot) {
+  await fetch(`/api/save/${slot}`, { method: 'DELETE' });
+}
+async function newGame() {
+  STATE.run.money = 1000;
+  STATE.run.lifetimeEarnings = 0;
+  STATE.run.buildings = [];
+  STATE.run.ores = [];
+  STATE.run.timeScale = 1.0;
+  STATE.run.isPaused = false;
+  
+  STATE.shop.stock = {};
+  STATE.shop.dynamicPriceLevel = {};
+  
+  STATE.inventory.items = {
+    extractor: { qty: 2, permanent: false, source: 'starter' },
+    belt: { qty: 10, permanent: false, source: 'starter' },
+    upgrader1x1: { qty: 1, permanent: false, source: 'starter' },
+    seller: { qty: 1, permanent: false, source: 'starter' }
+  };
+  
+  if (typeof renderHotbar === 'function') renderHotbar();
+  if (typeof renderInventoryGrid === 'function') renderInventoryGrid();
+  triggerSaveState();
+}
+
 function triggerSaveState() {
   try {
     const jsonStr = JSON.stringify(STATE, null, 2);
     localStorage.setItem('miners_haven_save', jsonStr);
-    fetch('/api/save', {
+    
+    const slot = STATE.activeSaveSlot || 0;
+    const data = { slotName: `Save ${slot + 1}`, savedAt: new Date().toISOString(), state: STATE };
+    fetch(`/api/save/${slot}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: jsonStr
+      body: JSON.stringify(data)
     }).catch(err => console.error('Save API error:', err));
   } catch (e) {
     console.error('Save state error:', e);
@@ -824,15 +879,35 @@ function clampedOrigin(w, h, rawCol, rawRow) {
 
 function worldToCell(wx, wy, defId) {
   const cs = STATE.config.grid.cellSize;
-  const def = defId ? STATE.defs.buildingDefs[defId] : (placingState ? STATE.defs.buildingDefs[placingState.defId] : null);
+  let def = null;
+  let rot = 0;
+
+  if (defId) {
+    def = STATE.defs.buildingDefs[defId];
+  } else if (placingState) {
+    def = STATE.defs.buildingDefs[placingState.defId];
+    rot = placingState.rot;
+  } else if (movingState) {
+    const building = findBuildingById(movingState.buildingId);
+    if (building) {
+      def = STATE.defs.buildingDefs[building.defId];
+      rot = movingState.rot;
+    }
+  }
 
   let col = Math.floor(wx / cs);
   let row = Math.floor(wy / cs);
 
-  if (def && def.isHalfBelt) {
-    const subX = (wx / cs) - col;
-    const subCol = subX >= 0.5 ? 0.5 : 0;
-    col += subCol;
+  if (def && (def.isHalfBelt || def.isHalf)) {
+    const fp = getFootprint(def, rot);
+    if (fp.w < 1) {
+      const subX = (wx / cs) - col;
+      col += subX >= 0.5 ? 0.5 : 0;
+    }
+    if (fp.h < 1) {
+      const subY = (wy / cs) - row;
+      row += subY >= 0.5 ? 0.5 : 0;
+    }
   }
   return { col, row };
 }
@@ -1790,7 +1865,7 @@ const CATEGORY_ICONS = {
     ctx.moveTo(cx, cy - s*0.35); ctx.lineTo(cx, cy + s*0.35);
     ctx.stroke();
   },
-  upgrader: (cx, cy, s, col) => {
+  upgrader: (ctx, cy, s, col) => {
     ctx.strokeStyle = col; ctx.lineWidth = s * 0.08;
     ctx.beginPath();
     ctx.moveTo(cx - s*0.25, cy + s*0.2); ctx.lineTo(cx, cy - s*0.25); ctx.lineTo(cx + s*0.25, cy + s*0.2);
@@ -1803,6 +1878,180 @@ const CATEGORY_ICONS = {
     ctx.moveTo(cx - s*0.15, cy); ctx.lineTo(cx + s*0.15, cy);
     ctx.moveTo(cx, cy - s*0.15); ctx.lineTo(cx, cy + s*0.15);
     ctx.stroke();
+  }
+};
+
+const SPRITE_RENDERERS = {
+  extractor: (ctx, x, y, w, h, def, zoom, rot) => {
+    ctx.save();
+    ctx.globalAlpha = 0.7;
+    const cx = x + w/2, cy = y + h/2;
+    const r = Math.min(w, h) * 0.3;
+    const lighter = hexShift(def.color, 50);
+
+    ctx.strokeStyle = lighter;
+    ctx.lineWidth = Math.max(1, Math.min(w, h) * 0.05);
+
+    if (def.id === 'coalExtractor') {
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(x + w - w*0.3, y + h*0.1, w*0.15, h*0.4);
+      ctx.fillRect(x + w - w*0.25, y + h*0.05, w*0.05, h*0.1);
+    } else if (def.id === 'thermalExtractor') {
+      ctx.fillStyle = '#f97316';
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - r*0.8);
+      ctx.quadraticCurveTo(cx + r*0.8, cy + r*0.8, cx, cy + r*0.8);
+      ctx.quadraticCurveTo(cx - r*0.8, cy + r*0.8, cx, cy - r*0.8);
+      ctx.fill();
+    } else if (def.id === 'uraniumMine') {
+      ctx.strokeStyle = '#4ade80';
+      ctx.lineWidth = Math.min(w, h) * 0.08;
+      for (let i=0; i<3; i++) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r*0.8, i * Math.PI*2/3 + 0.2, (i+1) * Math.PI*2/3 - 0.2);
+        ctx.stroke();
+      }
+      ctx.fillStyle = '#4ade80';
+      ctx.beginPath(); ctx.arc(cx, cy, r*0.3, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = lighter;
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(cx - r, cy - r); ctx.lineTo(cx + r, cy + r);
+    ctx.moveTo(cx - r, cy + r); ctx.lineTo(cx + r, cy - r);
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, r*0.4, 0, Math.PI*2); ctx.stroke();
+
+    const t = performance.now() / 50;
+    const vib = (Math.sin(t) > 0) ? 2 * zoom : -2 * zoom;
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x + w*0.1 + vib, y + h*0.2); ctx.lineTo(x + w*0.1 + vib, y + h*0.8);
+    ctx.moveTo(x + w*0.9 + vib, y + h*0.2); ctx.lineTo(x + w*0.9 + vib, y + h*0.8);
+    ctx.stroke();
+    ctx.restore();
+  },
+  belt: (ctx, x, y, w, h, def, zoom, rot, b) => {
+    ctx.save();
+    ctx.globalAlpha = 0.7;
+    const cx = x + w/2, cy = y + h/2;
+    const lighter = hexShift(def.color, 50);
+    ctx.fillStyle = lighter;
+    
+    let dir = b ? b.rot : rot;
+    const fp = getFootprint(def, dir);
+    if (fp.ports && fp.ports[0] && fp.ports[0].dropSide !== null && fp.ports[0].dropSide !== undefined) {
+      dir = fp.ports[0].dropSide;
+    }
+    if (def.isSplitter && b) {
+       dir = (b.rot + ((b.splitCount||0) % 2 === 0 ? 0 : 1)) % 4;
+    }
+    
+    const drawArrow = (ax, ay, size, angle) => {
+      ctx.save();
+      ctx.translate(ax, ay);
+      ctx.rotate(angle * Math.PI / 2);
+      ctx.beginPath();
+      ctx.moveTo(-size, -size); ctx.lineTo(size, 0); ctx.lineTo(-size, size);
+      ctx.fill();
+      ctx.restore();
+    };
+
+    const asize = Math.min(w, h) * 0.2;
+    
+    if (def.id === 'fastBelt') {
+      drawArrow(cx - w*0.2, cy, asize, dir);
+      drawArrow(cx, cy, asize, dir);
+      drawArrow(cx + w*0.2, cy, asize, dir);
+    } else if (def.id === 'ultraBelt') {
+      ctx.fillStyle = '#fbbf24';
+      drawArrow(cx - w*0.3, cy, asize, dir);
+      drawArrow(cx - w*0.1, cy, asize, dir);
+      drawArrow(cx + w*0.1, cy, asize, dir);
+      drawArrow(cx + w*0.3, cy, asize, dir);
+    } else if (def.isSplitter) {
+      ctx.save();
+      ctx.translate(cx, cy); ctx.rotate(dir * Math.PI / 2);
+      ctx.beginPath();
+      ctx.moveTo(-asize*1.5, -asize*0.5); ctx.lineTo(0, -asize*0.5);
+      ctx.lineTo(asize, -asize*1.5); ctx.lineTo(asize*1.5, -asize);
+      ctx.lineTo(0, 0); ctx.lineTo(asize*1.5, asize); ctx.lineTo(asize, asize*1.5);
+      ctx.lineTo(0, asize*0.5); ctx.lineTo(-asize*1.5, asize*0.5);
+      ctx.fill();
+      ctx.restore();
+    } else if (def.isMerger) {
+      ctx.save();
+      ctx.translate(cx, cy); ctx.rotate(dir * Math.PI / 2);
+      ctx.beginPath();
+      ctx.moveTo(asize*1.5, 0); ctx.lineTo(0, -asize); ctx.lineTo(0, asize);
+      ctx.fill();
+      ctx.restore();
+    } else {
+      drawArrow(cx - w*0.15, cy, asize, dir);
+      drawArrow(cx + w*0.15, cy, asize, dir);
+    }
+    ctx.restore();
+  },
+  upgrader: (ctx, x, y, w, h, def, zoom, rot) => {
+    ctx.save();
+    ctx.globalAlpha = 0.7;
+    const cx = x + w/2, cy = y + h/2;
+    const asize = Math.min(w, h) * 0.3;
+    const lighter = hexShift(def.color, 50);
+    ctx.fillStyle = lighter;
+    
+    if (def.id === 'freonSprayer') {
+      ctx.strokeStyle = lighter; ctx.lineWidth = Math.max(1, w*0.05);
+      for (let i=0; i<6; i++) {
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(i*Math.PI/3) * asize, cy + Math.sin(i*Math.PI/3) * asize);
+        ctx.stroke();
+      }
+    } else if (def.id === 'pyroRefiner') {
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - asize);
+      ctx.quadraticCurveTo(cx + asize, cy + asize, cx, cy + asize);
+      ctx.quadraticCurveTo(cx - asize, cy + asize, cx, cy - asize);
+      ctx.fill();
+    } else if (def.id === 'leadDecontaminator') {
+      ctx.beginPath();
+      ctx.moveTo(cx - asize, cy - asize*0.5); ctx.lineTo(cx + asize, cy - asize*0.5);
+      ctx.lineTo(cx + asize, cy + asize*0.2); ctx.lineTo(cx, cy + asize);
+      ctx.lineTo(cx - asize, cy + asize*0.2); ctx.closePath();
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - asize); ctx.lineTo(cx + asize, cy + asize); ctx.lineTo(cx - asize, cy + asize);
+      ctx.fill();
+    }
+    ctx.restore();
+  },
+  seller: (ctx, x, y, w, h, def, zoom, rot) => {
+    ctx.save();
+    ctx.globalAlpha = 0.7;
+    const cx = x + w/2, cy = y + h/2;
+    const lighter = hexShift(def.color, 50);
+    const aw = w * 0.2, ah = h * 0.3;
+    
+    ctx.strokeStyle = lighter;
+    ctx.lineWidth = Math.max(1, w*0.05);
+
+    if (def.id === 'blastSmelter') {
+      ctx.fillStyle = 'rgba(255, 100, 0, 0.5)';
+      ctx.fillRect(cx - aw*1.5, cy, aw*3, ah);
+      ctx.beginPath(); ctx.moveTo(cx-aw, cy); ctx.lineTo(cx-aw, cy-ah); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy-ah*1.2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx+aw, cy); ctx.lineTo(cx+aw, cy-ah); ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(cx - aw, cy - ah); ctx.lineTo(cx + aw, cy - ah);
+      ctx.lineTo(cx + aw*0.3, cy + ah); ctx.lineTo(cx - aw*0.3, cy + ah);
+      ctx.closePath();
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 };
 
@@ -1848,6 +2097,9 @@ function drawBuildings() {
     ctx.beginPath();
     roundRect(ctx, p1.x, p1.y, w, h, Math.min(3 * zoom, 4));
     ctx.stroke();
+
+    const renderer = SPRITE_RENDERERS[def.id] || SPRITE_RENDERERS[def.category];
+    if (renderer) renderer(ctx, p1.x, p1.y, w, h, def, zoom, b.rot, b);
 
     // Category icon when zoomed in
     if (zoom > 0.55 && w > 20) {
@@ -1914,6 +2166,9 @@ function drawBuildings() {
     ctx.strokeStyle = isSelected ? '#e8a030' : hexToRgba(def.color, 0.5);
     ctx.lineWidth = isSelected ? 2 * zoom : 0.8 * zoom;
     ctx.strokeRect(p1.x, p1.y, w, h);
+
+    const renderer = SPRITE_RENDERERS[def.id] || SPRITE_RENDERERS[def.category];
+    if (renderer) renderer(ctx, p1.x, p1.y, w, h, def, zoom, b.rot, b);
 
     ctx.globalAlpha = isMoving ? 0.45 : 1;
     drawPorts(fp, b.col, b.row);

@@ -542,47 +542,245 @@ function buyAndOpenCrate(crateTier) {
 function startUnboxingAnimation(reward) {
   const overlay = document.getElementById('unboxingOverlay');
   const track = document.getElementById('rouletteTrack');
-  const title = document.getElementById('rouletteTitle');
   if (!overlay || !track) return;
 
-  if (title) title.textContent = `Unboxing Reward: ${reward.label}`;
+  const ITEM_W = 90; // px per roulette item
+  const WIN_INDEX = 22; // which slot holds the winner
+  const TOTAL = 30;
+
   track.innerHTML = '';
   track.style.transition = 'none';
-  track.style.left = '0px';
+  track.style.transform = 'translateX(0)';
 
-  const allItems = Object.values(STATE.defs.buildingDefs);
-  for (let i = 0; i < 30; i++) {
-    const item = (i === 24 && reward.id) ? (STATE.defs.buildingDefs[reward.id] || allItems[0]) : allItems[Math.floor(Math.random() * allItems.length)];
+  // Build pool of visually plausible filler items (not everything)
+  const allDefs = Object.values(STATE.defs.buildingDefs);
+  const winDef = reward.id ? STATE.defs.buildingDefs[reward.id] : null;
+
+  function makeItem(def, isWinner) {
     const el = document.createElement('div');
-    el.className = `roulette-item rarity-${item.rarity || 'common'}`;
+    el.className = 'roulette-item';
+    if (isWinner) el.classList.add('roulette-winner');
 
     const swatch = document.createElement('div');
-    swatch.style.width = '24px'; swatch.style.height = '24px'; swatch.style.borderRadius = '4px';
-    swatch.style.background = item.color;
+    swatch.className = 'roulette-item-swatch';
+    swatch.style.background = def.color;
     el.appendChild(swatch);
 
     const name = document.createElement('div');
-    name.style.fontSize = '9px'; name.style.fontWeight = '800'; name.style.color = '#fff';
-    name.textContent = item.name;
+    name.className = 'roulette-item-name';
+    name.textContent = def.name;
     el.appendChild(name);
 
-    track.appendChild(el);
+    const rarity = document.createElement('div');
+    rarity.className = 'roulette-item-rarity';
+    rarity.textContent = (def.rarity || 'COMMON').toUpperCase();
+    rarity.style.color = getRarityColor(def.rarity);
+    el.appendChild(rarity);
+    return el;
+  }
+
+  for (let i = 0; i < TOTAL; i++) {
+    const isWinner = (i === WIN_INDEX) && winDef;
+    const def = isWinner ? winDef : allDefs[Math.floor(Math.random() * allDefs.length)];
+    track.appendChild(makeItem(def, isWinner));
   }
 
   overlay.classList.add('open');
 
-  setTimeout(() => {
-    track.style.transition = 'left 3.5s cubic-bezier(0.1, 1, 0.1, 1)';
-    const targetOffset = -(24 * 98 - (document.querySelector('.roulette-container').offsetWidth / 2 - 43));
-    track.style.left = `${targetOffset}px`;
-  }, 50);
+  // Remove any old result card
+  document.getElementById('rouletteResult')?.remove();
 
-  setTimeout(() => {
-    showToast(`Reward Granted: ${reward.label}`);
-    renderHotbar();
-    renderInventoryGrid();
-  }, 3800);
+  // After paint, calculate the scroll position to land WIN_INDEX centered
+  requestAnimationFrame(() => {
+    const containerW = overlay.querySelector('.roulette-container')?.offsetWidth || 500;
+    const targetLeft = -(WIN_INDEX * ITEM_W) + (containerW / 2) - (ITEM_W / 2);
+
+    setTimeout(() => {
+      track.style.transition = 'transform 4s cubic-bezier(0.05, 1, 0.2, 1)';
+      track.style.transform = `translateX(${targetLeft}px)`;
+    }, 80);
+
+    setTimeout(() => {
+      // Show result card below the roulette
+      const resultCard = document.createElement('div');
+      resultCard.id = 'rouletteResult';
+      resultCard.className = 'roulette-result-card';
+
+      const rewardType = reward.type === 'permanent' ? 'PERMANENT COPY' :
+                         reward.type === 'blueprint' ? 'BLUEPRINT UNLOCKED' :
+                         reward.type === 'item' ? 'ITEM GRANTED' :
+                         reward.type === 'relic' ? 'RELIC UNLOCKED' :
+                         reward.type === 'shards' ? 'SHARDS EARNED' :
+                         reward.type === 'prestigeDust' ? 'PRESTIGE DUST' : 'REWARD';
+
+      if (winDef) {
+        resultCard.innerHTML = `
+          <div class="rr-type">${rewardType}</div>
+          <div class="rr-swatch" style="background:${winDef.color}"></div>
+          <div class="rr-name">${winDef.name}</div>
+          <div class="rr-rarity" style="color:${getRarityColor(winDef.rarity)}">${(winDef.rarity || 'COMMON').toUpperCase()} &bull; ${winDef.size.w}x${winDef.size.h}</div>
+          <div class="rr-desc">${getDefDescription(winDef)}</div>
+        `;
+      } else {
+        resultCard.innerHTML = `
+          <div class="rr-type">${rewardType}</div>
+          <div class="rr-name">${reward.label}</div>
+        `;
+      }
+
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'rr-close-btn';
+      closeBtn.textContent = 'COLLECT';
+      closeBtn.addEventListener('click', () => {
+        overlay.classList.remove('open');
+        resultCard.remove();
+      });
+      resultCard.appendChild(closeBtn);
+
+      overlay.appendChild(resultCard);
+
+      showToast(`Reward Granted: ${reward.label}`);
+      renderHotbar();
+      renderInventoryGrid();
+    }, 4500);
+  });
 }
+
+// Save Slots UI
+async function openSavesModal() {
+  closeInventoryModal();
+  closeCrateModal();
+  document.getElementById('savesModal')?.classList.add('open');
+  await renderSaveSlots();
+}
+
+function closeSavesModal() {
+  document.getElementById('savesModal')?.classList.remove('open');
+}
+
+async function renderSaveSlots() {
+  const grid = document.getElementById('savesGrid');
+  if (!grid) return;
+  grid.innerHTML = '<div style="color:#fff;">Loading...</div>';
+  
+  try {
+    const slots = await fetchSaveSlots();
+    grid.innerHTML = '';
+    
+    slots.forEach(slotData => {
+      const card = document.createElement('div');
+      card.className = 'save-slot-card';
+      
+      const header = document.createElement('div');
+      header.className = 'save-slot-number';
+      header.textContent = `SLOT ${slotData.slot + 1} ${slotData.slot === STATE.activeSaveSlot ? '(ACTIVE)' : ''}`;
+      if (slotData.slot === STATE.activeSaveSlot) header.style.color = 'var(--accent-amber)';
+      card.appendChild(header);
+      
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.className = 'save-slot-name-input';
+      nameInput.value = slotData.name || `Save ${slotData.slot + 1}`;
+      card.appendChild(nameInput);
+      
+      const timeStr = slotData.exists ? new Date(slotData.timestamp).toLocaleString() : 'Empty Slot';
+      const timeEl = document.createElement('div');
+      timeEl.className = 'save-slot-time';
+      timeEl.textContent = timeStr;
+      card.appendChild(timeEl);
+      
+      const btnRow = document.createElement('div');
+      btnRow.className = 'save-btn-row';
+      
+      if (slotData.exists) {
+        const loadBtn = document.createElement('button');
+        loadBtn.className = 'save-btn load';
+        loadBtn.textContent = 'Load Game';
+        loadBtn.onclick = async () => {
+          await loadFromSlot(slotData.slot);
+          closeSavesModal();
+          showToast('Game Loaded');
+        };
+        btnRow.appendChild(loadBtn);
+      }
+      
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'save-btn';
+      saveBtn.textContent = slotData.exists ? 'Overwrite Save' : 'Save Here';
+      saveBtn.onclick = async () => {
+        await saveToSlot(slotData.slot, nameInput.value);
+        showToast('Game Saved');
+        renderSaveSlots();
+      };
+      btnRow.appendChild(saveBtn);
+      
+      if (slotData.exists) {
+        const delBtn = document.createElement('button');
+        delBtn.className = 'save-btn del';
+        delBtn.textContent = 'Delete';
+        delBtn.onclick = async () => {
+          if (confirm('Are you sure you want to delete this save?')) {
+            await deleteSlot(slotData.slot);
+            renderSaveSlots();
+          }
+        };
+        btnRow.appendChild(delBtn);
+      }
+      
+      card.appendChild(btnRow);
+      grid.appendChild(card);
+    });
+  } catch (e) {
+    grid.innerHTML = '<div style="color:red;">Failed to load saves</div>';
+  }
+}
+
+document.getElementById('openSavesBtn')?.addEventListener('click', openSavesModal);
+document.getElementById('closeSavesBtn')?.addEventListener('click', closeSavesModal);
+document.getElementById('btnNewGame')?.addEventListener('click', async () => {
+  if (confirm('Start a new game? You will keep meta progression (Keys, Permanent Unlocks).')) {
+    await newGame();
+    closeSavesModal();
+    showToast('Started New Game');
+  }
+});
+
+function getRarityColor(rarity) {
+  const map = {
+    common: '#8b9ab5', uncommon: '#4ade80', rare: '#60a5fa',
+    epic: '#c084fc', exotic: '#fbbf24', legendary: '#f472b6', mythic: '#f87171'
+  };
+  return map[rarity] || map.common;
+}
+
+function getDefDescription(def) {
+  const parts = [];
+  if (def.produces) parts.push(`Produces ${def.produces.item.replace(/([A-Z])/g, ' $1').trim()} every ${def.produces.rate || 1000}ms`);
+  if (def.multiplier) parts.push(`${def.multiplier}x ore value multiplier`);
+  if (def.flatAdd) parts.push(`+$${def.flatAdd.toLocaleString()} flat bonus per ore`);
+  if (def.sellerBonus) parts.push(`${def.sellerBonus}x sell bonus`);
+  if (def.speed) parts.push(`Belt speed: ${def.speed}`);
+  if (def.extinguishes) parts.push('Extinguishes flaming ores');
+  if (def.appliesWet) parts.push(`Applies Wet for ${def.appliesWet}s`);
+  if (def.appliesFlaming) parts.push('Applies Flaming status');
+  if (def.removesRadioactive) parts.push('Removes Radioactive status');
+  if (def.appliesSparkling) parts.push('Applies Sparkling bonus');
+  if (def.duplicatesOre) parts.push('Duplicates ores passing through');
+  if (def.requiresFuel) parts.push('Requires fuel ore input');
+  if (def.isSplitter) parts.push('Splits ore flow between outputs');
+  if (def.isMerger) parts.push('Merges multiple belt inputs');
+  if (def.freezesOres) parts.push('Freezes ores (slow but safe)');
+  if (def.passesThrough) parts.push('Passes through other machines');
+  if (def.gravityInvert) parts.push('Reverses ore gravity effects');
+  if (def.isTeleporter) parts.push('Teleports ores to linked exit');
+  if (def.nullifiesBadStatuses) parts.push('Removes all negative status effects');
+  if (def.transmutation) parts.push('Converts low-value ores to higher tier');
+  if (def.auraRadius) parts.push(`Buffs nearby machines within ${def.auraRadius} tiles`);
+  if (def.consumes && def.category === 'seller') parts.push('Collects and sells ores for cash');
+  if (parts.length === 0) parts.push(def.category.charAt(0).toUpperCase() + def.category.slice(1));
+  return parts.join(' \u2022 ');
+}
+
 
 // Object Creator Logic
 function initCustomObjectCreator() {
@@ -793,6 +991,7 @@ function initMobileToolbarListeners() {
     closeContextMenu();
     closeInventoryModal();
     closeCrateModal();
+    closeSavesModal();
     closePrestigeModal();
     cancelMode();
     document.getElementById('mobileInspectBtn')?.classList.remove('active');

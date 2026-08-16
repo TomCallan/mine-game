@@ -79,6 +79,7 @@
 <div id="hotbarContainer">
   <div id="hotbarSlots" style="display: contents;"></div>
   <div class="hotbar-divider"></div>
+  <button class="hb-action-btn inv" id="openSavesBtn">Saves</button>
   <button class="hb-action-btn inv" id="openInvBtn">Shop [E]</button>
   <button class="hb-action-btn crate" id="openCrateBtn">Crates</button>
   <button class="hb-action-btn prestige" id="openPrestigeBtn">Prestige</button>
@@ -183,6 +184,20 @@
           <div class="roulette-track" id="rouletteTrack"></div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Saves Modal -->
+<div id="savesModal">
+  <div class="saves-window">
+    <div class="saves-header">
+      <div class="saves-title">SAVE MANAGER</div>
+      <button class="saves-close" id="closeSavesBtn">&times;</button>
+    </div>
+    <div class="saves-body">
+      <div class="saves-grid" id="savesGrid"></div>
+      <button class="new-game-btn" id="btnNewGame">New Game (Keeps Meta Progression)</button>
     </div>
   </div>
 </div>

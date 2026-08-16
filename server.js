@@ -48,7 +48,7 @@ const RELOAD_SCRIPT = `
 `;
 
 const server = http.createServer((req, res) => {
-  // Savegame API endpoint
+  // Savegame API endpoint (legacy)
   if (req.url === '/api/save' && req.method === 'POST') {
     let body = '';
     req.on('data', chunk => { body += chunk.toString(); });
@@ -61,6 +61,72 @@ const server = http.createServer((req, res) => {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ status: 'ok' }));
         }
+      });
+    });
+    return;
+  }
+
+  // Get all saves
+  if (req.url === '/api/saves' && req.method === 'GET') {
+    const slots = [];
+    for (let i = 0; i < 3; i++) {
+      const p = path.join(ROOT, `savegame_slot${i}.json`);
+      if (fs.existsSync(p)) {
+        try {
+          const data = JSON.parse(fs.readFileSync(p));
+          slots.push({ slot: i, name: data.slotName || `Save ${i+1}`, timestamp: data.savedAt || '', exists: true });
+        } catch(e) {
+          slots.push({ slot: i, name: `Save ${i+1}`, timestamp: '', exists: false });
+        }
+      } else {
+        slots.push({ slot: i, name: `Save ${i+1}`, timestamp: '', exists: false });
+      }
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(slots));
+    return;
+  }
+
+  // Load from slot
+  if (req.url.startsWith('/api/load/') && req.method === 'GET') {
+    const slot = req.url.split('/')[3];
+    const p = path.join(ROOT, `savegame_slot${slot}.json`);
+    if (fs.existsSync(p)) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(fs.readFileSync(p));
+    } else {
+      res.writeHead(404);
+      res.end('{}');
+    }
+    return;
+  }
+
+  // Delete from slot
+  if (req.url.startsWith('/api/save/') && req.method === 'DELETE') {
+    const slot = req.url.split('/')[3];
+    const p = path.join(ROOT, `savegame_slot${slot}.json`);
+    if (fs.existsSync(p)) fs.unlinkSync(p);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok' }));
+    return;
+  }
+
+  // Save to slot
+  if (req.url.startsWith('/api/save/') && req.method === 'POST') {
+    const slot = req.url.split('/')[3];
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', () => {
+      const p = path.join(ROOT, `savegame_slot${slot}.json`);
+      fs.writeFile(p, body, (err) => {
+        if (slot === '0') {
+           try {
+             const d = JSON.parse(body);
+             fs.writeFileSync(path.join(ROOT, 'savegame.json'), JSON.stringify(d.state || {}));
+           } catch(e) {}
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'ok' }));
       });
     });
     return;
