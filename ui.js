@@ -132,9 +132,13 @@ function closeContextMenu() {
   activeContextBuilding = null;
 }
 
+function getGameTarget() {
+  return document.getElementById('game-container') || window.canvas || document.body;
+}
+
 function initContextMenuListeners() {
   document.getElementById('closeCtxBtn')?.addEventListener('click', closeContextMenu);
-  canvas.addEventListener('mousedown', (e) => {
+  window.addEventListener('mousedown', (e) => {
     if (e.button === 0 && document.getElementById('contextMenu')?.classList.contains('open')) {
       const rect = document.getElementById('contextMenu').getBoundingClientRect();
       if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
@@ -173,32 +177,33 @@ function initContextMenuListeners() {
       }
     });
   }
+
+  const target = getGameTarget();
+  target.addEventListener('dblclick', (e) => {
+    if (mode !== 'idle') return;
+    const world = screenToWorld(e.clientX, e.clientY);
+    const cell = worldToCell(world.x, world.y);
+    const b = findBuildingAtCell(cell.col, cell.row);
+    if (b) openContextMenu(b, e.clientX, e.clientY);
+  });
+
+  target.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if (mode !== 'idle') {
+      cancelMode();
+      return;
+    }
+    // Right-click on building opens context menu; otherwise cancel
+    const world = screenToWorld(e.clientX, e.clientY);
+    const cell = worldToCell(world.x, world.y);
+    const b = findBuildingAtCell(cell.col, cell.row);
+    if (b) {
+      openContextMenu(b, e.clientX, e.clientY);
+    } else {
+      closeContextMenu();
+    }
+  });
 }
-
-canvas.addEventListener('dblclick', (e) => {
-  if (mode !== 'idle') return;
-  const world = screenToWorld(e.clientX, e.clientY);
-  const cell = worldToCell(world.x, world.y);
-  const b = findBuildingAtCell(cell.col, cell.row);
-  if (b) openContextMenu(b, e.clientX, e.clientY);
-});
-
-canvas.addEventListener('contextmenu', (e) => {
-  e.preventDefault();
-  if (mode !== 'idle') {
-    cancelMode();
-    return;
-  }
-  // Right-click on building opens context menu; otherwise cancel
-  const world = screenToWorld(e.clientX, e.clientY);
-  const cell = worldToCell(world.x, world.y);
-  const b = findBuildingAtCell(cell.col, cell.row);
-  if (b) {
-    openContextMenu(b, e.clientX, e.clientY);
-  } else {
-    closeContextMenu();
-  }
-});
 
 // Mode Placers
 function enterPlacingMode(defId) {

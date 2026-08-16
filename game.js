@@ -1,16 +1,9 @@
 // ===========================================================
-// MINER'S HAVEN - GAME SIMULATION ENGINE & RENDERER (V2 OVERHAUL)
+// MINER'S HAVEN - PHASER 3 GAME SIMULATION ENGINE & RENDERER
 // ===========================================================
 
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
-
-function resizeCanvas() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
+let phaserGame = null;
+let sceneInstance = null;
 
 // ===========================================================
 // STATE SCHEMA & ARCHITECTURE
@@ -42,7 +35,9 @@ const STATE = {
     buildings: [],
     ores: [],
     timeScale: 1.0,
-    isPaused: false
+    isPaused: false,
+    totalOresSold: 0,
+    bestOreSold: 0
   },
 
   shop: {
@@ -94,8 +89,6 @@ const STATE = {
       uraniumOre: { id: 'uraniumOre', name: 'Uranium Ore', color: '#2ecc71', size: 16, baseValue: 150, shape: 'circle', defaultStatus: { radioactive: true } },
       coalOre: { id: 'coalOre', name: 'Coal Fuel Ore', color: '#334155', size: 16, baseValue: 15, shape: 'square', isFuel: true },
       superDiamondOre: { id: 'superDiamondOre', name: 'Super Diamond Ore', color: '#38bdf8', size: 24, baseValue: 300, shape: 'diamond', defaultStatus: { sparkling: true } },
-      
-      // New Ore Types
       crystalOre: { id: 'crystalOre', name: 'Crystal Ore', color: '#a855f7', size: 16, baseValue: 200, shape: 'diamond', defaultStatus: { sparkling: true, crystalline: true } },
       antimatterPellet: { id: 'antimatterPellet', name: 'Antimatter Pellet', color: '#ec4899', size: 20, baseValue: 1500, shape: 'diamond' },
       timeCrystalOre: { id: 'timeCrystalOre', name: 'Time Crystal Ore', color: '#06b6d4', size: 18, baseValue: 800, shape: 'diamond', defaultStatus: { timeAged: true } },
@@ -149,1107 +142,680 @@ const STATE = {
         unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 2, h: 2 }, layer: 'machine', color: '#14532d', speed: 40,
         tags: ['dropper', 'radioactive'], attributes: { radiationSv: 50 },
         ports: [{ dx: 2, dy: 0.5, kind: 'output', color: '#2ecc71', dropSide: null }],
-        produces: { item: 'uraniumOre', rate: 1600 }
+        produces: { item: 'uraniumOre', rate: 1400 }
       },
-
-      // --- NEW EXTRACTORS ---
       geodeDriller: {
-        id: 'geodeDriller', name: 'Crystal Geode Driller', category: 'extractor', rarity: 'rare', cost: 9000, priceGrowth: 1.12,
-        unlockMethod: 'goldenCrate', crateOnly: true, size: { w: 3, h: 2 }, layer: 'machine', color: '#a855f7', speed: 40,
-        tags: ['dropper', 'crystal'], attributes: {},
-        ports: [{ dx: 3, dy: 0.5, kind: 'output', color: '#c084fc', dropSide: null }],
-        produces: { item: 'crystalOre', rate: 1100 }
+        id: 'geodeDriller', name: 'Crystalline Geode Driller', category: 'extractor', rarity: 'legendary', cost: 2500000, priceGrowth: 1.16,
+        unlockMethod: 'goldenCrate', crateOnly: true, size: { w: 2, h: 2 }, layer: 'machine', color: '#7e22ce', speed: 40,
+        tags: ['dropper', 'crystal'], attributes: { resonance: 99 },
+        ports: [{ dx: 2, dy: 0.5, kind: 'output', color: '#a855f7', dropSide: null }],
+        produces: { item: 'crystalOre', rate: 1000 }
       },
       antimatterSiphon: {
-        id: 'antimatterSiphon', name: 'Antimatter Siphon', category: 'extractor', rarity: 'legendary', cost: 2500000, priceGrowth: 1.15,
-        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 2, h: 2 }, layer: 'machine', color: '#ec4899', speed: 40,
-        tags: ['dropper', 'antimatter'], attributes: {},
-        ports: [{ dx: 2, dy: 0.5, kind: 'output', color: '#f472b6', dropSide: null }],
-        produces: { item: 'antimatterPellet', rate: 1400 }
+        id: 'antimatterSiphon', name: 'Antimatter Siphon', category: 'extractor', rarity: 'mythic', cost: 45000000, priceGrowth: 1.18,
+        unlockMethod: 'exoticCrate', crateOnly: true, size: { w: 3, h: 3 }, layer: 'machine', color: '#be185d', speed: 40,
+        tags: ['dropper', 'antimatter'], attributes: { containment: 100 },
+        ports: [{ dx: 3, dy: 1, kind: 'output', color: '#ec4899', dropSide: null }],
+        produces: { item: 'antimatterPellet', rate: 1800 }
       },
       temporalFluxBorer: {
-        id: 'temporalFluxBorer', name: 'Temporal Flux Borer', category: 'extractor', rarity: 'exotic', cost: 1400000, priceGrowth: 1.14,
-        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 3, h: 3 }, layer: 'machine', color: '#06b6d4', speed: 40,
-        tags: ['dropper', 'temporal'], attributes: {},
-        ports: [{ dx: 3, dy: 1, kind: 'output', color: '#67e8f9', dropSide: null }],
-        produces: { item: 'timeCrystalOre', rate: 1000 }
+        id: 'temporalFluxBorer', name: 'Temporal Flux Borer', category: 'extractor', rarity: 'legendary', cost: 8000000, priceGrowth: 1.17,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 2, h: 1 }, layer: 'machine', color: '#0e7490', speed: 40,
+        tags: ['dropper', 'temporal'], attributes: { timeWarp: true },
+        ports: [{ dx: 2, dy: 0, kind: 'output', color: '#06b6d4', dropSide: null }],
+        produces: { item: 'timeCrystalOre', rate: 1200 }
       },
       algaeVat: {
-        id: 'algaeVat', name: 'Bioluminescent Algae Vat', category: 'extractor', rarity: 'epic', cost: 65000, priceGrowth: 1.13,
-        unlockMethod: 'exoticCrate', crateOnly: true, size: { w: 2, h: 1 }, layer: 'machine', color: '#10b981', speed: 40,
-        tags: ['dropper', 'algae'], attributes: {},
-        ports: [{ dx: 2, dy: 0, kind: 'output', color: '#34d399', dropSide: null }],
-        produces: { item: 'glowAlgaeOre', rate: 900 }
+        id: 'algaeVat', name: 'Bioluminescent Algae Vat', category: 'extractor', rarity: 'rare', cost: 12000, priceGrowth: 1.12,
+        unlockMethod: 'shop', size: { w: 2, h: 2 }, layer: 'machine', color: '#047857', speed: 40,
+        tags: ['dropper', 'wet'], attributes: { moisture: 100 },
+        ports: [{ dx: 2, dy: 0.5, kind: 'output', color: '#10b981', dropSide: null }],
+        produces: { item: 'glowAlgaeOre', rate: 1000 }
       },
       voidHarvester: {
-        id: 'voidHarvester', name: 'Void Fragment Harvester', category: 'extractor', rarity: 'mythic', cost: 25000000, priceGrowth: 1.16,
-        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 4, h: 2 }, layer: 'machine', color: '#312e81', speed: 40,
-        tags: ['dropper', 'void'], attributes: {},
-        ports: [{ dx: 4, dy: 0.5, kind: 'output', color: '#818cf8', dropSide: null }],
-        produces: { item: 'voidShardOre', rate: 1600 }
+        id: 'voidHarvester', name: 'Cosmic Void Harvester', category: 'extractor', rarity: 'mythic', cost: 150000000, priceGrowth: 1.20,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 3, h: 2 }, layer: 'machine', color: '#1e1b4b', speed: 40,
+        tags: ['dropper', 'void'], attributes: { singularity: true },
+        ports: [{ dx: 3, dy: 0.5, kind: 'output', color: '#312e81', dropSide: null }],
+        produces: { item: 'voidShardOre', rate: 2500 }
       },
 
-      // --- CORE CONVEYORS & LOGISTICS ---
+      // --- CONVEYORS & UTILITY GATES ---
       belt: {
-        id: 'belt', name: 'Conveyor Belt', category: 'belt', rarity: 'common', cost: 15, priceGrowth: 1.08,
-        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#4b4f58', speed: 90,
+        id: 'belt', name: 'Standard Conveyor', category: 'belt', rarity: 'common', cost: 25, priceGrowth: 1.05,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#4a5568', speed: 90,
         tags: ['transport'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#ffcf5c', dropSide: 0 }]
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#7fd0ff', dropSide: 0 }]
       },
       halfBelt: {
-        id: 'halfBelt', name: 'Half-Width Belt', category: 'belt', rarity: 'uncommon', cost: 35, priceGrowth: 1.09,
-        unlockMethod: 'shop', size: { w: 0.5, h: 1 }, layer: 'belt', color: '#334155', isHalfBelt: true, speed: 90,
-        tags: ['transport', 'narrow'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#94a3b8', dropSide: 0 }]
+        id: 'halfBelt', name: '0.5x1 Narrow Belt', category: 'belt', rarity: 'common', cost: 20, priceGrowth: 1.05,
+        unlockMethod: 'shop', size: { w: 0.5, h: 1 }, layer: 'belt', color: '#475569', speed: 90,
+        tags: ['transport', 'narrow'], attributes: {}, isHalfBelt: true,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#7fd0ff', dropSide: 0 }]
       },
       fastBelt: {
-        id: 'fastBelt', name: 'Fast Conveyor', category: 'belt', rarity: 'uncommon', cost: 120, priceGrowth: 1.10,
-        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#3a7ca5', speed: 180,
-        tags: ['transport'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#7fd0ff', dropSide: 0 }]
-      },
-      switchGate: {
-        id: 'switchGate', name: 'Diverter Switch Gate', category: 'belt', rarity: 'uncommon', cost: 450, priceGrowth: 1.10,
-        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#0284c7', speed: 120,
-        isSwitchGate: true, tags: ['routing', 'interactive', 'gate'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#38bdf8', dropSide: 0 }]
-      },
-      loopGate: {
-        id: 'loopGate', name: 'Loop Counter Gate', category: 'belt', rarity: 'rare', cost: 2200, priceGrowth: 1.11,
-        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#059669', speed: 120,
-        isLoopGate: true, tags: ['routing', 'interactive', 'loop'], attributes: { defaultLoops: 3 },
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#34d399', dropSide: 0 }]
-      },
-      filterSorter: {
-        id: 'filterSorter', name: 'Filter Sorter Gate', category: 'belt', rarity: 'rare', cost: 4500, priceGrowth: 1.11,
-        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#d97706', speed: 120,
-        isFilterSorter: true, tags: ['routing', 'interactive', 'sorter'], attributes: { defaultMode: 'unrefined' },
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#fbbf24', dropSide: 0 }]
-      },
-      crossoverBelt: {
-        id: 'crossoverBelt', name: 'Cross-Overpass Belt', category: 'belt', rarity: 'uncommon', cost: 750, priceGrowth: 1.10,
-        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#64748b', speed: 150,
-        isCrossover: true, tags: ['routing', 'overpass'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#94a3b8', dropSide: 0 }]
-      },
-      splitter: {
-        id: 'splitter', name: 'Belt Splitter', category: 'belt', rarity: 'rare', cost: 1100, priceGrowth: 1.11,
-        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#e67e22', isSplitter: true, speed: 100,
-        tags: ['routing'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#f39c12', dropSide: 0 }]
-      },
-      tripleSplitter: {
-        id: 'tripleSplitter', name: 'Triple Splitter', category: 'belt', rarity: 'rare', cost: 3200, priceGrowth: 1.11,
-        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#ea580c', isSplitter3: true, speed: 120,
-        tags: ['routing', 'splitter'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#fb923c', dropSide: 0 }]
-      },
-      merger: {
-        id: 'merger', name: 'Belt Merger', category: 'belt', rarity: 'rare', cost: 1100, priceGrowth: 1.11,
-        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#27ae60', isMerger: true, speed: 100,
-        tags: ['routing'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#2ecc71', dropSide: 0 }]
-      },
-      heavyMerger: {
-        id: 'heavyMerger', name: 'Heavy 3-Way Merger', category: 'belt', rarity: 'rare', cost: 3200, priceGrowth: 1.11,
-        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#16a34a', isMerger: true, speed: 200,
-        tags: ['routing', 'merger'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#4ade80', dropSide: 0 }]
+        id: 'fastBelt', name: '2x Fast Conveyor', category: 'belt', rarity: 'uncommon', cost: 150, priceGrowth: 1.08,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#2563eb', speed: 180,
+        tags: ['transport', 'speed'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#7fd0ff', dropSide: 0 }]
       },
       ultraBelt: {
-        id: 'ultraBelt', name: 'Ultra Conveyor', category: 'belt', rarity: 'epic', cost: 8000, priceGrowth: 1.12,
+        id: 'ultraBelt', name: 'Overclocked Mag-Belt', category: 'belt', rarity: 'rare', cost: 850, priceGrowth: 1.10,
         unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#d97706', speed: 320,
-        tags: ['transport'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#fbbf24', dropSide: 0 }]
+        tags: ['transport', 'speed'], attributes: {},
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#fbbf24', dropSide: 0 }]
       },
-
-      // --- NEW LOGISTICS MACHINES ---
+      switchGate: {
+        id: 'switchGate', name: 'Diverter Switch Gate', category: 'belt', rarity: 'uncommon', cost: 350, priceGrowth: 1.08,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#0891b2', speed: 120,
+        tags: ['transport', 'logic', 'gate'], attributes: {}, isSwitchGate: true,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#e8a030', dropSide: 0 }]
+      },
+      loopGate: {
+        id: 'loopGate', name: 'Loop Counter Gate', category: 'belt', rarity: 'rare', cost: 1200, priceGrowth: 1.10,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#059669', speed: 120,
+        tags: ['transport', 'logic', 'loop'], attributes: {}, isLoopGate: true,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#34d399', dropSide: 0 }]
+      },
+      filterSorter: {
+        id: 'filterSorter', name: 'Smart Status Sorter', category: 'belt', rarity: 'rare', cost: 2500, priceGrowth: 1.12,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#b45309', speed: 120,
+        tags: ['transport', 'logic', 'filter'], attributes: {}, isFilterSorter: true,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#f59e0b', dropSide: 0 }]
+      },
+      crossoverBelt: {
+        id: 'crossoverBelt', name: 'Conveyor Cross-Overpass', category: 'belt', rarity: 'uncommon', cost: 450, priceGrowth: 1.08,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#334155', speed: 120,
+        tags: ['transport', 'utility', 'cross'], attributes: {}, isCrossover: true,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#94a3b8', dropSide: 0 }]
+      },
+      splitter: {
+        id: 'splitter', name: 'Dual Splitter', category: 'belt', rarity: 'uncommon', cost: 300, priceGrowth: 1.08,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#6d28d9', speed: 90,
+        tags: ['transport', 'splitter'], attributes: {}, isSplitter: true,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#c084fc', dropSide: 0 }]
+      },
+      tripleSplitter: {
+        id: 'tripleSplitter', name: '3-Way Splitter', category: 'belt', rarity: 'rare', cost: 1800, priceGrowth: 1.10,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#7c3aed', speed: 120,
+        tags: ['transport', 'splitter'], attributes: {}, isSplitter3: true,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#c084fc', dropSide: 0 }]
+      },
+      merger: {
+        id: 'merger', name: 'Conveyor Merger', category: 'belt', rarity: 'uncommon', cost: 300, priceGrowth: 1.08,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#4338ca', speed: 90,
+        tags: ['transport', 'merger'], attributes: {}, isMerger: true,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#818cf8', dropSide: 0 }]
+      },
+      heavyMerger: {
+        id: 'heavyMerger', name: '3-Way Heavy Merger', category: 'belt', rarity: 'rare', cost: 2200, priceGrowth: 1.10,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#3730a3', speed: 200,
+        tags: ['transport', 'merger'], attributes: {}, isMerger: true,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#818cf8', dropSide: 0 }]
+      },
       magLevRail: {
-        id: 'magLevRail', name: 'Magnetic Levitation Rail', category: 'belt', rarity: 'epic', cost: 30000, priceGrowth: 1.12,
-        unlockMethod: 'goldenCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#6366f1', speed: 450,
+        id: 'magLevRail', name: 'Mag-Lev Express Rail', category: 'belt', rarity: 'legendary', cost: 1500000, priceGrowth: 1.15,
+        unlockMethod: 'goldenCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#0ea5e9', speed: 450,
         tags: ['transport', 'maglev'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#818cf8', dropSide: 0 }]
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#38bdf8', dropSide: 0 }]
       },
       phaseShiftBelt: {
-        id: 'phaseShiftBelt', name: 'Phase-Shift Conveyor', category: 'belt', rarity: 'exotic', cost: 220000, priceGrowth: 1.13,
-        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#8b5cf6', speed: 250,
-        tags: ['transport', 'intangible'], attributes: {}, passesThrough: true,
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#c084fc', dropSide: 0 }]
+        id: 'phaseShiftBelt', name: 'Phase Shift Belt', category: 'belt', rarity: 'exotic', cost: 450000, priceGrowth: 1.14,
+        unlockMethod: 'exoticCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#ec4899', speed: 120,
+        tags: ['transport', 'phase'], attributes: {}, phasePassable: true,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#f472b6', dropSide: 0 }]
       },
       gravityInverter: {
-        id: 'gravityInverter', name: 'Gravity Inverter Belt', category: 'belt', rarity: 'rare', cost: 4500, priceGrowth: 1.11,
-        unlockMethod: 'goldenCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#e11d48', speed: 120,
-        tags: ['transport', 'gravity'], attributes: {}, gravityInvert: true,
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#fb7185', dropSide: 0 }]
+        id: 'gravityInverter', name: 'Graviton Inverter Rail', category: 'belt', rarity: 'legendary', cost: 1200000, priceGrowth: 1.15,
+        unlockMethod: 'goldenCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#8b5cf6', speed: 150,
+        tags: ['transport', 'gravity'], attributes: {}, invertGravity: true,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#a78bfa', dropSide: 0 }]
       },
       cryoStorageBelt: {
-        id: 'cryoStorageBelt', name: 'Cryo-Storage Conveyor', category: 'belt', rarity: 'rare', cost: 7500, priceGrowth: 1.11,
-        unlockMethod: 'goldenCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#0284c7', speed: 40,
-        tags: ['transport', 'freeze'], attributes: {}, freezesOres: true,
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#38bdf8', dropSide: 0 }]
+        id: 'cryoStorageBelt', name: 'Cryo-Buffer Conveyor', category: 'belt', rarity: 'rare', cost: 25000, priceGrowth: 1.12,
+        unlockMethod: 'goldenCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#06b6d4', speed: 40,
+        tags: ['transport', 'cryo'], attributes: {}, cryoPreserve: true,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#67e8f9', dropSide: 0 }]
       },
       quantumLink: {
-        id: 'quantumLink', name: 'Quantum Entanglement Link', category: 'belt', rarity: 'legendary', cost: 1800000, priceGrowth: 1.14,
-        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#d946ef', speed: 200,
-        tags: ['transport', 'teleport'], attributes: {}, isTeleporter: true,
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#f0abfc', dropSide: 0 }]
+        id: 'quantumLink', name: 'Quantum Link Terminal', category: 'belt', rarity: 'mythic', cost: 25000000, priceGrowth: 1.18,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#10b981', speed: 600,
+        tags: ['transport', 'teleport'], attributes: {}, isTeleport: true,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#34d399', dropSide: 0 }]
       },
 
-      // --- CORE UPGRADERS ---
+      // --- UPGRADERS ---
       upgrader1x1: {
-        id: 'upgrader1x1', name: '1x1 Upgrader', category: 'upgrader', rarity: 'common', cost: 300, priceGrowth: 1.10,
-        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#d35400', multiplier: 2.0, energyCost: 10, speed: 90, maxUses: 1,
-        tags: ['multiplier'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#e67e22', dropSide: 0 }]
+        id: 'upgrader1x1', name: 'Basic Refiner (2.0x)', category: 'upgrader', rarity: 'common', cost: 200, priceGrowth: 1.10,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'machine', color: '#059669', speed: 60,
+        tags: ['upgrader', 'multiplier'], attributes: {}, multiplier: 2.0, maxUses: 1,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#34d399', dropSide: 0 }]
       },
       upgraderHalf: {
-        id: 'upgraderHalf', name: 'Half Upgrader', category: 'upgrader', rarity: 'uncommon', cost: 550, priceGrowth: 1.11,
-        unlockMethod: 'shop', size: { w: 0.5, h: 1 }, layer: 'belt', color: '#8e44ad', multiplier: 1.5, energyCost: 5, isHalf: true, speed: 90, maxUses: 1,
-        tags: ['multiplier', 'narrow'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#9b59b6', dropSide: 0 }]
-      },
-      freonSprayer: {
-        id: 'freonSprayer', name: 'Freon Cooling Sprayer', category: 'upgrader', rarity: 'uncommon', cost: 2200, priceGrowth: 1.11,
-        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#0284c7', extinguishes: true, appliesWet: 6, cooldownEnergy: 50, speed: 90, maxUses: 1,
-        tags: ['cooling', 'extinguisher'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#38bdf8', dropSide: 0 }]
+        id: 'upgraderHalf', name: '0.5x1 Micro Refiner (1.5x)', category: 'upgrader', rarity: 'common', cost: 150, priceGrowth: 1.10,
+        unlockMethod: 'shop', size: { w: 0.5, h: 1 }, layer: 'machine', color: '#10b981', speed: 60,
+        tags: ['upgrader', 'narrow'], attributes: {}, multiplier: 1.5, maxUses: 1, isHalf: true,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#34d399', dropSide: 0 }]
       },
       upgrader2x1: {
-        id: 'upgrader2x1', name: '2x1 Wide Upgrader', category: 'upgrader', rarity: 'rare', cost: 8500, priceGrowth: 1.12,
-        unlockMethod: 'shop', size: { w: 2, h: 1 }, layer: 'belt', color: '#c0392b', multiplier: 3.0, energyCost: 20, speed: 90, maxUses: 1,
-        tags: ['multiplier'], attributes: {},
+        id: 'upgrader2x1', name: '2x1 Dual-Lane Refiner (3.0x)', category: 'upgrader', rarity: 'rare', cost: 3500, priceGrowth: 1.12,
+        unlockMethod: 'shop', size: { w: 2, h: 1 }, layer: 'machine', color: '#047857', speed: 60,
+        tags: ['upgrader', 'multiplier'], attributes: {}, multiplier: 3.0, maxUses: 1,
         ports: [
-          { dx: 0, dy: 0, kind: 'through', color: '#e74c3c', dropSide: 0 },
-          { dx: 1, dy: 0, kind: 'through', color: '#e74c3c', dropSide: 0 }
+          { dx: 0, dy: 0, kind: 'conveyor', color: '#34d399', dropSide: 0 },
+          { dx: 1, dy: 0, kind: 'conveyor', color: '#34d399', dropSide: 0 }
         ]
+      },
+      freonSprayer: {
+        id: 'freonSprayer', name: 'Freon Cooling Chamber', category: 'upgrader', rarity: 'rare', cost: 8500, priceGrowth: 1.12,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'machine', color: '#0284c7', speed: 60,
+        tags: ['upgrader', 'extinguisher'], attributes: {}, multiplier: 1.8, appliesWet: 8, extinguishes: true, maxUses: 2,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#38bdf8', dropSide: 0 }]
       },
       pyroRefiner: {
-        id: 'pyroRefiner', name: 'Pyro Blast Furnace', category: 'upgrader', rarity: 'rare', cost: 14000, priceGrowth: 1.12,
-        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#b91c1c', multiplier: 3.5, appliesFlaming: true, speed: 90, maxUses: 1,
-        tags: ['multiplier', 'flaming'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#f87171', dropSide: 0 }]
+        id: 'pyroRefiner', name: 'Pyro Superheater (3.5x)', category: 'upgrader', rarity: 'epic', cost: 22000, priceGrowth: 1.13,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'machine', color: '#b91c1c', speed: 60,
+        tags: ['upgrader', 'flaming'], attributes: {}, multiplier: 3.5, appliesFlaming: true, maxUses: 2,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#f87171', dropSide: 0 }]
       },
       leadDecontaminator: {
-        id: 'leadDecontaminator', name: 'Lead Decontaminator', category: 'upgrader', rarity: 'epic', cost: 40000, priceGrowth: 1.13,
-        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'belt', color: '#475569', removesRadioactive: true, multiplier: 2.5, speed: 90, maxUses: 1,
-        tags: ['decontaminator', 'multiplier'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#94a3b8', dropSide: 0 }]
+        id: 'leadDecontaminator', name: 'Lead Radiation Scrubber', category: 'upgrader', rarity: 'epic', cost: 45000, priceGrowth: 1.14,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'machine', color: '#475569', speed: 60,
+        tags: ['upgrader', 'decontamination'], attributes: {}, multiplier: 2.5, removesRadioactive: true, maxUses: 2,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#94a3b8', dropSide: 0 }]
       },
       stellarSparkler: {
-        id: 'stellarSparkler', name: 'Stellar Prism', category: 'upgrader', rarity: 'exotic', cost: 750000, priceGrowth: 1.13,
-        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#eab308', appliesSparkling: true, speed: 90, maxUses: 2,
-        tags: ['sparkles', 'buff'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#fde047', dropSide: 0 }]
+        id: 'stellarSparkler', name: 'Stellar Sparkler Infuser', category: 'upgrader', rarity: 'legendary', cost: 650000, priceGrowth: 1.15,
+        unlockMethod: 'goldenCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'machine', color: '#ca8a04', speed: 60,
+        tags: ['upgrader', 'sparkling'], attributes: {}, appliesSparkling: true, multiplier: 2.5, maxUses: 2,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#facc15', dropSide: 0 }]
       },
       upgraderPlasma: {
-        id: 'upgraderPlasma', name: 'Plasma Supercharger', category: 'upgrader', rarity: 'epic', cost: 800000, priceGrowth: 1.14,
-        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#ff0055', flatAdd: 500, energyCost: 35, speed: 100, maxUses: 2,
-        tags: ['flat_boost', 'plasma'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#ff0055', dropSide: 0 }]
+        id: 'upgraderPlasma', name: 'Plasma Injector (+$500)', category: 'upgrader', rarity: 'epic', cost: 60000, priceGrowth: 1.14,
+        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'machine', color: '#7c3aed', speed: 60,
+        tags: ['upgrader', 'flat_add'], attributes: {}, flatAdd: 500, maxUses: 2,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#a78bfa', dropSide: 0 }]
       },
-
-      // --- NEW UPGRADERS & UTILITY MACHINES ---
       oreCrystallizer: {
-        id: 'oreCrystallizer', name: 'Ore Crystallizer', category: 'upgrader', rarity: 'rare', cost: 22000, priceGrowth: 1.12,
-        unlockMethod: 'goldenCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#06b6d4', multiplier: 2.2, appliesCrystalline: true, speed: 90, maxUses: 1,
-        tags: ['multiplier', 'crystal'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#67e8f9', dropSide: 0 }]
+        id: 'oreCrystallizer', name: 'Ore Crystallizer (2.2x)', category: 'upgrader', rarity: 'legendary', cost: 1800000, priceGrowth: 1.15,
+        unlockMethod: 'goldenCrate', crateOnly: true, size: { w: 2, h: 1 }, layer: 'machine', color: '#9333ea', speed: 60,
+        tags: ['upgrader', 'crystallizer'], attributes: {}, multiplier: 2.2, appliesCrystalline: true, maxUses: 2,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#c084fc', dropSide: 0 }]
       },
       probabilityAmp: {
-        id: 'probabilityAmp', name: 'Probability Amplifier', category: 'upgrader', rarity: 'exotic', cost: 750000, priceGrowth: 1.13,
-        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#f59e0b', multiplier: 1.8, appliesLucky: true, speed: 90, maxUses: 2,
-        tags: ['multiplier', 'lucky'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#fbbf24', dropSide: 0 }]
+        id: 'probabilityAmp', name: 'Quantum Probability Amp', category: 'upgrader', rarity: 'exotic', cost: 750000, priceGrowth: 1.14,
+        unlockMethod: 'exoticCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'machine', color: '#16a34a', speed: 60,
+        tags: ['upgrader', 'lucky'], attributes: {}, multiplier: 1.8, appliesLucky: true, maxUses: 2,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#4ade80', dropSide: 0 }]
       },
       entropyStabilizer: {
-        id: 'entropyStabilizer', name: 'Entropy Stabilizer', category: 'upgrader', rarity: 'epic', cost: 110000, priceGrowth: 1.13,
-        unlockMethod: 'exoticCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#14b8a6', multiplier: 3.0, nullifiesBadStatuses: true, speed: 90, maxUses: 1,
-        tags: ['multiplier', 'stabilizer'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#2dd4bf', dropSide: 0 }]
+        id: 'entropyStabilizer', name: 'Entropy Stabilizer (3.0x)', category: 'upgrader', rarity: 'exotic', cost: 3200000, priceGrowth: 1.16,
+        unlockMethod: 'exoticCrate', crateOnly: true, size: { w: 2, h: 1 }, layer: 'machine', color: '#0284c7', speed: 60,
+        tags: ['upgrader', 'cleanse'], attributes: {}, multiplier: 3.0, nullifiesBadStatuses: true, maxUses: 2,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#38bdf8', dropSide: 0 }]
       },
       resonanceHarmonizer: {
-        id: 'resonanceHarmonizer', name: 'Resonance Harmonizer', category: 'upgrader', rarity: 'legendary', cost: 1600000, priceGrowth: 1.14,
-        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#eab308', multiplier: 4.5, sparklingSynergy: true, speed: 90, maxUses: 2,
-        tags: ['multiplier', 'synergy'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#fde047', dropSide: 0 }]
+        id: 'resonanceHarmonizer', name: 'Resonance Harmonizer (4.5x)', category: 'upgrader', rarity: 'legendary', cost: 12000000, priceGrowth: 1.16,
+        unlockMethod: 'goldenCrate', crateOnly: true, size: { w: 2, h: 2 }, layer: 'machine', color: '#e11d48', speed: 60,
+        tags: ['upgrader', 'synergy'], attributes: {}, multiplier: 4.5, sparklingSynergy: true, maxUses: 2,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#fb7185', dropSide: 0 }]
       },
       matterReplicator: {
-        id: 'matterReplicator', name: 'Matter Replicator', category: 'upgrader', rarity: 'mythic', cost: 12000000, priceGrowth: 1.15,
-        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 2, h: 1 }, layer: 'belt', color: '#a855f7', duplicatesOre: true, maxDuplicateCount: 1, speed: 90, maxUses: 1,
-        tags: ['duplicator'], attributes: {},
-        ports: [
-          { dx: 0, dy: 0, kind: 'through', color: '#c084fc', dropSide: 0 },
-          { dx: 1, dy: 0, kind: 'through', color: '#c084fc', dropSide: 0 }
-        ]
+        id: 'matterReplicator', name: 'Matter Replicator', category: 'upgrader', rarity: 'mythic', cost: 65000000, priceGrowth: 1.18,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 2, h: 1 }, layer: 'machine', color: '#4f46e5', speed: 60,
+        tags: ['upgrader', 'replicator'], attributes: {}, duplicatesOre: true, multiplier: 1.5, maxUses: 1,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#818cf8', dropSide: 0 }]
       },
       oreTransmuter: {
-        id: 'oreTransmuter', name: 'Ore Transmuter', category: 'upgrader', rarity: 'epic', cost: 250000, priceGrowth: 1.13,
-        unlockMethod: 'exoticCrate', crateOnly: true, size: { w: 1, h: 1 }, layer: 'belt', color: '#f43f5e', multiplier: 2.5, transmutation: true, speed: 90, maxUses: 1,
-        tags: ['transmuter'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'through', color: '#fb7185', dropSide: 0 }]
+        id: 'oreTransmuter', name: 'Ore Transmuter', category: 'upgrader', rarity: 'legendary', cost: 18000000, priceGrowth: 1.17,
+        unlockMethod: 'goldenCrate', crateOnly: true, size: { w: 2, h: 2 }, layer: 'machine', color: '#ea580c', speed: 60,
+        tags: ['upgrader', 'transmute'], attributes: {}, transmutesOre: true, multiplier: 2.5, maxUses: 1,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#fb923c', dropSide: 0 }]
       },
       shardOfLife: {
-        id: 'shardOfLife', name: 'Shard of Life', category: 'upgrader', rarity: 'mythic', cost: 40000000, priceGrowth: 1.16,
-        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 2, h: 2 }, layer: 'belt', color: '#22c55e', multiplier: 6.0, auraRadius: 2, speed: 90, maxUses: 3,
-        tags: ['aura', 'multiplier'], attributes: {},
-        ports: [
-          { dx: 0, dy: 0, kind: 'through', color: '#4ade80', dropSide: 0 },
-          { dx: 1, dy: 0, kind: 'through', color: '#4ade80', dropSide: 0 }
-        ]
+        id: 'shardOfLife', name: 'Shard of Life (6.0x)', category: 'upgrader', rarity: 'mythic', cost: 200000000, priceGrowth: 1.20,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 2, h: 2 }, layer: 'machine', color: '#15803d', speed: 60,
+        tags: ['upgrader', 'mythic'], attributes: {}, multiplier: 6.0, empowersAdjacent: true, maxUses: 3,
+        ports: [{ dx: 0, dy: 0, kind: 'conveyor', color: '#22c55e', dropSide: 0 }]
       },
 
-      // --- CORE SELLERS & SMELTERS ---
+      // --- SELLERS / SMELTERS ---
       seller: {
-        id: 'seller', name: 'Standard Seller', category: 'seller', rarity: 'common', cost: 0, priceGrowth: 1.00,
-        unlockMethod: 'shop', size: { w: 1, h: 1 }, layer: 'machine', color: '#7a4fa0', consumes: true, sellerBonus: 1.0,
-        tags: ['furnace', 'starter'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'input', color: '#9ad1ff', dropSide: null }]
+        id: 'seller', name: 'Standard Furnace (1.0x)', category: 'seller', rarity: 'common', cost: 100, priceGrowth: 1.10,
+        unlockMethod: 'shop', size: { w: 2, h: 2 }, layer: 'machine', color: '#991b1b', speed: 40,
+        tags: ['seller'], attributes: {}, consumes: true,
+        ports: [{ dx: 0, dy: 0.5, kind: 'input', color: '#ffcf5c', dropSide: null }]
       },
       blastSmelter: {
-        id: 'blastSmelter', name: 'Blast Smelter (2.0x)', category: 'seller', rarity: 'rare', cost: 45000, priceGrowth: 1.12,
-        unlockMethod: 'shop', size: { w: 2, h: 2 }, layer: 'machine', color: '#581c87', consumes: true, sellerBonus: 2.0,
-        tags: ['furnace', 'heavy_machinery'], attributes: {},
-        ports: [{ dx: 0, dy: 0.5, kind: 'input', color: '#a855f7', dropSide: null }]
+        id: 'blastSmelter', name: 'Industrial Blast Smelter (2.0x)', category: 'seller', rarity: 'uncommon', cost: 1200, priceGrowth: 1.10,
+        unlockMethod: 'shop', size: { w: 2, h: 2 }, layer: 'machine', color: '#b91c1c', speed: 40,
+        tags: ['seller', 'multiplier'], attributes: {}, consumes: true, sellerBonus: 2.0,
+        ports: [{ dx: 0, dy: 0.5, kind: 'input', color: '#f87171', dropSide: null }]
       },
       cryoSmelter: {
-        id: 'cryoSmelter', name: 'Cryo-Quench Smelter (3.0x)', category: 'seller', rarity: 'rare', cost: 120000, priceGrowth: 1.13,
-        unlockMethod: 'shop', size: { w: 2, h: 2 }, layer: 'machine', color: '#0284c7', consumes: true, sellerBonus: 3.0, wetBonus: 3.0, flamePenalty: 0.5,
-        tags: ['furnace', 'cryo'], attributes: {},
+        id: 'cryoSmelter', name: 'Cryo-Quench Smelter (3.0x Wet)', category: 'seller', rarity: 'rare', cost: 15000, priceGrowth: 1.12,
+        unlockMethod: 'shop', size: { w: 2, h: 2 }, layer: 'machine', color: '#0369a1', speed: 40,
+        tags: ['seller', 'cryo'], attributes: {}, consumes: true, sellerBonus: 1.5, wetBonus: 3.0, flamePenalty: 0.5,
         ports: [{ dx: 0, dy: 0.5, kind: 'input', color: '#38bdf8', dropSide: null }]
       },
       pyroSmelter: {
-        id: 'pyroSmelter', name: 'Thermobaric Smelter (4.0x)', category: 'seller', rarity: 'epic', cost: 350000, priceGrowth: 1.13,
-        unlockMethod: 'shop', size: { w: 2, h: 2 }, layer: 'machine', color: '#b91c1c', consumes: true, sellerBonus: 4.0, flameBonus: 4.0, wetDestroys: true,
-        tags: ['furnace', 'pyro'], attributes: {},
-        ports: [{ dx: 0, dy: 0.5, kind: 'input', color: '#f87171', dropSide: null }]
+        id: 'pyroSmelter', name: 'Thermobaric Smelter (4.0x Fire)', category: 'seller', rarity: 'rare', cost: 28000, priceGrowth: 1.13,
+        unlockMethod: 'shop', size: { w: 2, h: 2 }, layer: 'machine', color: '#c2410c', speed: 40,
+        tags: ['seller', 'flame'], attributes: {}, consumes: true, sellerBonus: 1.5, flameBonus: 4.0, wetDestroys: true,
+        ports: [{ dx: 0, dy: 0.5, kind: 'input', color: '#fb923c', dropSide: null }]
       },
       dimensionalVault: {
-        id: 'dimensionalVault', name: 'Dimensional Vault (3.5x)', category: 'seller', rarity: 'exotic', cost: 1400000, priceGrowth: 1.14,
-        unlockMethod: 'exoticCrate', crateOnly: true, size: { w: 2, h: 2 }, layer: 'machine', color: '#4c1d95', consumes: true, sellerBonus: 3.5, batchThreshold: 5,
-        tags: ['vault', 'batch_seller'], attributes: {},
+        id: 'dimensionalVault', name: 'Dimensional Vault (3.5x)', category: 'seller', rarity: 'rare', cost: 45000, priceGrowth: 1.13,
+        unlockMethod: 'shop', size: { w: 2, h: 2 }, layer: 'machine', color: '#4338ca', speed: 40,
+        tags: ['seller', 'batch'], attributes: {}, consumes: true, sellerBonus: 3.5,
         ports: [{ dx: 0, dy: 0.5, kind: 'input', color: '#818cf8', dropSide: null }]
       },
       catalyticConverter: {
-        id: 'catalyticConverter', name: 'Catalytic Converter (4.0x Rad)', category: 'seller', rarity: 'rare', cost: 95000, priceGrowth: 1.12,
-        unlockMethod: 'exoticCrate', crateOnly: true, size: { w: 2, h: 1 }, layer: 'machine', color: '#84cc16', consumes: true, sellerBonus: 2.5, radioactiveBonus: 4.0,
-        tags: ['furnace', 'radioactive_bonus'], attributes: {},
-        ports: [{ dx: 0, dy: 0, kind: 'input', color: '#a3e635', dropSide: null }]
+        id: 'catalyticConverter', name: 'Catalytic Converter (4.0x Rad)', category: 'seller', rarity: 'epic', cost: 180000, priceGrowth: 1.14,
+        unlockMethod: 'shop', size: { w: 2, h: 2 }, layer: 'machine', color: '#15803d', speed: 40,
+        tags: ['seller', 'radioactive'], attributes: {}, consumes: true, sellerBonus: 2.5, radioactiveBonus: 4.0,
+        ports: [{ dx: 0, dy: 0.5, kind: 'input', color: '#4ade80', dropSide: null }]
       },
       prismaticSmelter: {
-        id: 'prismaticSmelter', name: 'Prismatic Refiner Smelter (5.5x)', category: 'seller', rarity: 'exotic', cost: 2200000, priceGrowth: 1.14,
-        unlockMethod: 'goldenCrate', crateOnly: true, size: { w: 2, h: 2 }, layer: 'machine', color: '#eab308', consumes: true, sellerBonus: 2.0, sparklingBonus: 5.5,
-        tags: ['furnace', 'prismatic'], attributes: {},
+        id: 'prismaticSmelter', name: 'Prismatic Gem Smelter (5.5x)', category: 'seller', rarity: 'legendary', cost: 4500000, priceGrowth: 1.15,
+        unlockMethod: 'goldenCrate', crateOnly: true, size: { w: 2, h: 2 }, layer: 'machine', color: '#a16207', speed: 40,
+        tags: ['seller', 'sparkling'], attributes: {}, consumes: true, sellerBonus: 3.0, sparklingBonus: 5.5,
         ports: [{ dx: 0, dy: 0.5, kind: 'input', color: '#fde047', dropSide: null }]
       },
       singularitySmelter: {
-        id: 'singularitySmelter', name: 'Void Singularity Smelter (7.0x)', category: 'seller', rarity: 'legendary', cost: 18000000, priceGrowth: 1.15,
-        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 3, h: 3 }, layer: 'machine', color: '#312e81', consumes: true, sellerBonus: 7.0, vacuumRadius: 1.5,
-        tags: ['furnace', 'void', 'vacuum'], attributes: {},
-        ports: [{ dx: 0, dy: 1, kind: 'input', color: '#818cf8', dropSide: null }]
+        id: 'singularitySmelter', name: 'Singularity Smelter (7.0x)', category: 'seller', rarity: 'mythic', cost: 35000000, priceGrowth: 1.18,
+        unlockMethod: 'exoticCrate', crateOnly: true, size: { w: 3, h: 3 }, layer: 'machine', color: '#581c87', speed: 40,
+        tags: ['seller', 'singularity'], attributes: {}, consumes: true, sellerBonus: 7.0, vacuumRadius: 1.5,
+        ports: [{ dx: 0, dy: 1, kind: 'input', color: '#c084fc', dropSide: null }]
       },
       soulForge: {
-        id: 'soulForge', name: 'Soul Forge (8.0x)', category: 'seller', rarity: 'legendary', cost: 6500000, priceGrowth: 1.15,
-        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 3, h: 2 }, layer: 'machine', color: '#7f1d1d', consumes: true, sellerBonus: 8.0, penaltyRisk: 0.10,
-        tags: ['furnace', 'high_risk'], attributes: {},
-        ports: [{ dx: 0, dy: 0.5, kind: 'input', color: '#f87171', dropSide: null }]
+        id: 'soulForge', name: 'Soul Forge (8.0x High Risk)', category: 'seller', rarity: 'mythic', cost: 95000000, priceGrowth: 1.20,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 3, h: 3 }, layer: 'machine', color: '#450a0a', speed: 40,
+        tags: ['seller', 'high_risk'], attributes: {}, consumes: true, sellerBonus: 8.0, penaltyRisk: 0.10,
+        ports: [{ dx: 0, dy: 1, kind: 'input', color: '#ef4444', dropSide: null }]
       },
       supernovaCrucible: {
-        id: 'supernovaCrucible', name: 'Supernova Crucible (12.0x)', category: 'seller', rarity: 'mythic', cost: 80000000, priceGrowth: 1.16,
-        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 3, h: 2 }, layer: 'machine', color: '#ea580c', consumes: true, sellerBonus: 3.0, supernovaBonus: 12.0, minSupernovaValue: 10000,
-        tags: ['furnace', 'mythic'], attributes: {},
-        ports: [{ dx: 0, dy: 0.5, kind: 'input', color: '#ffedd5', dropSide: null }]
+        id: 'supernovaCrucible', name: 'Supernova Fusion Crucible (12.0x)', category: 'seller', rarity: 'mythic', cost: 500000000, priceGrowth: 1.22,
+        unlockMethod: 'prestigeCrate', crateOnly: true, size: { w: 3, h: 3 }, layer: 'machine', color: '#7c2d12', speed: 40,
+        tags: ['seller', 'supernova'], attributes: {}, consumes: true, sellerBonus: 5.0, supernovaBonus: 12.0, minSupernovaValue: 10000,
+        ports: [{ dx: 0, dy: 1, kind: 'input', color: '#fdba74', dropSide: null }]
       }
-    },
-
-    relicDefs: {
-      warehouseCharter: { id: 'warehouseCharter', name: 'Warehouse Charter I', desc: '+10 permanent inventory capacity', effect: { inventoryCap: 10 } },
-      starterBelts: { id: 'starterBelts', name: 'Starter Belt License', desc: 'Start each run with 8 Conveyor Belts', effect: { startingItems: { belt: 8 } } },
-      sellerPermit: { id: 'sellerPermit', name: 'Seller Permit', desc: 'Start each run with 1 Seller', effect: { startingItems: { seller: 1 } } },
-      crateMagnet: { id: 'crateMagnet', name: 'Crate Magnet', desc: '+3% crate blueprint odds', effect: { crateLuck: 0.03 } },
-      salvageToolkit: { id: 'salvageToolkit', name: 'Salvage Toolkit', desc: 'Demolished items always return full stock to inventory', effect: { salvage100: true } },
-      insuranceSeal: { id: 'insuranceSeal', name: 'Insurance Seal', desc: 'Mark 1 placed machine per run as prestige-safe', effect: { maxInsured: 1 } },
-      exoticPermit: { id: 'exoticPermit', name: 'Exotic Handling Permit', desc: 'First exotic item placed each run has free cost', effect: { freeFirstExotic: true } },
-      vaultArchivist: { id: 'vaultArchivist', name: 'Vault Archivist', desc: '+20% Prestige Dust from Prestige Crates', effect: { prestigeCrateBonus: 0.20 } }
-    },
-
-    crateDefs: {
-      regular: { id: 'regular', name: 'Regular Crate', currency: 'money', cost: 250 },
-      golden: { id: 'golden', name: 'Golden Crate', currency: 'money', cost: 1000 },
-      exotic: { id: 'exotic', name: 'Exotic Crate', currency: 'money', cost: 5000 },
-      prestige: { id: 'prestige', name: 'Prestige Crate', currency: 'prestigeKeys', cost: 1 }
     }
   },
 
-  // Backward compatibility getters
-  get world() {
-    return {
-      get money() { return STATE.run.money; },
-      set money(v) { STATE.run.money = v; },
-      get buildings() { return STATE.run.buildings; },
-      set buildings(v) { STATE.run.buildings = v; },
-      get ores() { return STATE.run.ores; },
-      set ores(v) { STATE.run.ores = v; }
-    };
-  },
-  get unlockedBuildingIds() {
-    return Object.keys(STATE.meta.blueprintUnlocks).filter(k => STATE.meta.blueprintUnlocks[k]);
-  },
-  get buildingDefs() {
-    return STATE.defs.buildingDefs;
-  },
-  get itemDefs() {
-    return STATE.defs.itemDefs;
+  camera: {
+    x: 0,
+    y: 0,
+    zoom: 1.0
   },
 
-  camera: { x: 0, y: 0, zoom: 1, minZoom: 0.25, maxZoom: 4 },
-  nextId: 1
+  stats: {
+    totalOresCreated: 0,
+    totalOresSold: 0,
+    buildingsPlaced: 0,
+    cratesOpened: 0
+  },
+
+  activeSaveSlot: 0
 };
 
-STATE.camera.x = (STATE.config.grid.cols * STATE.config.grid.cellSize) / 2;
-STATE.camera.y = (STATE.config.grid.rows * STATE.config.grid.cellSize) / 2;
+// ===========================================================
+// CORE GRID & TRANSFORMATION MATH
+// ===========================================================
 
+let idCounters = {};
 function genId(prefix) {
-  return `${prefix}_${STATE.nextId++}`;
+  if (!idCounters[prefix]) idCounters[prefix] = 0;
+  return `${prefix}_${++idCounters[prefix]}_${Date.now()}`;
 }
 
-// ===========================================================
-// HELPER & MANAGEMENT SYSTEMS (SHOP, INVENTORY, PRESTIGE, CRATES)
-// ===========================================================
-
-function getShopItemPrice(defId) {
-  const def = STATE.defs.buildingDefs[defId];
-  if (!def) return 0;
-  const owned = STATE.shop.stock[defId]?.ownedCount || 0;
-  const growth = def.priceGrowth || 1.10;
-  return Math.round(def.cost * Math.pow(growth, owned));
-}
-
-function buyShopItem(defId, qty = 1) {
-  const def = STATE.defs.buildingDefs[defId];
-  if (!def) return false;
-  if (!STATE.meta.blueprintUnlocks[defId]) {
-    showToast(`${def.name} blueprint is locked. Open Crates to unlock.`);
-    return false;
-  }
-  const price = getShopItemPrice(defId);
-  if (STATE.run.money < price * qty) {
-    showToast(`Need $${(price * qty).toLocaleString()} to buy ${qty}x ${def.name}.`);
-    return false;
-  }
-
-  STATE.run.money -= price * qty;
-  if (!STATE.shop.stock[defId]) {
-    STATE.shop.stock[defId] = { defId, currentPrice: price, ownedCount: 0 };
-  }
-  STATE.shop.stock[defId].ownedCount += qty;
-
-  addToInventory(defId, qty, false, 'shop');
-  showToast(`Purchased ${qty}x ${def.name}!`);
-  triggerSaveState();
-  return true;
-}
-
-function addToInventory(defId, qty = 1, isPermanent = false, source = 'shop') {
-  if (isPermanent) {
-    if (!STATE.inventory.permanentItems[defId]) {
-      STATE.inventory.permanentItems[defId] = { qty: 0, permanent: true, source };
-    }
-    STATE.inventory.permanentItems[defId].qty += qty;
-  } else {
-    if (!STATE.inventory.items[defId]) {
-      STATE.inventory.items[defId] = { qty: 0, permanent: false, source };
-    }
-    STATE.inventory.items[defId].qty += qty;
-  }
-  triggerSaveState();
-}
-
-function removeFromInventory(defId, qty = 1) {
-  if (STATE.inventory.items[defId] && STATE.inventory.items[defId].qty >= qty) {
-    STATE.inventory.items[defId].qty -= qty;
-    return true;
-  } else if (STATE.inventory.permanentItems[defId] && STATE.inventory.permanentItems[defId].qty >= qty) {
-    STATE.inventory.permanentItems[defId].qty -= qty;
-    return true;
-  }
-  return false;
-}
-
-function getInventoryQty(defId) {
-  const standard = STATE.inventory.items[defId]?.qty || 0;
-  const perm = STATE.inventory.permanentItems[defId]?.qty || 0;
-  return standard + perm;
-}
-
-function canPlaceFromInventory(defId) {
-  return getInventoryQty(defId) > 0;
-}
-
-// Prestige Calculator & Execution
-function calculatePrestigePayout(lifetimeEarnings) {
-  const threshold = STATE.config.prestigeThresholdLifetime || 1e10;
-  if (lifetimeEarnings < threshold) {
-    return { canPrestige: false, pointsGained: 0, keysGained: 0 };
-  }
-  const pointsGained = Math.floor(Math.pow(lifetimeEarnings / threshold, 0.5));
-  const keysGained = Math.max(1, 1 + Math.floor(Math.log10(lifetimeEarnings / threshold)));
-  return { canPrestige: true, pointsGained, keysGained };
-}
-
-function executePrestigeReset() {
-  const payout = calculatePrestigePayout(STATE.run.lifetimeEarnings);
-  if (!payout.canPrestige) return false;
-
-  STATE.meta.prestigePoints += payout.pointsGained;
-  STATE.meta.prestigeKeys += payout.keysGained;
-
-  // Reset active run state
-  STATE.run.money = 1000;
-  STATE.run.lifetimeEarnings = 0;
-  STATE.run.buildings = [];
-  STATE.run.ores = [];
-  STATE.run.timeScale = 1.0;
-  STATE.run.isPaused = false;
-
-  // Apply starting relic inventory grants
-  if (STATE.meta.relics.starterBelts) addToInventory('belt', 8, false, 'relic');
-  if (STATE.meta.relics.sellerPermit) addToInventory('seller', 1, false, 'relic');
-
-  showToast(`Prestige Complete! Gained +${payout.pointsGained} Points & +${payout.keysGained} Keys!`);
-  triggerSaveState();
-  return true;
-}
-
-// Crate Reward Resolution Engine
-function openCrate(tier) {
-  const crateDef = STATE.defs.crateDefs[tier];
-  if (!crateDef) return null;
-
-  if (crateDef.currency === 'money') {
-    if (STATE.run.money < crateDef.cost) {
-      showToast(`Need $${crateDef.cost} cash for ${crateDef.name}.`);
-      return null;
-    }
-    STATE.run.money -= crateDef.cost;
-  } else if (crateDef.currency === 'prestigeKeys') {
-    if (STATE.meta.prestigeKeys < crateDef.cost) {
-      showToast(`Need ${crateDef.cost} Prestige Key for ${crateDef.name}.`);
-      return null;
-    }
-    STATE.meta.prestigeKeys -= crateDef.cost;
-  }
-
-  // Roll rewards from weighted tables
-  const rand = Math.random();
-  let reward = null;
-
-  if (tier === 'regular') {
-    if (rand < 0.72) {
-      const ids = ['extractor', 'belt', 'fastBelt', 'upgrader1x1', 'freonSprayer'];
-      const id = ids[Math.floor(Math.random() * ids.length)];
-      addToInventory(id, 2, false, 'crate');
-      STATE.meta.blueprintUnlocks[id] = true;
-      reward = { type: 'item', id, qty: 2, label: `2x ${STATE.defs.buildingDefs[id].name}` };
-    } else if (rand < 0.92) {
-      const ids = ['halfBelt', 'splitter', 'merger', 'upgraderHalf'];
-      const id = ids[Math.floor(Math.random() * ids.length)];
-      addToInventory(id, 1, true, 'crate');
-      STATE.meta.blueprintUnlocks[id] = true;
-      reward = { type: 'permanent', id, qty: 1, label: `1x Permanent ${STATE.defs.buildingDefs[id].name}` };
-    } else if (rand < 0.99) {
-      const ids = ['coalExtractor', 'megaExtractor', 'pyroRefiner'];
-      const id = ids[Math.floor(Math.random() * ids.length)];
-      if (!STATE.meta.blueprintUnlocks[id]) {
-        STATE.meta.blueprintUnlocks[id] = true;
-        reward = { type: 'blueprint', id, label: `Blueprint: ${STATE.defs.buildingDefs[id].name}` };
-      } else {
-        STATE.meta.shards += 1;
-        reward = { type: 'shards', qty: 1, label: `Duplicate Blueprint -> +1 Shard` };
-      }
-    } else {
-      const rId = 'warehouseCharter';
-      STATE.meta.relics[rId] = true;
-      reward = { type: 'relic', id: rId, label: `Relic Unlocked: ${STATE.defs.relicDefs[rId].name}` };
-    }
-  } else if (tier === 'golden') {
-    if (rand < 0.45) {
-      const ids = ['geodeDriller', 'magLevRail', 'gravityInverter', 'cryoStorageBelt', 'oreCrystallizer'];
-      const id = ids[Math.floor(Math.random() * ids.length)];
-      addToInventory(id, 1, true, 'crate');
-      STATE.meta.blueprintUnlocks[id] = true;
-      reward = { type: 'permanent', id, qty: 1, label: `1x Permanent ${STATE.defs.buildingDefs[id].name}` };
-    } else if (rand < 0.80) {
-      const ids = ['volcanoDropper', 'thermalExtractor', 'upgrader2x1', 'geodeDriller'];
-      const id = ids[Math.floor(Math.random() * ids.length)];
-      if (!STATE.meta.blueprintUnlocks[id]) {
-        STATE.meta.blueprintUnlocks[id] = true;
-        reward = { type: 'blueprint', id, label: `Blueprint: ${STATE.defs.buildingDefs[id].name}` };
-      } else {
-        STATE.meta.shards += 4;
-        reward = { type: 'shards', qty: 4, label: `Duplicate Blueprint -> +4 Shards` };
-      }
-    } else if (rand < 0.95) {
-      const rId = 'starterBelts';
-      STATE.meta.relics[rId] = true;
-      reward = { type: 'relic', id: rId, label: `Relic Unlocked: ${STATE.defs.relicDefs[rId].name}` };
-    } else {
-      STATE.meta.shards += 10;
-      reward = { type: 'shards', qty: 10, label: `Meta Currency Bundle: +10 Shards` };
-    }
-  } else if (tier === 'exotic') {
-    if (rand < 0.35) {
-      const ids = ['algaeVat', 'entropyStabilizer', 'oreTransmuter', 'dimensionalVault', 'catalyticConverter'];
-      const id = ids[Math.floor(Math.random() * ids.length)];
-      addToInventory(id, 1, true, 'crate');
-      STATE.meta.blueprintUnlocks[id] = true;
-      reward = { type: 'permanent', id, qty: 1, label: `1x Permanent ${STATE.defs.buildingDefs[id].name}` };
-    } else if (rand < 0.70) {
-      const ids = ['algaeVat', 'entropyStabilizer', 'oreTransmuter', 'dimensionalVault', 'catalyticConverter'];
-      const id = ids[Math.floor(Math.random() * ids.length)];
-      if (!STATE.meta.blueprintUnlocks[id]) {
-        STATE.meta.blueprintUnlocks[id] = true;
-        reward = { type: 'blueprint', id, label: `Blueprint: ${STATE.defs.buildingDefs[id].name}` };
-      } else {
-        STATE.meta.shards += 15;
-        reward = { type: 'shards', qty: 15, label: `Duplicate Blueprint -> +15 Shards` };
-      }
-    } else if (rand < 0.90) {
-      const rId = 'salvageToolkit';
-      STATE.meta.relics[rId] = true;
-      reward = { type: 'relic', id: rId, label: `Relic Unlocked: ${STATE.defs.relicDefs[rId].name}` };
-    } else {
-      STATE.meta.shards += 25;
-      reward = { type: 'shards', qty: 25, label: `Shard Bundle: +25 Shards` };
-    }
-  } else if (tier === 'prestige') {
-    if (rand < 0.45) {
-      const ids = ['antimatterSiphon', 'temporalFluxBorer', 'phaseShiftBelt', 'quantumLink', 'probabilityAmp', 'resonanceHarmonizer', 'matterReplicator', 'voidHarvester', 'soulForge', 'shardOfLife'];
-      const id = ids[Math.floor(Math.random() * ids.length)];
-      if (!STATE.meta.blueprintUnlocks[id]) {
-        STATE.meta.blueprintUnlocks[id] = true;
-        reward = { type: 'blueprint', id, label: `Prestige Blueprint: ${STATE.defs.buildingDefs[id].name}` };
-      } else {
-        STATE.meta.prestigeDust += 50;
-        reward = { type: 'prestigeDust', qty: 50, label: `Duplicate Prestige Blueprint -> +50 Dust` };
-      }
-    } else if (rand < 0.70) {
-      const ids = ['antimatterSiphon', 'quantumLink', 'matterReplicator', 'soulForge', 'shardOfLife'];
-      const id = ids[Math.floor(Math.random() * ids.length)];
-      addToInventory(id, 1, true, 'crate');
-      STATE.meta.blueprintUnlocks[id] = true;
-      reward = { type: 'permanent', id, qty: 1, label: `1x Mythic Copy: ${STATE.defs.buildingDefs[id].name}` };
-    } else if (rand < 0.90) {
-      const rIds = ['insuranceSeal', 'exoticPermit', 'vaultArchivist'];
-      const rId = rIds[Math.floor(Math.random() * rIds.length)];
-      STATE.meta.relics[rId] = true;
-      reward = { type: 'relic', id: rId, label: `Relic Unlocked: ${STATE.defs.relicDefs[rId].name}` };
-    } else {
-      STATE.meta.prestigeDust += 100;
-      reward = { type: 'prestigeDust', qty: 100, label: `Prestige Dust Cache: +100 Dust` };
-    }
-  }
-
-  triggerSaveState();
-  return reward;
-}
-
-// Transient UI State Variables
-let mode = 'idle';
-let placingState = null;
-let movingState = null;
-let isBeltDragging = false;
-let beltDragStart = null;
-let selectedEntity = null;
-let mouseScreen = { x: 0, y: 0 };
-let currentCategory = 'all';
-let hotbarItems = ['extractor', 'belt', 'fastBelt', 'upgrader1x1', 'freonSprayer', 'seller'];
-
-function setMode(m) {
-  mode = m;
-  canvas.className = `mode-${mode}`;
-  updateInspectorPanel();
-}
-function cancelMode() {
-  placingState = null; movingState = null; isBeltDragging = false; beltDragStart = null; setMode('idle');
-}
-
-// Save & Migration System
-STATE.activeSaveSlot = 0;
-
-async function fetchSaveSlots() {
-  const res = await fetch('/api/saves');
-  return res.json();
-}
-async function saveToSlot(slot, name) {
-  STATE.activeSaveSlot = slot;
-  const data = { slotName: name, savedAt: new Date().toISOString(), state: STATE };
-  await fetch(`/api/save/${slot}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-}
-async function loadFromSlot(slot) {
-  const res = await fetch(`/api/load/${slot}`);
-  const data = await res.json();
-  if (data.state) {
-    STATE.activeSaveSlot = slot;
-    migrateSavedState(data.state);
-    if (typeof renderHotbar === 'function') renderHotbar();
-    if (typeof renderInventoryGrid === 'function') renderInventoryGrid();
-  }
-}
-async function deleteSlot(slot) {
-  await fetch(`/api/save/${slot}`, { method: 'DELETE' });
-}
-async function newGame() {
-  if (typeof cancelMode === 'function') cancelMode();
-  selectedEntity = null;
-
-  // Reset active run state & factory layout
-  STATE.run.money = 1000;
-  STATE.run.lifetimeEarnings = 0;
-  STATE.run.buildings = [];
-  STATE.run.ores = [];
-  STATE.run.timeScale = 1.0;
-  STATE.run.isPaused = false;
-  
-  // Reset shop dynamic inflation
-  STATE.shop.stock = {};
-  STATE.shop.dynamicPriceLevel = {};
-  
-  // Reset standard and permanent inventory
-  STATE.inventory.capacity = STATE.config.inventoryBaseCapacity || 40;
-  STATE.inventory.items = {
-    extractor: { qty: 2, permanent: false, source: 'starter' },
-    belt: { qty: 10, permanent: false, source: 'starter' },
-    upgrader1x1: { qty: 1, permanent: false, source: 'starter' },
-    seller: { qty: 1, permanent: false, source: 'starter' }
-  };
-  STATE.inventory.permanentItems = {};
-  STATE.inventory.consumables = {};
-
-  // Complete wipe of all meta progression
-  STATE.meta.prestigePoints = 0;
-  STATE.meta.prestigeKeys = 0;
-  STATE.meta.shards = 0;
-  STATE.meta.prestigeDust = 0;
-  STATE.meta.relics = {};
-  STATE.meta.collection = {};
-  STATE.meta.blueprintUnlocks = {
-    extractor: true,
-    belt: true,
-    fastBelt: true,
-    halfBelt: true,
-    upgrader1x1: true,
-    upgraderHalf: true,
-    seller: true,
-    coalExtractor: true
-  };
-
-  hotbarItems = ['extractor', 'belt', 'fastBelt', 'upgrader1x1', 'freonSprayer', 'seller'];
-
-  // Recenter camera
-  const cs = STATE.config.grid.cellSize;
-  STATE.camera.x = (STATE.config.grid.cols * cs) / 2;
-  STATE.camera.y = (STATE.config.grid.rows * cs) / 2;
-  STATE.camera.zoom = 1;
-  
-  if (typeof renderHotbar === 'function') renderHotbar();
-  if (typeof renderInventoryGrid === 'function') renderInventoryGrid();
-  triggerSaveState();
-}
-
-function triggerSaveState() {
-  try {
-    const jsonStr = JSON.stringify(STATE, null, 2);
-    localStorage.setItem('miners_haven_save', jsonStr);
-    
-    const slot = STATE.activeSaveSlot || 0;
-    const data = { slotName: `Save ${slot + 1}`, savedAt: new Date().toISOString(), state: STATE };
-    fetch(`/api/save/${slot}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).catch(err => console.error('Save API error:', err));
-  } catch (e) {
-    console.error('Save state error:', e);
-  }
-}
-
-function migrateSavedState(savedState) {
-  if (!savedState) return;
-
-  if (savedState.world) {
-    if (typeof savedState.world.money === 'number') STATE.run.money = savedState.world.money;
-    if (Array.isArray(savedState.world.buildings)) STATE.run.buildings = savedState.world.buildings;
-  }
-  if (savedState.run) Object.assign(STATE.run, savedState.run);
-  if (savedState.shop) Object.assign(STATE.shop, savedState.shop);
-  if (savedState.inventory) Object.assign(STATE.inventory, savedState.inventory);
-  if (savedState.meta) Object.assign(STATE.meta, savedState.meta);
-
-  if (Array.isArray(savedState.unlockedBuildingIds)) {
-    savedState.unlockedBuildingIds.forEach(id => { STATE.meta.blueprintUnlocks[id] = true; });
-  }
-
-  // Ensure default unlocks exist
-  ['extractor', 'belt', 'fastBelt', 'halfBelt', 'switchGate', 'loopGate', 'crossoverBelt', 'splitter', 'merger', 'upgrader1x1', 'upgraderHalf', 'seller', 'coalExtractor'].forEach(id => {
-    STATE.meta.blueprintUnlocks[id] = true;
-  });
-}
-
-function loadSavedGame() {
-  fetch('/savegame.json')
-    .then(res => res.json())
-    .then(savedState => {
-      migrateSavedState(savedState);
-    })
-    .catch(() => {
-      const local = localStorage.getItem('miners_haven_save');
-      if (local) {
-        try {
-          const savedState = JSON.parse(local);
-          migrateSavedState(savedState);
-        } catch(e) {}
-      }
-    })
-    .finally(() => {
-      if (typeof renderHotbar === 'function') renderHotbar();
-      if (typeof renderInventoryGrid === 'function') renderInventoryGrid();
-    });
-}
-
-// Math & Grid Utilities
-function screenToWorld(sx, sy) {
-  const cam = STATE.camera;
-  return {
-    x: (sx - canvas.width / 2) / cam.zoom + cam.x,
-    y: (sy - canvas.height / 2) / cam.zoom + cam.y
-  };
-}
-
-function worldToScreen(wx, wy) {
-  const cam = STATE.camera;
-  return {
-    x: (wx - cam.x) * cam.zoom + canvas.width / 2,
-    y: (wy - cam.y) * cam.zoom + canvas.height / 2
-  };
-}
-
-function clampCamera() {
-  const cs = STATE.config.grid.cellSize;
-  const maxW = STATE.config.grid.cols * cs;
-  const maxH = STATE.config.grid.rows * cs;
-  STATE.camera.x = Math.max(0, Math.min(maxW, STATE.camera.x));
-  STATE.camera.y = Math.max(0, Math.min(maxH, STATE.camera.y));
-}
-
-function rotatePointCW(x, y, w, h) {
-  return { x: h - 1 - y, y: x };
-}
-
-function getFootprint(def, rot) {
-  const r = ((rot % 4) + 4) % 4;
-  let w = def.size.w, h = def.size.h;
-  let ports = (def.ports || []).map(p => ({ ...p }));
-
-  for (let i = 0; i < r; i++) {
-    for (const p of ports) {
-      const rp = rotatePointCW(p.dx, p.dy, w, h);
-      p.dx = rp.x; p.dy = rp.y;
-      if (p.dropSide !== null && p.dropSide !== undefined) {
-        p.dropSide = (p.dropSide + 1) % 4;
-      }
-    }
-    const t = w; w = h; h = t;
-  }
-  return { w, h, ports };
-}
-
-function dirVector(dir) {
-  switch (dir) {
+function dirVector(rot) {
+  switch (rot % 4) {
     case 0: return { x: 1, y: 0 };
     case 1: return { x: 0, y: 1 };
     case 2: return { x: -1, y: 0 };
     case 3: return { x: 0, y: -1 };
-    default: return { x: 0, y: 0 };
+    default: return { x: 1, y: 0 };
   }
 }
 
-function clampedOrigin(w, h, rawCol, rawRow) {
-  const grid = STATE.config.grid;
-  return {
-    col: Math.min(grid.cols - w, Math.max(0, rawCol)),
-    row: Math.min(grid.rows - h, Math.max(0, rawRow))
-  };
+function getFootprint(def, rot) {
+  let w = def.size.w, h = def.size.h;
+  if (rot % 2 === 1) { const t = w; w = h; h = t; }
+
+  const ports = (def.ports || []).map(p => {
+    let px = p.dx, py = p.dy;
+    switch (rot % 4) {
+      case 0: break;
+      case 1: px = def.size.h - 1 - p.dy; py = p.dx; break;
+      case 2: px = def.size.w - 1 - p.dx; py = def.size.h - 1 - p.dy; break;
+      case 3: px = p.dy; py = def.size.w - 1 - p.dx; break;
+    }
+    const dropSide = p.dropSide !== null && p.dropSide !== undefined ? (p.dropSide + rot) % 4 : null;
+    return { ...p, dx: px, dy: py, dropSide };
+  });
+
+  return { w, h, ports };
 }
 
-function worldToCell(wx, wy, defId) {
+function worldToCell(wx, wy) {
   const cs = STATE.config.grid.cellSize;
-  let def = null;
-  let rot = 0;
+  let placingDef = null;
+  let activeRot = 0;
 
-  if (defId) {
-    def = STATE.defs.buildingDefs[defId];
-  } else if (placingState) {
-    def = STATE.defs.buildingDefs[placingState.defId];
-    rot = placingState.rot;
-  } else if (movingState) {
-    const building = findBuildingById(movingState.buildingId);
-    if (building) {
-      def = STATE.defs.buildingDefs[building.defId];
-      rot = movingState.rot;
+  if (mode === 'placing' && placingState) {
+    placingDef = STATE.defs.buildingDefs[placingState.defId];
+    activeRot = placingState.rot || 0;
+  } else if (mode === 'moving' && movingState) {
+    const b = findBuildingById(movingState.buildingId);
+    if (b) {
+      placingDef = STATE.defs.buildingDefs[b.defId];
+      activeRot = movingState.rot || 0;
     }
   }
 
-  let col = Math.floor(wx / cs);
-  let row = Math.floor(wy / cs);
+  if (placingDef && (placingDef.isHalfBelt || placingDef.isHalf)) {
+    const fp = getFootprint(placingDef, activeRot);
+    let col = Math.floor(wx / cs);
+    let row = Math.floor(wy / cs);
+    const subX = (wx % cs + cs) % cs / cs;
+    const subY = (wy % cs + cs) % cs / cs;
 
-  if (def && (def.isHalfBelt || def.isHalf)) {
-    const fp = getFootprint(def, rot);
-    if (fp.w < 1) {
-      const subX = (wx / cs) - col;
-      col += subX >= 0.5 ? 0.5 : 0;
-    }
-    if (fp.h < 1) {
-      const subY = (wy / cs) - row;
-      row += subY >= 0.5 ? 0.5 : 0;
-    }
+    if (fp.w < 1) col += (subX >= 0.5 ? 0.5 : 0);
+    if (fp.h < 1) row += (subY >= 0.5 ? 0.5 : 0);
+    return { col, row };
   }
-  return { col, row };
-}
 
-let toastTimer = null;
-function showToast(msg, type = 'info') {
-  let toast = document.getElementById('gameToast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'gameToast';
-    toast.style.cssText = [
-      'position:fixed',
-      'top:20px',
-      'left:50%',
-      'transform:translateX(-50%) translateY(-4px)',
-      'color:#fff',
-      'font-weight:700',
-      'padding:9px 18px',
-      'border-radius:10px',
-      'z-index:200',
-      'box-shadow:0 6px 24px rgba(0,0,0,0.6)',
-      'font-size:12px',
-      'font-family:Inter,system-ui,sans-serif',
-      'border:1px solid rgba(255,255,255,0.15)',
-      'backdrop-filter:blur(8px)',
-      'letter-spacing:0.01em',
-      'pointer-events:none',
-      'transition:opacity 0.2s,transform 0.2s',
-    ].join(';');
-    document.body.appendChild(toast);
-  }
-  const colors = {
-    info:    { bg: 'rgba(30,50,80,0.92)', border: 'rgba(59,130,246,0.4)' },
-    success: { bg: 'rgba(20,60,40,0.92)', border: 'rgba(34,197,94,0.4)' },
-    warn:    { bg: 'rgba(80,50,20,0.92)', border: 'rgba(245,158,11,0.4)' },
-    error:   { bg: 'rgba(80,20,20,0.92)', border: 'rgba(239,68,68,0.4)' },
+  return {
+    col: Math.floor(wx / cs),
+    row: Math.floor(wy / cs)
   };
-  const c = colors[type] || colors.info;
-  toast.style.background = c.bg;
-  toast.style.borderColor = c.border;
-  toast.textContent = msg;
-  toast.style.opacity = '1';
-  toast.style.display = 'block';
-  toast.style.transform = 'translateX(-50%) translateY(0)';
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => {
-    toast.style.opacity = '0';
-    toast.style.transform = 'translateX(-50%) translateY(-4px)';
-    setTimeout(() => { toast.style.display = 'none'; }, 200);
-  }, 2400);
 }
 
-function getCellOccupants(col, row, excludeId) {
-  const occupants = [];
-  const eps = 0.0001;
-  for (const b of STATE.run.buildings) {
-    if (excludeId && b.id === excludeId) continue;
-    const def = STATE.defs.buildingDefs[b.defId];
-    if (!def) continue;
-    const fp = getFootprint(def, b.rot);
-    if (col >= b.col - eps && col < b.col + fp.w - eps && row >= b.row - eps && row < b.row + fp.h - eps) {
-      const localDx = Math.floor(col - b.col), localDy = Math.floor(row - b.row);
-      const port = fp.ports.find(p => Math.abs(p.dx - localDx) < 0.5 && Math.abs(p.dy - localDy) < 0.5) || null;
-      occupants.push({ building: b, def, fp, isPort: !!port, port });
-    }
+function cellToWorld(col, row) {
+  const cs = STATE.config.grid.cellSize;
+  return { x: col * cs, y: row * cs };
+}
+
+function screenToWorld(sx, sy) {
+  if (sceneInstance && sceneInstance.cameras && sceneInstance.cameras.main) {
+    const p = sceneInstance.cameras.main.getWorldPoint(sx, sy);
+    return { x: p.x, y: p.y };
   }
-  return occupants;
+  const zoom = STATE.camera.zoom;
+  return {
+    x: sx / zoom + STATE.camera.x,
+    y: sy / zoom + STATE.camera.y
+  };
 }
 
-function wouldOverlapAt(defId, col, row, w, h, excludeId) {
-  const gridW = STATE.config.grid.cols;
-  const gridH = STATE.config.grid.rows;
-  const def = STATE.defs.buildingDefs[defId];
+function worldToScreen(wx, wy) {
+  if (sceneInstance && sceneInstance.cameras && sceneInstance.cameras.main) {
+    const cam = sceneInstance.cameras.main;
+    return {
+      x: (wx - cam.scrollX) * cam.zoom,
+      y: (wy - cam.scrollY) * cam.zoom
+    };
+  }
+  const zoom = STATE.camera.zoom;
+  return {
+    x: (wx - STATE.camera.x) * zoom,
+    y: (wy - STATE.camera.y) * zoom
+  };
+}
 
-  if (col < 0 || row < 0 || col + w > gridW || row + h > gridH) return true;
-
-  const eps = 0.0001;
+function wouldOverlapAt(def, col, row, rot, ignoreBuildingId = null) {
+  const fp = getFootprint(def, rot);
+  const grid = STATE.config.grid;
+  if (col < 0 || row < 0 || col + fp.w > grid.cols || row + fp.h > grid.rows) {
+    return true;
+  }
   for (const b of STATE.run.buildings) {
-    if (b.id === excludeId) continue;
+    if (ignoreBuildingId && b.id === ignoreBuildingId) continue;
     const bDef = STATE.defs.buildingDefs[b.defId];
     if (!bDef) continue;
-    const fp = getFootprint(bDef, b.rot);
-
-    if (col < b.col + fp.w - eps && col + w > b.col + eps &&
-        row < b.row + fp.h - eps && row + h > b.row + eps) {
-      if ((def.layer === 'belt' && bDef.layer === 'machine') || (def.layer === 'machine' && bDef.layer === 'belt')) continue;
-      if (def.id === bDef.id && Math.abs(col - b.col) < eps && Math.abs(row - b.row) < eps) {
-        deleteBuilding(b);
-        continue;
-      }
+    const bfp = getFootprint(bDef, b.rot);
+    if (col < b.col + bfp.w && col + fp.w > b.col &&
+        row < b.row + bfp.h && row + fp.h > b.row) {
       return true;
     }
   }
   return false;
 }
 
+function clampedOrigin(w, h, col, row) {
+  const grid = STATE.config.grid;
+  return {
+    col: Math.max(0, Math.min(grid.cols - w, col)),
+    row: Math.max(0, Math.min(grid.rows - h, row))
+  };
+}
+
 function findBuildingAtCell(col, row) {
-  for (let i = STATE.run.buildings.length - 1; i >= 0; i--) {
-    const b = STATE.run.buildings[i];
+  for (const b of STATE.run.buildings) {
     const def = STATE.defs.buildingDefs[b.defId];
     if (!def) continue;
     const fp = getFootprint(def, b.rot);
-    if (col >= b.col && col < b.col + fp.w && row >= b.row && row < b.row + fp.h) return b;
+    if (col >= b.col && col < b.col + fp.w && row >= b.row && row < b.row + fp.h) {
+      return b;
+    }
   }
   return null;
 }
 
 function findBuildingById(id) {
-  return STATE.run.buildings.find(b => b.id === id) || null;
+  return STATE.run.buildings.find(b => b.id === id);
 }
 
-// Building Placement & Demolition with Inventory Integration
-// Flash feedback for placement
-let placementFlash = null;
-function triggerPlacementFlash(col, row, fp, success) {
-  placementFlash = { col, row, w: fp.w, h: fp.h, success, alpha: 0.7, timer: 0 };
+function getCellOccupants(col, row) {
+  const results = [];
+  for (const b of STATE.run.buildings) {
+    const def = STATE.defs.buildingDefs[b.defId];
+    if (!def) continue;
+    const fp = getFootprint(def, b.rot);
+    if (col >= b.col && col < b.col + fp.w && row >= b.row && row < b.row + fp.h) {
+      results.push({ building: b, def, isPort: false });
+    }
+    for (const p of fp.ports) {
+      if (Math.floor(b.col + p.dx) === Math.floor(col) && Math.floor(b.row + p.dy) === Math.floor(row)) {
+        results.push({ building: b, def, isPort: true, port: p });
+      }
+    }
+  }
+  return results;
+}
+
+function getTransportPortAt(col, row) {
+  for (const b of STATE.run.buildings) {
+    const def = STATE.defs.buildingDefs[b.defId];
+    if (!def) continue;
+    const fp = getFootprint(def, b.rot);
+    if (def.category === 'belt' || def.category === 'upgrader') {
+      if (col >= b.col && col < b.col + fp.w && row >= b.row && row < b.row + fp.h) {
+        return { building: b, def, port: fp.ports[0] || { dropSide: b.rot } };
+      }
+    }
+    for (const p of fp.ports) {
+      if (Math.floor(b.col + p.dx) === Math.floor(col) && Math.floor(b.row + p.dy) === Math.floor(row)) {
+        return { building: b, def, port: p };
+      }
+    }
+  }
+  return null;
+}
+
+// ===========================================================
+// INTERACTION MODES & PLACEMENT LOGIC
+// ===========================================================
+
+let mode = 'idle';
+let placingState = null;
+let movingState = null;
+let selectedEntity = null;
+let activeContextBuilding = null;
+let mouseScreen = { x: 0, y: 0 };
+let isBeltDragging = false;
+let beltDragStart = null;
+let placementFlashTime = 0;
+
+function setMode(newMode) {
+  mode = newMode;
+  const container = document.getElementById('game-container');
+  if (container) {
+    container.classList.remove('mode-placing', 'mode-moving', 'mode-inspecting');
+    if (mode === 'placing') container.classList.add('mode-placing');
+    else if (mode === 'moving') container.classList.add('mode-moving');
+    else if (mode === 'inspecting') container.classList.add('mode-inspecting');
+  }
+  if (typeof updateModeBadge === 'function') updateModeBadge();
+}
+
+function cancelMode() {
+  placingState = null;
+  movingState = null;
+  isBeltDragging = false;
+  beltDragStart = null;
+  setMode('idle');
+}
+
+function enterPlacingMode(defId) {
+  if (!STATE.defs.buildingDefs[defId]) return;
+  placingState = { defId, rot: 0 };
+  setMode('placing');
+}
+
+function enterMovingMode(building) {
+  movingState = { buildingId: building.id, rot: building.rot };
+  setMode('moving');
+}
+
+function enterInspectMode() {
+  setMode('inspecting');
 }
 
 function tryPlaceBuilding(defId, col, row, rot) {
   const def = STATE.defs.buildingDefs[defId];
   if (!def) return false;
-  if (!canPlaceFromInventory(defId)) {
-    showToast(`No ${def.name} in inventory — buy from Shop.`, 'warn');
-    return false;
-  }
-  // If player owns the item, auto-unlock blueprint
-  if (!STATE.meta.blueprintUnlocks[defId]) {
-    STATE.meta.blueprintUnlocks[defId] = true;
-  }
-  const fp = getFootprint(def, rot);
-  if (wouldOverlapAt(defId, col, row, fp.w, fp.h, null)) {
-    triggerPlacementFlash(col, row, fp, false);
+
+  const currentQty = getInventoryQty(defId);
+  if (currentQty <= 0) {
+    showToast(`Out of inventory: ${def.name}`, 'warn');
     return false;
   }
 
+  if (wouldOverlapAt(def, col, row, rot)) {
+    showToast('Cannot place: Space occupied or out of bounds', 'warn');
+    return false;
+  }
+
+  const building = {
+    id: genId('b'),
+    defId,
+    col,
+    row,
+    rot,
+    createdAt: Date.now(),
+    walls: [false, false, false, false],
+    fuelTimer: def.requiresFuel ? (def.attributes.runDurationSec || 8) : 0,
+    activeBranch: 0,
+    targetLoops: 3,
+    filterMode: 'unrefined'
+  };
+
+  STATE.run.buildings.push(building);
   removeFromInventory(defId, 1);
-  STATE.run.buildings.push({
-    id: genId('bldg'), defId, col, row, rot,
-    fuelTimer: 0,
-    lastProduced: performance.now()
-  });
-  triggerPlacementFlash(col, row, fp, true);
-  triggerSaveState();
-  if (typeof renderInventoryGrid === 'function') renderInventoryGrid();
+  STATE.stats.buildingsPlaced++;
+  placementFlashTime = 0.25;
+
+  if (sceneInstance && sceneInstance.spawnPlacementBurst) {
+    const cs = STATE.config.grid.cellSize;
+    const fp = getFootprint(def, rot);
+    sceneInstance.spawnPlacementBurst((col + fp.w / 2) * cs, (row + fp.h / 2) * cs, def.color);
+  }
+
   if (typeof renderHotbar === 'function') renderHotbar();
-  return true;
-}
-
-function tryMoveBuilding(building, col, row, rot) {
-  const def = STATE.defs.buildingDefs[building.defId];
-  const fp = getFootprint(def, rot);
-  if (wouldOverlapAt(building.defId, col, row, fp.w, fp.h, building.id)) return false;
-  building.col = col; building.row = row; building.rot = rot;
   triggerSaveState();
   return true;
 }
 
-function rotateBuildingInPlace(building) {
+function tryMoveBuilding(building, newCol, newRow, newRot) {
   const def = STATE.defs.buildingDefs[building.defId];
-  const newRot = (building.rot + 1) % 4;
-  const fp = getFootprint(def, newRot);
-  const origin = clampedOrigin(fp.w, fp.h, building.col, building.row);
-  if (wouldOverlapAt(building.defId, origin.col, origin.row, fp.w, fp.h, building.id)) return false;
-  building.col = origin.col; building.row = origin.row; building.rot = newRot;
+  if (!def) return false;
+
+  if (wouldOverlapAt(def, newCol, newRow, newRot, building.id)) {
+    showToast('Cannot move: Space occupied', 'warn');
+    return false;
+  }
+
+  building.col = newCol;
+  building.row = newRow;
+  building.rot = newRot;
   triggerSaveState();
   return true;
 }
 
-function deleteBuilding(building) {
-  addToInventory(building.defId, 1, building.isPermanent || false, 'salvage');
+function demolishBuilding(building) {
   const idx = STATE.run.buildings.findIndex(b => b.id === building.id);
-  if (idx >= 0) STATE.run.buildings.splice(idx, 1);
+  if (idx === -1) return;
+
+  STATE.run.buildings.splice(idx, 1);
+  addToInventory(building.defId, 1);
   if (selectedEntity && selectedEntity.type === 'building' && selectedEntity.id === building.id) {
     selectedEntity = null;
   }
-  showToast(`Demolished ${STATE.defs.buildingDefs[building.defId]?.name || 'Building'} -> Returned to Inventory`);
-  triggerSaveState();
-  if (typeof renderInventoryGrid === 'function') renderInventoryGrid();
-  if (typeof renderHotbar === 'function') renderHotbar();
-}
 
-// Mouse & Dragging Controls
-function getBeltDragPath(startCell, endCell) {
-  const dCol = endCell.col - startCell.col;
-  const dRow = endCell.row - startCell.row;
-  const cells = [];
-  let rot = 0;
-
-  if (Math.abs(dCol) >= Math.abs(dRow)) {
-    rot = dCol >= 0 ? 0 : 2;
-    const step = dCol >= 0 ? 1 : -1;
-    for (let c = startCell.col; dCol >= 0 ? c <= endCell.col : c >= endCell.col; c += step) {
-      cells.push({ col: c, row: startCell.row });
-    }
-  } else {
-    rot = dRow >= 0 ? 1 : 3;
-    const step = dRow >= 0 ? 1 : -1;
-    for (let r = startCell.row; dRow >= 0 ? r <= endCell.row : r >= endCell.row; r += step) {
-      cells.push({ col: startCell.col, row: r });
-    }
+  if (sceneInstance && sceneInstance.spawnDemolishBurst) {
+    const cs = STATE.config.grid.cellSize;
+    const def = STATE.defs.buildingDefs[building.defId];
+    const fp = getFootprint(def || { size: { w: 1, h: 1 }, ports: [] }, building.rot);
+    sceneInstance.spawnDemolishBurst((building.col + fp.w / 2) * cs, (building.row + fp.h / 2) * cs);
   }
-  return { cells, rot };
+
+  if (typeof renderHotbar === 'function') renderHotbar();
+  triggerSaveState();
 }
 
-canvas.addEventListener('wheel', (e) => {
-  e.preventDefault();
-  const before = screenToWorld(e.clientX, e.clientY);
-  const zoomFactor = Math.pow(1.0015, -e.deltaY);
-  const cam = STATE.camera;
-  cam.zoom = Math.min(cam.maxZoom, Math.max(cam.minZoom, cam.zoom * zoomFactor));
-  const after = screenToWorld(e.clientX, e.clientY);
-  cam.x += before.x - after.x; cam.y += before.y - after.y;
-  clampCamera();
-}, { passive: false });
+function deleteBuilding(building) {
+  return demolishBuilding(building);
+}
 
-function handleClickAction(screenX, screenY) {
-  const world = screenToWorld(screenX, screenY);
-  if (mode === 'placing') {
+function rotateBuildingInPlace(building) {
+  if (!building) return false;
+  const def = STATE.defs.buildingDefs[building.defId];
+  if (!def) return false;
+
+  const nextRot = (building.rot + 1) % 4;
+  if (wouldOverlapAt(def, building.col, building.row, nextRot, building.id)) {
+    return false;
+  }
+
+  building.rot = nextRot;
+  triggerSaveState();
+  return true;
+}
+
+function handleClickAction(worldX, worldY) {
+  if (mode === 'placing' && placingState) {
     const def = STATE.defs.buildingDefs[placingState.defId];
     const fp = getFootprint(def, placingState.rot);
-    const raw = worldToCell(world.x, world.y);
+    const raw = worldToCell(worldX, worldY);
     const origin = clampedOrigin(fp.w, fp.h, raw.col, raw.row);
     tryPlaceBuilding(placingState.defId, origin.col, origin.row, placingState.rot);
-  } else if (mode === 'moving') {
+  } else if (mode === 'moving' && movingState) {
     const building = findBuildingById(movingState.buildingId);
     if (building) {
       const def = STATE.defs.buildingDefs[building.defId];
       const fp = getFootprint(def, movingState.rot);
-      const raw = worldToCell(world.x, world.y);
+      const raw = worldToCell(worldX, worldY);
       const origin = clampedOrigin(fp.w, fp.h, raw.col, raw.row);
       tryMoveBuilding(building, origin.col, origin.row, movingState.rot);
     }
     cancelMode();
   } else if (mode === 'inspecting') {
-    selectEntityAt(world.x, world.y);
+    selectEntityAt(worldX, worldY);
   } else if (mode === 'idle') {
-    // Interactive in-world machine clicking
-    const cell = worldToCell(world.x, world.y);
+    // Interactive In-World Machine Toggling
+    const cell = worldToCell(worldX, worldY);
     const b = findBuildingAtCell(cell.col, cell.row);
     if (b) {
       const def = STATE.defs.buildingDefs[b.defId];
@@ -1283,318 +849,91 @@ function handleClickAction(screenX, screenY) {
   }
 }
 
-canvas.addEventListener('mousedown', (e) => {
-  if (e.button === 2 && mode !== 'idle') {
-    cancelMode();
+function selectEntityAt(worldX, worldY) {
+  const cell = worldToCell(worldX, worldY);
+  const b = findBuildingAtCell(cell.col, cell.row);
+  if (b) {
+    selectedEntity = { type: 'building', id: b.id };
+    if (typeof updateInspector === 'function') updateInspector(b);
     return;
   }
-  if (e.button !== 0) return;
-  if (typeof closeContextMenu === 'function') closeContextMenu();
-  const world = screenToWorld(e.clientX, e.clientY);
-  const cell = worldToCell(world.x, world.y);
-
-  if (mode === 'placing' && placingState) {
-    const def = STATE.defs.buildingDefs[placingState.defId];
-    if (def && def.layer === 'belt') {
-      isBeltDragging = true;
-      beltDragStart = cell;
+  for (const ore of STATE.run.ores) {
+    const dx = ore.x - worldX, dy = ore.y - worldY;
+    if (dx * dx + dy * dy < (ore.size * 1.5) ** 2) {
+      selectedEntity = { type: 'ore', id: ore.id };
+      if (typeof updateInspector === 'function') updateInspector(ore);
+      return;
     }
   }
-
-  isDragging = true; dragMoved = false;
-  canvas.classList.add('dragging');
-  lastMouse = { x: e.clientX, y: e.clientY };
-});
-
-let isDragging = false;
-let dragMoved = false;
-let lastMouse = { x: 0, y: 0 };
-
-canvas.addEventListener('mousemove', (e) => {
-  mouseScreen = { x: e.clientX, y: e.clientY };
-  if (!isDragging) return;
-  const dx = e.clientX - lastMouse.x, dy = e.clientY - lastMouse.y;
-  if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragMoved = true;
-  if (mode !== 'placing') {
-    STATE.camera.x -= dx / STATE.camera.zoom;
-    STATE.camera.y -= dy / STATE.camera.zoom;
-    clampCamera();
-  }
-  lastMouse = { x: e.clientX, y: e.clientY };
-});
-
-window.addEventListener('mouseup', (e) => {
-  if (e.button !== 0) return;
-  if (mode === 'placing' && placingState) {
-    if (isBeltDragging && beltDragStart) {
-      const world = screenToWorld(e.clientX, e.clientY);
-      const endCell = worldToCell(world.x, world.y);
-      const line = getBeltDragPath(beltDragStart, endCell);
-      line.cells.forEach(c => { tryPlaceBuilding(placingState.defId, c.col, c.row, line.rot); });
-    } else {
-      handleClickAction(e.clientX, e.clientY);
-    }
-  } else if (isDragging && !dragMoved) {
-    handleClickAction(e.clientX, e.clientY);
-  }
-  isBeltDragging = false; beltDragStart = null; isDragging = false;
-  canvas.classList.remove('dragging');
-});
-
-// Mobile Touch Interactions
-let touchStartDist = 0;
-let lastTouchPos = { x: 0, y: 0 };
-let lastTapTime = 0;
-
-canvas.addEventListener('touchstart', (e) => {
-  if (e.touches.length === 1) {
-    const t = e.touches[0];
-    lastTouchPos = { x: t.clientX, y: t.clientY };
-    mouseScreen = { x: t.clientX, y: t.clientY };
-
-    const now = performance.now();
-    if (now - lastTapTime < 300) {
-      const world = screenToWorld(t.clientX, t.clientY);
-      const cell = worldToCell(world.x, world.y);
-      const b = findBuildingAtCell(cell.col, cell.row);
-      if (b && typeof openContextMenu === 'function') {
-        openContextMenu(b, t.clientX, t.clientY);
-      }
-    }
-    lastTapTime = now;
-
-    if (mode === 'placing' && placingState) {
-      const world = screenToWorld(t.clientX, t.clientY);
-      const cell = worldToCell(world.x, world.y);
-      const def = STATE.defs.buildingDefs[placingState.defId];
-      if (def && def.layer === 'belt') {
-        isBeltDragging = true;
-        beltDragStart = cell;
-      }
-    }
-    isDragging = true; dragMoved = false;
-  } else if (e.touches.length === 2) {
-    const t1 = e.touches[0], t2 = e.touches[1];
-    touchStartDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-  }
-}, { passive: true });
-
-canvas.addEventListener('touchmove', (e) => {
-  if (e.touches.length === 1 && isDragging) {
-    const t = e.touches[0];
-    mouseScreen = { x: t.clientX, y: t.clientY };
-    const dx = t.clientX - lastTouchPos.x, dy = t.clientY - lastTouchPos.y;
-    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragMoved = true;
-
-    if (mode !== 'placing') {
-      STATE.camera.x -= dx / STATE.camera.zoom;
-      STATE.camera.y -= dy / STATE.camera.zoom;
-      clampCamera();
-    }
-    lastTouchPos = { x: t.clientX, y: t.clientY };
-  } else if (e.touches.length === 2 && touchStartDist > 0) {
-    const t1 = e.touches[0], t2 = e.touches[1];
-    const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-    const zoomRatio = currentDist / touchStartDist;
-    STATE.camera.zoom = Math.min(STATE.camera.maxZoom, Math.max(STATE.camera.minZoom, STATE.camera.zoom * (1 + (zoomRatio - 1) * 0.1)));
-    touchStartDist = currentDist;
-    clampCamera();
-  }
-}, { passive: true });
-
-canvas.addEventListener('touchend', (e) => {
-  if (e.touches.length === 0) {
-    if (mode === 'placing' && placingState) {
-      if (isBeltDragging && beltDragStart) {
-        const world = screenToWorld(lastTouchPos.x, lastTouchPos.y);
-        const endCell = worldToCell(world.x, world.y);
-        const line = getBeltDragPath(beltDragStart, endCell);
-        line.cells.forEach(c => { tryPlaceBuilding(placingState.defId, c.col, c.row, line.rot); });
-      } else {
-        handleClickAction(lastTouchPos.x, lastTouchPos.y);
-      }
-    } else if (isDragging && !dragMoved) {
-      handleClickAction(lastTouchPos.x, lastTouchPos.y);
-    }
-    isBeltDragging = false; beltDragStart = null; isDragging = false; touchStartDist = 0;
-  }
-}, { passive: true });
-
-// Entity Selection & Inspector Panel
-function selectEntityAt(wx, wy) {
-  const cell = worldToCell(wx, wy);
-  const b = findBuildingAtCell(cell.col, cell.row);
-  if (b) { selectedEntity = { type: 'building', id: b.id }; updateInspectorPanel(); return; }
-  for (let i = STATE.run.ores.length - 1; i >= 0; i--) {
-    const o = STATE.run.ores[i];
-    const dx = o.x - wx, dy = o.y - wy;
-    if (dx * dx + dy * dy <= (o.size / 2) * (o.size / 2)) {
-      selectedEntity = { type: 'ore', id: o.id };
-      updateInspectorPanel(); return;
-    }
-  }
-  selectedEntity = null; updateInspectorPanel();
+  selectedEntity = null;
 }
 
-function getSelectedEntityObject() {
-  if (!selectedEntity) return null;
-  if (selectedEntity.type === 'ore') return STATE.run.ores.find(o => o.id === selectedEntity.id) || null;
-  return findBuildingById(selectedEntity.id);
-}
+// ===========================================================
+// SIMULATION ENGINE & ORE PHYSICS
+// ===========================================================
 
-function updateInspectorPanel() {
-  const panel = document.getElementById('inspectorPanel');
-  const title = document.getElementById('inspectorTitle');
-  const body = document.getElementById('inspectorBody');
-  if (!panel || !title || !body) return;
-
-  if (mode !== 'inspecting' || !selectedEntity) { panel.classList.remove('open'); return; }
-  const obj = getSelectedEntityObject();
-  if (!obj) { selectedEntity = null; panel.classList.remove('open'); return; }
-  panel.classList.add('open');
-
-  const typeLabel = selectedEntity.type === 'ore' ? 'Ore' : (STATE.defs.buildingDefs[obj.defId] ? STATE.defs.buildingDefs[obj.defId].name : 'Building');
-  title.textContent = `${typeLabel} — ${obj.id}`;
-
-  if (selectedEntity.type === 'ore') {
-    let activeEffects = [];
-    if (obj.status) {
-      if (obj.status.flaming) activeEffects.push('🔥 Flaming');
-      if (obj.status.radioactive) activeEffects.push('☢️ Radioactive');
-      if (obj.status.wet > 0) activeEffects.push(`💧 Wet (${Math.ceil(obj.status.wet)}s)`);
-      if (obj.status.sparkling) activeEffects.push('✨ Sparkling');
-      if (obj.status.crystalline) activeEffects.push('💎 Crystalline');
-      if (obj.status.lucky) activeEffects.push('🍀 Lucky (2x Next Upgrade)');
-      if (obj.status.duplicated) activeEffects.push('👯 Duplicated');
-      if (obj.status.timeAged) activeEffects.push('⏳ Time-Aged');
-    }
-    body.innerHTML = `
-      <div style="margin-bottom:8px;"><strong>ID:</strong> ${obj.id}</div>
-      <div style="margin-bottom:8px;"><strong>Type:</strong> ${obj.itemType}</div>
-      <div style="margin-bottom:8px;"><strong>Value:</strong> $${obj.value.toLocaleString()}</div>
-      <div style="margin-bottom:8px;"><strong>Effects:</strong> ${activeEffects.length ? activeEffects.join(', ') : 'Normal'}</div>
-      <div style="margin-bottom:8px;"><strong>Pos:</strong> (${Math.round(obj.x)}, ${Math.round(obj.y)})</div>
-      <div style="margin-bottom:8px;"><strong>Age:</strong> ${obj.age ? obj.age.toFixed(1) + 's' : '0s'}</div>
-    `;
-  } else {
-    const def = STATE.defs.buildingDefs[obj.defId];
-    body.innerHTML = `
-      <div style="margin-bottom:8px;"><strong>Name:</strong> ${def ? def.name : obj.defId}</div>
-      <div style="margin-bottom:8px;"><strong>Category:</strong> ${def ? def.category : 'N/A'}</div>
-      <div style="margin-bottom:8px;"><strong>ID:</strong> ${obj.id}</div>
-      <div style="margin-bottom:8px;"><strong>Pos:</strong> (${obj.x}, ${obj.y})</div>
-      <div style="margin-bottom:8px;"><strong>Rotation:</strong> ${obj.rot * 90}°</div>
-      ${obj.fuelTimer ? `<div style="margin-bottom:8px;"><strong>Fuel Remaining:</strong> ${Math.ceil(obj.fuelTimer)}s</div>` : ''}
-    `;
-  }
-}
-
-// Particle & Physics Effects
-let lastFrameTime = performance.now();
-const particles = [];
+let extractorTimers = {};
 const explosions = [];
+const particles = [];
+const salesHistory = [];
 
-function triggerExplosion(x, y, radius = 96) {
-  explosions.push({ x, y, maxRadius: radius, currentRadius: 4, alpha: 1.0 });
-  for (let k = 0; k < 20; k++) {
-    const angle = Math.random() * Math.PI * 2, spd = 50 + Math.random() * 140;
-    particles.push({
-      x, y, vx: Math.cos(angle) * spd, vy: Math.sin(angle) * spd,
-      life: 0.6, maxLife: 0.6, color: Math.random() > 0.4 ? '#ff4757' : '#ffa502', size: 3 + Math.random() * 5
-    });
-  }
-  for (let j = 0; j < STATE.run.ores.length; j++) {
-    const nearOre = STATE.run.ores[j];
-    if (!nearOre) continue;
-    const dx = nearOre.x - x, dy = nearOre.y - y;
-    if (dx * dx + dy * dy <= radius * radius) nearOre.destroyed = true;
+function triggerExplosion(x, y, radius = 50) {
+  explosions.push({ x, y, maxRadius: radius, currentRadius: 0, alpha: 1.0 });
+  if (sceneInstance && sceneInstance.spawnExplosionBurst) {
+    sceneInstance.spawnExplosionBurst(x, y);
   }
 }
 
-function updateEffects(dt) {
-  for (let i = explosions.length - 1; i >= 0; i--) {
-    const exp = explosions[i];
-    exp.currentRadius += 180 * dt; exp.alpha -= 1.8 * dt;
-    if (exp.alpha <= 0) explosions.splice(i, 1);
-  }
-  for (let i = particles.length - 1; i >= 0; i--) {
-    const p = particles[i];
-    p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
-    if (p.life <= 0) particles.splice(i, 1);
-  }
-}
-
-function update(now) {
-  const rawDt = Math.min(0.05, (now - lastFrameTime) / 1000);
-  lastFrameTime = now;
-  if (STATE.run.isPaused) return;
-  const dt = rawDt * (STATE.run.timeScale || 1.0);
-
-  updateProduction(dt);
-  updateOrePhysics(dt);
-  resolveOreCollisions();
-  processConsumption();
-  updateEffects(dt);
-}
-
-function updateProduction(dt) {
+function updateExtractors(dt) {
+  const cs = STATE.config.grid.cellSize;
   for (const b of STATE.run.buildings) {
-    if (movingState && movingState.buildingId === b.id) continue;
     const def = STATE.defs.buildingDefs[b.defId];
     if (!def || !def.produces) continue;
 
     if (def.requiresFuel) {
-      if ((b.fuelTimer || 0) > 0) {
-        b.fuelTimer = Math.max(0, b.fuelTimer - dt);
-        b.prodTimer = (b.prodTimer || 0) + dt * 1000;
-        if (b.prodTimer >= def.produces.rate) {
-          b.prodTimer %= def.produces.rate;
-          spawnOreFromBuilding(b, def);
-        }
-      }
-    } else {
-      b.prodTimer = (b.prodTimer || 0) + dt * 1000;
-      if (b.prodTimer >= def.produces.rate) {
-        b.prodTimer %= def.produces.rate;
-        spawnOreFromBuilding(b, def);
-      }
+      if (!b.fuelTimer || b.fuelTimer <= 0) continue;
+      b.fuelTimer = Math.max(0, b.fuelTimer - dt);
+    }
+
+    if (!extractorTimers[b.id]) extractorTimers[b.id] = 0;
+    extractorTimers[b.id] += dt * 1000;
+
+    const rate = def.produces.rate || 1000;
+    if (extractorTimers[b.id] >= rate) {
+      extractorTimers[b.id] -= rate;
+      if (STATE.run.ores.length >= STATE.config.maxOres) continue;
+
+      const itemDef = STATE.defs.itemDefs[def.produces.item];
+      if (!itemDef) continue;
+
+      const fp = getFootprint(def, b.rot);
+      const outPort = fp.ports.find(p => p.kind === 'output');
+      if (!outPort) continue;
+
+      const spawnX = (b.col + outPort.dx + 0.5) * cs;
+      const spawnY = (b.row + outPort.dy + 0.5) * cs;
+      const dv = dirVector(b.rot);
+
+      STATE.run.ores.push({
+        id: genId('ore'),
+        itemType: itemDef.id,
+        x: spawnX,
+        y: spawnY,
+        vx: dv.x * 60,
+        vy: dv.y * 60,
+        size: itemDef.size,
+        color: itemDef.color,
+        shape: itemDef.shape,
+        value: itemDef.baseValue,
+        energy: 0,
+        status: { ...(itemDef.defaultStatus || {}) },
+        isFuel: !!itemDef.isFuel,
+        upgradersPassed: [],
+        upgraderUses: {}
+      });
+      STATE.stats.totalOresCreated++;
     }
   }
-}
-
-function spawnOreFromBuilding(building, def) {
-  if (STATE.run.ores.length >= STATE.config.maxOres) return;
-  const fp = getFootprint(def, building.rot);
-  const outPort = fp.ports.find(p => p.kind === 'output');
-  if (!outPort) return;
-  const itemDef = STATE.defs.itemDefs[def.produces.item] || STATE.defs.itemDefs['ore'];
-  const cs = STATE.config.grid.cellSize;
-
-  const portX = (building.col + outPort.dx + 0.5) * cs;
-  const portY = (building.row + outPort.dy + 0.5) * cs;
-
-  STATE.run.ores.push({
-    id: genId('ore'),
-    itemType: itemDef.id,
-    x: portX, y: portY,
-    vx: 0, vy: 0,
-    size: itemDef.size,
-    color: itemDef.color,
-    shape: itemDef.shape || 'circle',
-    value: Math.round(itemDef.baseValue * (0.8 + Math.random() * 0.4)),
-    energy: 0,
-    maxEnergy: 100,
-    isFuel: !!itemDef.isFuel,
-    status: itemDef.defaultStatus ? JSON.parse(JSON.stringify(itemDef.defaultStatus)) : {},
-    upgradersPassed: []
-  });
-}
-
-function getTransportPortAt(col, row) {
-  const occupants = getCellOccupants(col, row);
-  const belt = occupants.find(o => o.def.layer === 'belt' && o.isPort);
-  if (belt) return belt;
-  return occupants.find(o => o.isPort && o.port.dropSide !== null && o.port.dropSide !== undefined) || null;
 }
 
 function updateOrePhysics(dt) {
@@ -1606,10 +945,9 @@ function updateOrePhysics(dt) {
   for (let i = STATE.run.ores.length - 1; i >= 0; i--) {
     const ore = STATE.run.ores[i];
     if (!ore || ore.destroyed) continue;
-
     if (!ore.status) ore.status = {};
 
-    // 1. Status Timers & Reactions
+    // 1. Elemental Status Effects
     if (ore.status.wet > 0) {
       ore.status.wet = Math.max(0, ore.status.wet - dt);
       if (ore.status.flaming) { ore.status.flaming = false; ore.status.flameTime = 0; }
@@ -1620,13 +958,6 @@ function updateOrePhysics(dt) {
         ore.status.flaming = false;
       } else {
         ore.status.flameTime = (ore.status.flameTime || 0) + dt;
-        if (Math.random() < 0.35) {
-          particles.push({
-            x: ore.x + (Math.random() - 0.5) * 8, y: ore.y + (Math.random() - 0.5) * 8,
-            vx: (Math.random() - 0.5) * 15, vy: -25 - Math.random() * 20,
-            life: 0.3, maxLife: 0.3, color: Math.random() > 0.4 ? '#ff4757' : '#ffa502', size: 3
-          });
-        }
         if (ore.status.flameTime >= 4.0) {
           ore.destroyed = true;
           triggerExplosion(ore.x, ore.y, 60);
@@ -1637,11 +968,10 @@ function updateOrePhysics(dt) {
 
     if (ore.status.timeAged) {
       ore.travelTime = (ore.travelTime || 0) + dt;
-      if (ore.travelTime <= 10) {
-        ore.value += Math.round(50 * dt);
-      }
+      if (ore.travelTime <= 10) ore.value += Math.round(50 * dt);
     }
 
+    // 2. Transport Physics & Machine Upgrades
     const cell = worldToCell(ore.x, ore.y);
     const transport = getTransportPortAt(cell.col, cell.row);
     let targetVx = 0, targetVy = 0, blend;
@@ -1651,14 +981,15 @@ function updateOrePhysics(dt) {
       const b = transport.building;
       const def = transport.def;
 
-      // Fuel Extractor input port handling
+      // Fueled extractor loading
       if (def.requiresFuel && transport.port.kind === 'input' && ore.isFuel) {
         b.fuelTimer = (b.fuelTimer || 0) + (def.attributes.runDurationSec || 8);
         ore.destroyed = true;
-        showToast(`Fuel Loaded! Thermal Mine running for ${Math.round(b.fuelTimer)}s.`);
+        showToast(`Fuel Loaded! Running for ${Math.round(b.fuelTimer)}s.`);
         continue;
       }
 
+      // Upgrader processing with maxUses limit
       if (!ore.upgradersPassed) ore.upgradersPassed = [];
       ore.upgraderUses = ore.upgraderUses || {};
       const currentUses = ore.upgraderUses[def.id] || 0;
@@ -1680,16 +1011,6 @@ function updateOrePhysics(dt) {
           ore.status.radioactive = false;
         }
 
-        // Elemental synergy reactions
-        if (ore.status.flaming && ore.status.radioactive) {
-          ore.value += 2500; // Supercritical bonus
-          ore.status.supercritical = true;
-        }
-        if (ore.status.sparkling && ore.status.crystalline) {
-          ore.value = Math.round(ore.value * 1.5); // Resonant matrix
-        }
-
-        // Multiplier & Lucky Calculation
         let effectiveMulti = def.multiplier || 1.0;
         if (def.multiplier && ore.status.sparkling) effectiveMulti += 0.5;
         if (def.multiplier && ore.status.crystalline) effectiveMulti += 0.75;
@@ -1697,13 +1018,12 @@ function updateOrePhysics(dt) {
 
         if (ore.status.lucky && def.multiplier) {
           effectiveMulti *= 2.0;
-          ore.status.lucky = false; // Consumed lucky
+          ore.status.lucky = false;
         }
 
         if (def.multiplier) { ore.value = Math.round(ore.value * effectiveMulti); ore.upgraded = true; }
         if (def.flatAdd) { ore.value += def.flatAdd; ore.upgraded = true; }
 
-        // Matter Replicator Duplication
         if (def.duplicatesOre && !ore.status.duplicated && STATE.run.ores.length < STATE.config.maxOres) {
           ore.status.duplicated = true;
           STATE.run.ores.push({
@@ -1723,6 +1043,7 @@ function updateOrePhysics(dt) {
         }
       }
 
+      // Conveyor & Gate Routing
       let currentDropSide = transport.port.dropSide;
       if (def.isSwitchGate) {
         currentDropSide = (b.activeBranch === 1 ? (b.rot + 1) % 4 : b.rot);
@@ -1733,11 +1054,7 @@ function updateOrePhysics(dt) {
           ore.loopCounts[b.id] = (ore.loopCounts[b.id] || 0) + 1;
         }
         const targetLoops = b.targetLoops || 3;
-        if ((ore.loopCounts[b.id] || 1) < targetLoops) {
-          currentDropSide = (b.rot + 1) % 4; // Loop back
-        } else {
-          currentDropSide = b.rot; // Exit straight to seller
-        }
+        currentDropSide = (ore.loopCounts[b.id] || 1) < targetLoops ? (b.rot + 1) % 4 : b.rot;
       } else if (def.isFilterSorter) {
         const fMode = b.filterMode || 'unrefined';
         let match = false;
@@ -1765,16 +1082,6 @@ function updateOrePhysics(dt) {
         } else { currentDropSide = (b.rot + (b.splitCount % 2 === 0 ? 0 : 1)) % 4; }
       } else if (def.isMerger) { currentDropSide = b.rot; }
 
-      if (b.walls) {
-        const bLeft = b.col * cs, bRight = (b.col + 1) * cs;
-        const bTop = b.row * cs, bBottom = (b.row + 1) * cs;
-        const r = ore.size / 2;
-        if (b.walls[0] && ore.x > bRight - r) { ore.x = bRight - r; if (ore.vx > 0) ore.vx = 0; }
-        if (b.walls[1] && ore.y > bBottom - r) { ore.y = bBottom - r; if (ore.vy > 0) ore.vy = 0; }
-        if (b.walls[2] && ore.x < bLeft + r) { ore.x = bLeft + r; if (ore.vx < 0) ore.vx = 0; }
-        if (b.walls[3] && ore.y < bTop + r) { ore.y = bTop + r; if (ore.vy < 0) ore.vy = 0; }
-      }
-
       const dv = dirVector(currentDropSide !== null && currentDropSide !== undefined ? currentDropSide : b.rot);
       const speed = def.speed || 90;
       targetVx = dv.x * speed; targetVy = dv.y * speed;
@@ -1787,7 +1094,7 @@ function updateOrePhysics(dt) {
       blend = 1 - Math.exp(-cfg.groundFriction * dt);
     }
 
-    // Void Singularity gravitational pull
+    // Singularity Gravitational Pull
     for (const b of STATE.run.buildings) {
       const bDef = STATE.defs.buildingDefs[b.defId];
       if (bDef && bDef.vacuumRadius) {
@@ -1840,8 +1147,6 @@ function resolveOreCollisions() {
   }
 }
 
-const salesHistory = [];
-
 function processConsumption() {
   const cs = STATE.config.grid.cellSize;
   const now = performance.now();
@@ -1856,8 +1161,6 @@ function processConsumption() {
       const sDef = sellerAcc.def;
 
       if (sDef.sellerBonus) soldVal = Math.round(soldVal * sDef.sellerBonus);
-      
-      // Special Smelter condition payouts
       if (sDef.wetBonus && ore.status && (ore.status.wet > 0 || ore.extinguished)) {
         soldVal = Math.round(soldVal * sDef.wetBonus);
       }
@@ -1885,8 +1188,8 @@ function processConsumption() {
         }
       }
       if (sDef.penaltyRisk && Math.random() < sDef.penaltyRisk) {
-        soldVal = 0; // Soul Forge penalty reset
-        showToast('Soul Forge consumed ore with no payout!', 'warn');
+        soldVal = 0;
+        showToast('Soul Forge destroyed ore with no payout!', 'warn');
       }
 
       STATE.run.money += soldVal;
@@ -1898,777 +1201,1001 @@ function processConsumption() {
         STATE.run.bestOreSold = soldVal;
       }
       STATE.run.totalOresSold = (STATE.run.totalOresSold || 0) + 1;
+
+      // Spawn floating payout text in Phaser scene
+      if (sceneInstance && sceneInstance.spawnFloatingPayout && soldVal > 0) {
+        sceneInstance.spawnFloatingPayout(ore.x, ore.y, soldVal);
+      }
     }
   }
 
-  // Purge old sales history (> 3 seconds)
   while (salesHistory.length > 0 && now - salesHistory[0].t > 3000) {
     salesHistory.shift();
   }
 }
 
-// Rendering Pipeline
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawGrid();
-  drawBeltPaths();
-  drawBuildings();
-  drawOres();
-  drawGhostPreview();
-  drawBeltDragPreview();
-  drawPlacementFlash();
-  drawEffects();
-  updateHUD();
+// ===========================================================
+// SAVE / LOAD SYSTEM & SLOTS
+// ===========================================================
+
+async function fetchSaveSlots() {
+  try {
+    const res = await fetch('/api/saves');
+    if (res.ok) return await res.json();
+  } catch (e) {}
+  return [
+    { slot: 0, name: 'Save Slot 1', timestamp: null, exists: false },
+    { slot: 1, name: 'Save Slot 2', timestamp: null, exists: false },
+    { slot: 2, name: 'Save Slot 3', timestamp: null, exists: false }
+  ];
 }
 
-function drawGrid() {
-  const grid = STATE.config.grid;
-  const cs = grid.cellSize;
-  const zoom = STATE.camera.zoom;
-
-  // Fine grid — only when zoomed in
-  if (zoom > 0.35) {
-    const alpha = Math.min(0.055, 0.055 * (zoom / 0.5));
-    ctx.strokeStyle = `rgba(74, 143, 168, ${alpha})`;
-    ctx.lineWidth = 0.5;
-    ctx.beginPath();
-    for (let col = 0; col <= grid.cols; col++) {
-      const sx = worldToScreen(col * cs, 0).x;
-      ctx.moveTo(sx, 0); ctx.lineTo(sx, canvas.height);
-    }
-    for (let row = 0; row <= grid.rows; row++) {
-      const sy = worldToScreen(0, row * cs).y;
-      ctx.moveTo(0, sy); ctx.lineTo(canvas.width, sy);
-    }
-    ctx.stroke();
-  }
-
-  // Major grid every 4 cells
-  ctx.strokeStyle = 'rgba(74, 143, 168, 0.06)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  for (let col = 0; col <= grid.cols; col += 4) {
-    const sx = worldToScreen(col * cs, 0).x;
-    ctx.moveTo(sx, 0); ctx.lineTo(sx, canvas.height);
-  }
-  for (let row = 0; row <= grid.rows; row += 4) {
-    const sy = worldToScreen(0, row * cs).y;
-    ctx.moveTo(0, sy); ctx.lineTo(canvas.width, sy);
-  }
-  ctx.stroke();
-
-  // World boundary
-  ctx.strokeStyle = 'rgba(232, 160, 48, 0.35)';
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([8, 4]);
-  const p1 = worldToScreen(0, 0), p2 = worldToScreen(grid.cols * cs, grid.rows * cs);
-  ctx.strokeRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
-  ctx.setLineDash([]);
-}
-
-function currentGhost() {
-  if (mode === 'placing' && placingState) {
-    const world = screenToWorld(mouseScreen.x, mouseScreen.y);
-    const def = STATE.defs.buildingDefs[placingState.defId];
-    if (!def) return null;
-    const fp = getFootprint(def, placingState.rot);
-    const raw = worldToCell(world.x, world.y);
-    const origin = clampedOrigin(fp.w, fp.h, raw.col, raw.row);
-    return { def, fp, col: origin.col, row: origin.row };
-  }
-  if (mode === 'moving' && movingState) {
-    const building = findBuildingById(movingState.buildingId);
-    if (!building) return null;
-    const world = screenToWorld(mouseScreen.x, mouseScreen.y);
-    const def = STATE.defs.buildingDefs[building.defId];
-    if (!def) return null;
-    const fp = getFootprint(def, movingState.rot);
-    const raw = worldToCell(world.x, world.y);
-    const origin = clampedOrigin(fp.w, fp.h, raw.col, raw.row);
-    return { def, fp, col: origin.col, row: origin.row };
-  }
-  return null;
-}
-
-function drawSelectionGlowAndGizmo(p1, p2, rot = 0) {
-  const pad = 8 * STATE.camera.zoom;
-  const gx1 = p1.x - pad, gy1 = p1.y - pad;
-  const gw = (p2.x - p1.x) + pad * 2, gh = (p2.y - p1.y) + pad * 2;
-
-  ctx.save();
-  ctx.fillStyle = 'rgba(127, 208, 255, 0.18)';
-  ctx.fillRect(gx1, gy1, gw, gh);
-
-  ctx.strokeStyle = '#7fd0ff';
-  ctx.lineWidth = 2 * STATE.camera.zoom;
-  ctx.setLineDash([6, 4]);
-  ctx.strokeRect(gx1, gy1, gw, gh);
-  ctx.setLineDash([]);
-  ctx.restore();
-}
-
-function drawGhostPreview() {
-  const ghost = currentGhost();
-  if (!ghost) return;
-  const { def, fp, col, row } = ghost;
-  const cs = STATE.config.grid.cellSize;
-  const p1 = worldToScreen(col * cs, row * cs);
-  const p2 = worldToScreen((col + fp.w) * cs, (row + fp.h) * cs);
-
-  drawSelectionGlowAndGizmo(p1, p2, placingState ? placingState.rot : 0);
-  ctx.fillStyle = hexToRgba(def.color, 0.35);
-  ctx.fillRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
-  ctx.strokeStyle = 'rgba(255,255,255,0.7)';
-  ctx.setLineDash([6, 4]);
-  ctx.strokeRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
-  ctx.setLineDash([]);
-  drawPorts(fp, col, row);
-}
-
-function drawPorts(fp, col, row) {
-  const cs = STATE.config.grid.cellSize;
-  for (const port of fp.ports) {
-    const px = col + port.dx, py = row + port.dy;
-    const p1 = worldToScreen(px * cs, py * cs);
-    const p2 = worldToScreen((px + 1) * cs, (py + 1) * cs);
-    const color = port.color || (port.kind === 'input' ? '#9ad1ff' : '#ffcf5c');
-
-    if (port.kind === 'output') {
-      const center = worldToScreen((px + 0.5) * cs, (py + 0.5) * cs);
-      const radius = 10 * STATE.camera.zoom;
-      ctx.save();
-      ctx.fillStyle = hexToRgba(color, 0.45);
-      ctx.beginPath();
-      ctx.arc(center.x, center.y, radius, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = hexToRgba(color, 0.95); ctx.lineWidth = 2; ctx.stroke();
-      ctx.restore();
-    } else {
-      ctx.fillStyle = hexToRgba(color, 0.4);
-      ctx.fillRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
-      ctx.strokeStyle = hexToRgba(color, 0.9); ctx.lineWidth = 2;
-      ctx.strokeRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
-    }
-  }
-}
-
-// Belt conveyor animation tick (0..1)
-let beltAnimTick = 0;
-
-function drawBeltPaths() {
-  const cs = STATE.config.grid.cellSize;
-  const zoom = STATE.camera.zoom;
-  if (zoom < 0.25) return;
-  beltAnimTick = (performance.now() / 400) % 1;
-
-  for (const b of STATE.run.buildings) {
-    const def = STATE.defs.buildingDefs[b.defId];
-    if (!def || def.layer !== 'belt') continue;
-    const fp = getFootprint(def, b.rot);
-    const p1 = worldToScreen(b.col * cs, b.row * cs);
-    const p2 = worldToScreen((b.col + fp.w) * cs, (b.row + fp.h) * cs);
-    const w = p2.x - p1.x, h = p2.y - p1.y;
-    const cx = (p1.x + p2.x) / 2, cy = (p1.y + p2.y) / 2;
-    const isSelected = selectedEntity && selectedEntity.type === 'building' && selectedEntity.id === b.id;
-
-    ctx.save();
-
-    // 1. Base Belt Plate
-    ctx.fillStyle = def.color || '#2b353e';
-    ctx.fillRect(p1.x, p1.y, w, h);
-
-    // Lateral guide rails
-    ctx.strokeStyle = '#1a2228';
-    ctx.lineWidth = Math.max(1, 2 * zoom);
-    ctx.strokeRect(p1.x, p1.y, w, h);
-
-    // 2. Animated Directional Flow Chevrons
-    let primaryDir = b.rot;
-    const port = fp.ports && fp.ports[0];
-    if (port && port.dropSide !== null && port.dropSide !== undefined) {
-      primaryDir = port.dropSide;
-    }
-
-    const drawChevron = (x, y, dir, size, col, alpha = 0.85) => {
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(dir * Math.PI / 2);
-      ctx.strokeStyle = col;
-      ctx.lineWidth = Math.max(1.5, 2.5 * zoom);
-      ctx.globalAlpha = alpha;
-      ctx.beginPath();
-      ctx.moveTo(-size * 0.7, -size * 0.6);
-      ctx.lineTo(size * 0.4, 0);
-      ctx.lineTo(-size * 0.7, size * 0.6);
-      ctx.stroke();
-      ctx.restore();
+async function saveToSlot(slot, name) {
+  try {
+    STATE.activeSaveSlot = slot;
+    const payload = {
+      slotName: name || `Save Slot ${slot + 1}`,
+      savedAt: new Date().toISOString(),
+      state: STATE
     };
+    const res = await fetch(`/api/save/${slot}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      showToast(`Saved to Slot ${slot + 1}!`);
+      return true;
+    }
+  } catch (e) {
+    showToast('Failed to save', 'warn');
+  }
+  return false;
+}
 
-    if (def.isCrossover) {
-      // Draw horizontal track & vertical track crossing
-      ctx.fillStyle = 'rgba(0,0,0,0.3)';
-      ctx.fillRect(p1.x, p1.y, w, h);
-
-      // Horizontal track
-      for (let k = 0; k < 2; k++) {
-        const offset = ((k / 2 + beltAnimTick) % 1) - 0.5;
-        drawChevron(cx + offset * w, cy, 0, Math.min(w, h) * 0.35, '#94a3b8', 0.8);
+async function loadFromSlot(slot) {
+  try {
+    const res = await fetch(`/api/load/${slot}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.state) {
+        migrateSavedState(data.state);
+        STATE.activeSaveSlot = slot;
+        showToast(`Loaded Slot ${slot + 1}!`);
+        if (typeof renderHotbar === 'function') renderHotbar();
+        return true;
       }
-      // Vertical track overpass
-      for (let k = 0; k < 2; k++) {
-        const offset = ((k / 2 + beltAnimTick) % 1) - 0.5;
-        drawChevron(cx, cy + offset * h, 1, Math.min(w, h) * 0.35, '#38bdf8', 0.9);
+    }
+  } catch (e) {
+    showToast('Failed to load slot', 'warn');
+  }
+  return false;
+}
+
+async function deleteSlot(slot) {
+  try {
+    const res = await fetch(`/api/save/${slot}`, { method: 'DELETE' });
+    if (res.ok) {
+      showToast(`Slot ${slot + 1} deleted`);
+      return true;
+    }
+  } catch (e) {
+    showToast('Failed to delete slot', 'warn');
+  }
+  return false;
+}
+
+function newGame() {
+  STATE.run = {
+    money: 1000,
+    lifetimeEarnings: 0,
+    buildings: [],
+    ores: [],
+    timeScale: 1.0,
+    isPaused: false,
+    totalOresSold: 0,
+    bestOreSold: 0
+  };
+  STATE.shop.stock = {};
+  STATE.shop.dynamicPriceLevel = {};
+  STATE.inventory = {
+    capacity: 40,
+    items: {
+      extractor: { qty: 2, permanent: false, source: 'starter' },
+      belt: { qty: 10, permanent: false, source: 'starter' },
+      upgrader1x1: { qty: 1, permanent: false, source: 'starter' },
+      seller: { qty: 1, permanent: false, source: 'starter' }
+    },
+    permanentItems: {},
+    consumables: {}
+  };
+  STATE.meta = {
+    prestigePoints: 0,
+    prestigeKeys: 0,
+    blueprintUnlocks: {
+      extractor: true,
+      belt: true,
+      fastBelt: true,
+      halfBelt: true,
+      switchGate: true,
+      loopGate: true,
+      crossoverBelt: true,
+      splitter: true,
+      merger: true,
+      upgrader1x1: true,
+      upgraderHalf: true,
+      seller: true,
+      coalExtractor: true
+    },
+    relics: {},
+    shards: 0,
+    prestigeDust: 0,
+    collection: {}
+  };
+
+  selectedEntity = null;
+  cancelMode();
+  showToast('Started a fresh new game!');
+  if (typeof renderHotbar === 'function') renderHotbar();
+  triggerSaveState();
+}
+
+function triggerSaveState() {
+  const slot = STATE.activeSaveSlot || 0;
+  fetch(`/api/save/${slot}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      slotName: `Slot ${slot + 1}`,
+      savedAt: new Date().toISOString(),
+      state: STATE
+    })
+  }).catch(() => {});
+}
+
+function loadSavedState() {
+  fetch('/api/load/0')
+    .then(r => r.json())
+    .then(data => {
+      if (data && data.state) {
+        migrateSavedState(data.state);
+        if (typeof renderHotbar === 'function') renderHotbar();
       }
-    } else if (def.isSwitchGate) {
-      // Diverter switch: straight (0) + 90 deg turn
-      const straightDir = b.rot;
-      const divertDir = (b.rot + 1) % 4;
-      const isDiverted = b.activeBranch === 1;
+    })
+    .catch(() => {});
+}
 
-      // Inactive path (dim)
-      const inactDir = isDiverted ? straightDir : divertDir;
-      drawChevron(cx, cy, inactDir, Math.min(w, h) * 0.28, 'rgba(255,255,255,0.2)', 0.3);
+function migrateSavedState(saved) {
+  if (!saved) return;
+  if (saved.run) {
+    STATE.run = { ...STATE.run, ...saved.run };
+    if (!STATE.run.buildings) STATE.run.buildings = [];
+    if (!STATE.run.ores) STATE.run.ores = [];
+  }
+  if (saved.shop) STATE.shop = { ...STATE.shop, ...saved.shop };
+  if (saved.inventory) STATE.inventory = { ...STATE.inventory, ...saved.inventory };
+  if (saved.meta) {
+    STATE.meta = { ...STATE.meta, ...saved.meta };
+    if (!STATE.meta.blueprintUnlocks) STATE.meta.blueprintUnlocks = {};
+  }
+  ['extractor', 'belt', 'fastBelt', 'halfBelt', 'switchGate', 'loopGate', 'crossoverBelt', 'splitter', 'merger', 'upgrader1x1', 'upgraderHalf', 'seller', 'coalExtractor'].forEach(id => {
+    STATE.meta.blueprintUnlocks[id] = true;
+  });
+}
 
-      // Active path (bright glowing amber with moving chevrons)
-      const actDir = isDiverted ? divertDir : straightDir;
-      for (let k = 0; k < 2; k++) {
-        const offset = ((k / 2 + beltAnimTick) % 1) - 0.5;
-        const dv = dirVector(actDir);
-        drawChevron(cx + dv.x * offset * w * 0.6, cy + dv.y * offset * h * 0.6, actDir, Math.min(w, h) * 0.4, '#e8a030', 1.0);
+// ===========================================================
+// INVENTORY & CRATE LOGIC
+// ===========================================================
+
+function getInventoryQty(defId) {
+  const item = STATE.inventory.items[defId];
+  return item ? item.qty : 0;
+}
+
+function addToInventory(defId, qty = 1, permanent = false) {
+  if (!STATE.inventory.items[defId]) {
+    STATE.inventory.items[defId] = { qty: 0, permanent, source: 'reward' };
+  }
+  STATE.inventory.items[defId].qty += qty;
+  if (permanent) {
+    STATE.inventory.items[defId].permanent = true;
+    if (!STATE.inventory.permanentItems) STATE.inventory.permanentItems = {};
+    STATE.inventory.permanentItems[defId] = true;
+  }
+  if (STATE.meta && STATE.meta.blueprintUnlocks) {
+    STATE.meta.blueprintUnlocks[defId] = true;
+  }
+}
+
+function removeFromInventory(defId, qty = 1) {
+  if (!STATE.inventory.items[defId]) return false;
+  if (STATE.inventory.items[defId].qty < qty) return false;
+  STATE.inventory.items[defId].qty -= qty;
+  if (STATE.inventory.items[defId].qty <= 0 && !STATE.inventory.items[defId].permanent) {
+    delete STATE.inventory.items[defId];
+  }
+  return true;
+}
+
+function getShopItemPrice(defId) {
+  const def = STATE.defs.buildingDefs[defId];
+  if (!def) return 0;
+  const stock = STATE.shop.stock[defId] || { ownedCount: 0 };
+  const growth = def.priceGrowth || 1.10;
+  return Math.round(def.cost * Math.pow(growth, stock.ownedCount || 0));
+}
+
+function buyShopItem(defId, qty = 1) {
+  const def = STATE.defs.buildingDefs[defId];
+  if (!def) return false;
+
+  let totalCost = 0;
+  const currentCount = (STATE.shop.stock[defId] && STATE.shop.stock[defId].ownedCount) || 0;
+  const growth = def.priceGrowth || 1.10;
+
+  for (let i = 0; i < qty; i++) {
+    totalCost += Math.round(def.cost * Math.pow(growth, currentCount + i));
+  }
+
+  if (STATE.run.money < totalCost) {
+    showToast('Insufficient funds!', 'warn');
+    return false;
+  }
+
+  STATE.run.money -= totalCost;
+  if (!STATE.shop.stock[defId]) STATE.shop.stock[defId] = { ownedCount: 0 };
+  STATE.shop.stock[defId].ownedCount += qty;
+
+  addToInventory(defId, qty);
+  showToast(`Purchased ${qty}x ${def.name}!`);
+  if (typeof renderHotbar === 'function') renderHotbar();
+  triggerSaveState();
+  return true;
+}
+
+const CRATES_CONFIG = {
+  regular: {
+    name: 'Regular Crate', cost: 1500,
+    pool: [
+      { id: 'fastBelt', weight: 40 },
+      { id: 'upgrader1x1', weight: 30 },
+      { id: 'blastSmelter', weight: 20 },
+      { id: 'megaExtractor', weight: 10 }
+    ]
+  },
+  golden: {
+    name: 'Golden Crate', cost: 25000,
+    pool: [
+      { id: 'stellarSparkler', weight: 25, permanent: true },
+      { id: 'oreCrystallizer', weight: 25, permanent: true },
+      { id: 'geodeDriller', weight: 25, permanent: true },
+      { id: 'magLevRail', weight: 25, permanent: true }
+    ]
+  },
+  exotic: {
+    name: 'Exotic Crate', cost: 150000,
+    pool: [
+      { id: 'singularitySmelter', weight: 30, permanent: true },
+      { id: 'antimatterSiphon', weight: 30, permanent: true },
+      { id: 'phaseShiftBelt', weight: 20, permanent: true },
+      { id: 'entropyStabilizer', weight: 20, permanent: true }
+    ]
+  },
+  prestige: {
+    name: 'Prestige Crate', costKeys: 5,
+    pool: [
+      { id: 'shardOfLife', weight: 35, permanent: true },
+      { id: 'supernovaCrucible', weight: 35, permanent: true },
+      { id: 'voidHarvester', weight: 30, permanent: true }
+    ]
+  }
+};
+
+function openCrate(tier) {
+  const crate = CRATES_CONFIG[tier];
+  if (!crate) return null;
+
+  const totalWeight = crate.pool.reduce((acc, cur) => acc + cur.weight, 0);
+  let roll = Math.random() * totalWeight;
+  let chosen = crate.pool[0];
+
+  for (const item of crate.pool) {
+    if (roll < item.weight) { chosen = item; break; }
+    roll -= item.weight;
+  }
+
+  addToInventory(chosen.id, 1, !!chosen.permanent);
+  STATE.stats.cratesOpened++;
+  triggerSaveState();
+  return { id: chosen.id, permanent: !!chosen.permanent };
+}
+
+function buyAndOpenCrate(tier) {
+  const crate = CRATES_CONFIG[tier];
+  if (!crate) return null;
+
+  if (crate.costKeys) {
+    if ((STATE.meta.prestigeKeys || 0) < crate.costKeys) {
+      showToast('Not enough Prestige Keys!', 'warn');
+      return null;
+    }
+    STATE.meta.prestigeKeys -= crate.costKeys;
+  } else if (crate.cost) {
+    if (STATE.run.money < crate.cost) {
+      showToast('Insufficient funds to purchase crate!', 'warn');
+      return null;
+    }
+    STATE.run.money -= crate.cost;
+  }
+
+  return openCrate(tier);
+}
+
+// ===========================================================
+// PRESTIGE & CUSTOM CREATOR
+// ===========================================================
+
+function buyPrestigeUpgrade(id) {
+  showToast('Prestige upgrade unlocked!');
+}
+
+function registerCustomItem(item) {
+  if (!item || !item.id) return;
+  STATE.defs.buildingDefs[item.id] = {
+    ...item,
+    cost: item.cost || 500,
+    priceGrowth: 1.10,
+    layer: item.category === 'belt' ? 'belt' : 'machine',
+    ports: item.ports || [{ dx: 0, dy: 0, kind: 'conveyor', color: '#ffcf5c', dropSide: 0 }]
+  };
+  STATE.meta.blueprintUnlocks[item.id] = true;
+  addToInventory(item.id, 1);
+  showToast(`Registered custom item: ${item.name}!`);
+  triggerSaveState();
+}
+
+function showToast(msg, type = 'info') {
+  let toastEl = document.getElementById('toastNotification');
+  if (!toastEl) {
+    toastEl = document.createElement('div');
+    toastEl.id = 'toastNotification';
+    toastEl.style.position = 'fixed';
+    toastEl.style.bottom = '90px';
+    toastEl.style.left = '50%';
+    toastEl.style.transform = 'translateX(-50%)';
+    toastEl.style.background = '#141a1f';
+    toastEl.style.color = '#e8edf0';
+    toastEl.style.border = '1px solid #e8a030';
+    toastEl.style.padding = '8px 18px';
+    toastEl.style.borderRadius = '4px';
+    toastEl.style.fontFamily = 'Inter, sans-serif';
+    toastEl.style.fontSize = '13px';
+    toastEl.style.fontWeight = '600';
+    toastEl.style.zIndex = '9999';
+    toastEl.style.pointerEvents = 'none';
+    toastEl.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+    document.body.appendChild(toastEl);
+  }
+  toastEl.textContent = msg;
+  toastEl.style.borderColor = type === 'warn' ? '#ef4444' : (type === 'success' ? '#22c55e' : '#e8a030');
+  toastEl.style.opacity = '1';
+  clearTimeout(toastEl._timer);
+  toastEl._timer = setTimeout(() => { toastEl.style.opacity = '0'; }, 2400);
+}
+
+// Helper color utilities
+function hexToNumber(hex) {
+  if (!hex || hex[0] !== '#') return 0x3d6a8f;
+  return parseInt(hex.slice(1), 16);
+}
+
+function hexShift(hex, amount) {
+  if (!hex || hex[0] !== '#') return hex;
+  let r = Math.min(255, Math.max(0, parseInt(hex.slice(1, 3), 16) + amount));
+  let g = Math.min(255, Math.max(0, parseInt(hex.slice(3, 5), 16) + amount));
+  let b = Math.min(255, Math.max(0, parseInt(hex.slice(5, 7), 16) + amount));
+  return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+}
+
+// ===========================================================
+// PHASER 3 FACTORY SCENE
+// ===========================================================
+
+class FactoryScene extends Phaser.Scene {
+  constructor() {
+    super({ key: 'FactoryScene' });
+  }
+
+  create() {
+    sceneInstance = this;
+    const cs = STATE.config.grid.cellSize;
+    const worldW = STATE.config.grid.cols * cs;
+    const worldH = STATE.config.grid.rows * cs;
+
+    // 1. Phaser Camera & Bounds
+    this.cameras.main.setBounds(-200, -200, worldW + 400, worldH + 400);
+    this.cameras.main.setScroll(worldW / 2 - window.innerWidth / 2, worldH / 2 - window.innerHeight / 2);
+    this.cameras.main.setZoom(1.0);
+
+    // 2. Phaser Graphics Layers
+    this.gridGfx = this.add.graphics();
+    this.beltGfx = this.add.graphics();
+    this.buildingGfx = this.add.graphics();
+    this.oreGfx = this.add.graphics();
+    this.previewGfx = this.add.graphics();
+    this.effectsGfx = this.add.graphics();
+
+    // 3. Floating Text Group
+    this.floatingTexts = [];
+
+    // 4. Input & Panning Setup
+    this.isDragging = false;
+    this.dragStart = { x: 0, y: 0 };
+    this.cameraStart = { x: 0, y: 0 };
+    this.dragMoved = false;
+
+    this.input.on('pointerdown', (pointer) => {
+      if (pointer.rightButtonDown()) {
+        if (mode !== 'idle') cancelMode();
+        return;
       }
 
-      // Interactive on-sprite Toggle Pill
-      if (zoom > 0.45) {
-        ctx.fillStyle = isDiverted ? '#0284c7' : '#e8a030';
-        ctx.beginPath();
-        roundRect(ctx, cx - 18 * zoom, p1.y + 2, 36 * zoom, 10 * zoom, 2);
-        ctx.fill();
-        ctx.fillStyle = '#000';
-        ctx.font = `800 ${Math.max(6, 7 * zoom)}px JetBrains Mono, monospace`;
-        ctx.textAlign = 'center';
-        ctx.fillText(isDiverted ? 'DIVERT' : 'STRAIGHT', cx, p1.y + 9 * zoom);
+      const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+      const cell = worldToCell(worldPoint.x, worldPoint.y);
+
+      if (mode === 'placing' && placingState) {
+        const def = STATE.defs.buildingDefs[placingState.defId];
+        if (def && def.layer === 'belt') {
+          isBeltDragging = true;
+          beltDragStart = cell;
+        }
       }
-    } else if (def.isLoopGate) {
-      const straightDir = b.rot;
-      const loopDir = (b.rot + 1) % 4;
 
-      // Draw both paths
-      for (let k = 0; k < 2; k++) {
-        const offset = ((k / 2 + beltAnimTick) % 1) - 0.5;
-        const dv = dirVector(loopDir);
-        drawChevron(cx + dv.x * offset * w * 0.6, cy + dv.y * offset * h * 0.6, loopDir, Math.min(w, h) * 0.32, '#34d399', 0.85);
-      }
-      drawChevron(cx, cy, straightDir, Math.min(w, h) * 0.32, '#fbbf24', 0.7);
+      this.isDragging = true;
+      this.dragMoved = false;
+      this.dragStart = { x: pointer.x, y: pointer.y };
+      this.cameraStart = { x: this.cameras.main.scrollX, y: this.cameras.main.scrollY };
+    });
 
-      // Interactive Loop Target Pill
-      if (zoom > 0.45) {
-        ctx.fillStyle = '#059669';
-        ctx.beginPath();
-        roundRect(ctx, cx - 20 * zoom, p1.y + 2, 40 * zoom, 10 * zoom, 2);
-        ctx.fill();
-        ctx.fillStyle = '#fff';
-        ctx.font = `800 ${Math.max(6, 7 * zoom)}px JetBrains Mono, monospace`;
-        ctx.textAlign = 'center';
-        ctx.fillText(`${b.targetLoops || 3}x LOOP`, cx, p1.y + 9 * zoom);
-      }
-    } else if (def.isFilterSorter) {
-      const straightDir = b.rot;
-      const divertDir = (b.rot + 1) % 4;
+    this.input.on('pointermove', (pointer) => {
+      mouseScreen = { x: pointer.x, y: pointer.y };
+      STATE.camera.x = this.cameras.main.scrollX;
+      STATE.camera.y = this.cameras.main.scrollY;
+      STATE.camera.zoom = this.cameras.main.zoom;
 
-      drawChevron(cx, cy, straightDir, Math.min(w, h) * 0.3, '#38bdf8', 0.75);
-      drawChevron(cx, cy, divertDir, Math.min(w, h) * 0.3, '#f59e0b', 0.75);
+      if (!this.isDragging) return;
 
-      // Interactive Filter Mode Pill
-      if (zoom > 0.45) {
-        ctx.fillStyle = '#d97706';
-        ctx.beginPath();
-        roundRect(ctx, cx - 24 * zoom, p1.y + 2, 48 * zoom, 10 * zoom, 2);
-        ctx.fill();
-        ctx.fillStyle = '#000';
-        ctx.font = `800 ${Math.max(6, 6.5 * zoom)}px JetBrains Mono, monospace`;
-        ctx.textAlign = 'center';
-        ctx.fillText((b.filterMode || 'unrefined').toUpperCase(), cx, p1.y + 9 * zoom);
-      }
-    } else {
-      // Standard / Fast / Ultra Belts & Splitters / Mergers
-      const numChevrons = def.id === 'ultraBelt' ? 4 : (def.id === 'fastBelt' || def.id === 'magLevRail' ? 3 : 2);
-      const chevronColor = def.id === 'ultraBelt' ? '#fbbf24' : (def.id === 'fastBelt' ? '#7fd0ff' : '#e8edf0');
+      const dx = pointer.x - this.dragStart.x;
+      const dy = pointer.y - this.dragStart.y;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) this.dragMoved = true;
 
-      for (let k = 0; k < numChevrons; k++) {
-        const offset = ((k / numChevrons + beltAnimTick) % 1) - 0.5;
-        const dv = dirVector(primaryDir);
-        drawChevron(
-          cx + dv.x * offset * w * 0.8,
-          cy + dv.y * offset * h * 0.8,
-          primaryDir,
-          Math.min(w, h) * 0.38,
-          chevronColor,
-          0.85
+      if (mode !== 'placing' || !isBeltDragging) {
+        this.cameras.main.setScroll(
+          this.cameraStart.x - dx / this.cameras.main.zoom,
+          this.cameraStart.y - dy / this.cameras.main.zoom
         );
       }
+    });
+
+    this.input.on('pointerup', (pointer) => {
+      if (!this.isDragging) return;
+      this.isDragging = false;
+
+      const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+
+      if (isBeltDragging && beltDragStart && placingState) {
+        const cell = worldToCell(worldPoint.x, worldPoint.y);
+        this.placeBeltLine(beltDragStart, cell, placingState.defId);
+        isBeltDragging = false;
+        beltDragStart = null;
+        return;
+      }
+
+      if (!this.dragMoved) {
+        handleClickAction(worldPoint.x, worldPoint.y);
+      }
+    });
+
+    // Mouse Wheel Zoom
+    this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY) => {
+      const zoomFactor = deltaY > 0 ? 0.9 : 1.1;
+      const newZoom = Phaser.Math.Clamp(this.cameras.main.zoom * zoomFactor, 0.35, 2.5);
+      this.cameras.main.setZoom(newZoom);
+      STATE.camera.zoom = newZoom;
+    });
+
+    // Mobile Window Resize
+    this.scale.on('resize', (gameSize) => {
+      this.cameras.main.setSize(gameSize.width, gameSize.height);
+    });
+
+    // Initial State Loading
+    loadSavedState();
+  }
+
+  placeBeltLine(startCell, endCell, defId) {
+    const dc = endCell.col - startCell.col;
+    const dr = endCell.row - startCell.row;
+    const steps = Math.max(Math.abs(dc), Math.abs(dr));
+    if (steps === 0) {
+      tryPlaceBuilding(defId, startCell.col, startCell.row, placingState ? placingState.rot : 0);
+      return;
     }
 
-    ctx.restore();
+    const isHorizontal = Math.abs(dc) >= Math.abs(dr);
+    const rot = isHorizontal ? (dc >= 0 ? 0 : 2) : (dr >= 0 ? 1 : 3);
+
+    let col = startCell.col, row = startCell.row;
+    const stepC = isHorizontal ? (dc > 0 ? 1 : -1) : 0;
+    const stepR = !isHorizontal ? (dr > 0 ? 1 : -1) : 0;
+
+    for (let i = 0; i <= steps; i++) {
+      if (getInventoryQty(defId) <= 0) break;
+      tryPlaceBuilding(defId, col, row, rot);
+      col += stepC; row += stepR;
+    }
+  }
+
+  spawnPlacementBurst(x, y, colorHex) {
+    const col = hexToNumber(colorHex || '#e8a030');
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      const speed = Phaser.Math.Between(40, 100);
+      particles.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 0.35, maxLife: 0.35,
+        color: colorHex || '#e8a030',
+        size: 3
+      });
+    }
+  }
+
+  spawnDemolishBurst(x, y) {
+    for (let i = 0; i < 16; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Phaser.Math.Between(50, 140);
+      particles.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 0.4, maxLife: 0.4,
+        color: '#ef4444',
+        size: 3.5
+      });
+    }
+  }
+
+  spawnExplosionBurst(x, y) {
+    for (let i = 0; i < 24; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Phaser.Math.Between(60, 180);
+      particles.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 0.45, maxLife: 0.45,
+        color: Math.random() > 0.5 ? '#ff4757' : '#ffa502',
+        size: 4
+      });
+    }
+  }
+
+  spawnFloatingPayout(x, y, amount) {
+    const text = this.add.text(x, y - 10, `+$${amount.toLocaleString()}`, {
+      fontFamily: 'JetBrains Mono, monospace',
+      fontSize: '14px',
+      fontStyle: 'bold',
+      color: '#e8a030',
+      stroke: '#000000',
+      strokeThickness: 3
+    }).setOrigin(0.5);
+
+    this.tweens.add({
+      targets: text,
+      y: y - 45,
+      alpha: 0,
+      duration: 900,
+      ease: 'Power2',
+      onComplete: () => { text.destroy(); }
+    });
+  }
+
+  update(time, delta) {
+    const dt = Math.min(delta / 1000, 0.1);
+
+    // 1. Simulation Step
+    if (!STATE.run.isPaused) {
+      updateExtractors(dt * STATE.run.timeScale);
+      updateOrePhysics(dt * STATE.run.timeScale);
+      resolveOreCollisions();
+      processConsumption();
+    }
+
+    // 2. Render Layers
+    this.renderGrid();
+    this.renderBelts(time);
+    this.renderBuildings(time);
+    this.renderOres();
+    this.renderPreviews();
+    this.renderEffects(dt);
+
+    // 3. Sync UI HUD
+    updateHUD();
+  }
+
+  renderGrid() {
+    this.gridGfx.clear();
+    const grid = STATE.config.grid;
+    const cs = grid.cellSize;
+    const worldW = grid.cols * cs, worldH = grid.rows * cs;
+
+    // Faint grid lines
+    this.gridGfx.lineStyle(1, 0xffffff, 0.04);
+    for (let c = 0; c <= grid.cols; c++) {
+      this.gridGfx.lineBetween(c * cs, 0, c * cs, worldH);
+    }
+    for (let r = 0; r <= grid.rows; r++) {
+      this.gridGfx.lineBetween(0, r * cs, worldW, r * cs);
+    }
+
+    // Outer boundary line
+    this.gridGfx.lineStyle(2, 0x2a5060, 0.6);
+    this.gridGfx.strokeRect(0, 0, worldW, worldH);
+  }
+
+  renderBelts(time) {
+    this.beltGfx.clear();
+    const cs = STATE.config.grid.cellSize;
+    const animTick = (time / 400) % 1;
+
+    for (const b of STATE.run.buildings) {
+      const def = STATE.defs.buildingDefs[b.defId];
+      if (!def || def.category !== 'belt') continue;
+
+      const fp = getFootprint(def, b.rot);
+      const bx = b.col * cs, by = b.row * cs;
+      const bw = fp.w * cs, bh = fp.h * cs;
+      const cx = bx + bw / 2, cy = by + bh / 2;
+
+      // Base conveyor plate
+      this.beltGfx.fillStyle(hexToNumber(def.color || '#2b353e'), 1);
+      this.beltGfx.fillRect(bx, by, bw, bh);
+
+      // Lateral rails
+      this.beltGfx.lineStyle(1.5, 0x1a2228, 1);
+      this.beltGfx.strokeRect(bx, by, bw, bh);
+
+      let primaryDir = b.rot;
+      const port = fp.ports && fp.ports[0];
+      if (port && port.dropSide !== null && port.dropSide !== undefined) {
+        primaryDir = port.dropSide;
+      }
+
+      const drawChevronPhaser = (px, py, dir, size, colorHex, alpha = 0.85) => {
+        const dv = dirVector(dir);
+        const p1x = px - dv.x * (size * 0.5) - dv.y * (size * 0.4);
+        const p1y = py - dv.y * (size * 0.5) + dv.x * (size * 0.4);
+        const p2x = px + dv.x * (size * 0.5);
+        const p2y = py + dv.y * (size * 0.5);
+        const p3x = px - dv.x * (size * 0.5) + dv.y * (size * 0.4);
+        const p3y = py - dv.y * (size * 0.5) - dv.x * (size * 0.4);
+
+        this.beltGfx.lineStyle(2, hexToNumber(colorHex), alpha);
+        this.beltGfx.beginPath();
+        this.beltGfx.moveTo(p1x, p1y);
+        this.beltGfx.lineTo(p2x, p2y);
+        this.beltGfx.lineTo(p3x, p3y);
+        this.beltGfx.strokePath();
+      };
+
+      if (def.isCrossover) {
+        for (let k = 0; k < 2; k++) {
+          const offset = ((k / 2 + animTick) % 1) - 0.5;
+          drawChevronPhaser(cx + offset * bw * 0.8, cy, 0, 18, '#94a3b8', 0.8);
+          drawChevronPhaser(cx, cy + offset * bh * 0.8, 1, 18, '#38bdf8', 0.9);
+        }
+      } else if (def.isSwitchGate) {
+        const straightDir = b.rot;
+        const divertDir = (b.rot + 1) % 4;
+        const isDiverted = b.activeBranch === 1;
+
+        const inactDir = isDiverted ? straightDir : divertDir;
+        drawChevronPhaser(cx, cy, inactDir, 16, '#556677', 0.3);
+
+        const actDir = isDiverted ? divertDir : straightDir;
+        for (let k = 0; k < 2; k++) {
+          const offset = ((k / 2 + animTick) % 1) - 0.5;
+          const dv = dirVector(actDir);
+          drawChevronPhaser(cx + dv.x * offset * bw * 0.6, cy + dv.y * offset * bh * 0.6, actDir, 20, '#e8a030', 1.0);
+        }
+      } else if (def.isLoopGate) {
+        const loopDir = (b.rot + 1) % 4;
+        for (let k = 0; k < 2; k++) {
+          const offset = ((k / 2 + animTick) % 1) - 0.5;
+          const dv = dirVector(loopDir);
+          drawChevronPhaser(cx + dv.x * offset * bw * 0.6, cy + dv.y * offset * bh * 0.6, loopDir, 18, '#34d399', 0.9);
+        }
+        drawChevronPhaser(cx, cy, b.rot, 18, '#fbbf24', 0.7);
+      } else {
+        const numChevrons = def.id === 'ultraBelt' ? 3 : 2;
+        const chevronColor = def.id === 'ultraBelt' ? '#fbbf24' : (def.id === 'fastBelt' ? '#7fd0ff' : '#e8edf0');
+        for (let k = 0; k < numChevrons; k++) {
+          const offset = ((k / numChevrons + animTick) % 1) - 0.5;
+          const dv = dirVector(primaryDir);
+          drawChevronPhaser(cx + dv.x * offset * bw * 0.8, cy + dv.y * offset * bh * 0.8, primaryDir, 20, chevronColor, 0.9);
+        }
+      }
+    }
+  }
+
+  renderBuildings(time) {
+    this.buildingGfx.clear();
+    const cs = STATE.config.grid.cellSize;
+
+    for (const b of STATE.run.buildings) {
+      const def = STATE.defs.buildingDefs[b.defId];
+      if (!def || def.category === 'belt') continue;
+
+      const fp = getFootprint(def, b.rot);
+      const bx = b.col * cs, by = b.row * cs;
+      const bw = fp.w * cs, bh = fp.h * cs;
+      const cx = bx + bw / 2, cy = by + bh / 2;
+      const isSelected = selectedEntity && selectedEntity.type === 'building' && selectedEntity.id === b.id;
+
+      // Selection glow
+      if (isSelected) {
+        this.buildingGfx.fillStyle(0x7fd0ff, 0.15);
+        this.buildingGfx.fillRect(bx - 4, by - 4, bw + 8, bh + 8);
+        this.buildingGfx.lineStyle(2, 0xe8a030, 1);
+        this.buildingGfx.strokeRect(bx - 4, by - 4, bw + 8, bh + 8);
+      }
+
+      // Machine Chassis base plate
+      this.buildingGfx.fillStyle(hexToNumber(def.color || '#1e293b'), 1);
+      this.buildingGfx.fillRoundedRect(bx, by, bw, bh, 4);
+
+      // Chamfered border
+      this.buildingGfx.lineStyle(1.5, isSelected ? 0xe8a030 : hexToNumber(hexShift(def.color, 30)), 0.8);
+      this.buildingGfx.strokeRoundedRect(bx, by, bw, bh, 4);
+
+      // Category / Machine Specific Visuals
+      if (def.category === 'extractor') {
+        const dv = dirVector(b.rot);
+        const nozzleX = cx + dv.x * (bw * 0.4);
+        const nozzleY = cy + dv.y * (bh * 0.4);
+
+        // Nozzle ring
+        this.buildingGfx.fillStyle(0x1e293b, 1);
+        this.buildingGfx.fillCircle(nozzleX, nozzleY, 10);
+        this.buildingGfx.lineStyle(2, 0xe8a030, 1);
+        this.buildingGfx.strokeCircle(nozzleX, nozzleY, 10);
+
+        // Center drill X
+        this.buildingGfx.lineStyle(2, hexToNumber(hexShift(def.color, 40)), 0.9);
+        this.buildingGfx.lineBetween(cx - 12, cy - 12, cx + 12, cy + 12);
+        this.buildingGfx.lineBetween(cx - 12, cy + 12, cx + 12, cy - 12);
+        this.buildingGfx.strokeCircle(cx, cy, 6);
+      } else if (def.category === 'upgrader') {
+        const flowDir = b.rot;
+        const dv = dirVector(flowDir);
+
+        // Cyan intake frame [
+        const inX = cx - dv.x * (bw * 0.4);
+        const inY = cy - dv.y * (bh * 0.4);
+        this.buildingGfx.lineStyle(3, 0x38bdf8, 1);
+        if (flowDir === 0 || flowDir === 2) {
+          this.buildingGfx.lineBetween(inX, cy - bh * 0.35, inX, cy + bh * 0.35);
+        } else {
+          this.buildingGfx.lineBetween(cx - bw * 0.35, inY, cx + bw * 0.35, inY);
+        }
+
+        // Amber output frame ]
+        const outX = cx + dv.x * (bw * 0.4);
+        const outY = cy + dv.y * (bh * 0.4);
+        this.buildingGfx.lineStyle(3, 0xe8a030, 1);
+        if (flowDir === 0 || flowDir === 2) {
+          this.buildingGfx.lineBetween(outX, cy - bh * 0.35, outX, cy + bh * 0.35);
+        } else {
+          this.buildingGfx.lineBetween(cx - bw * 0.35, outY, cx + bw * 0.35, outY);
+        }
+
+        // Throughput arrow
+        this.buildingGfx.fillStyle(hexToNumber(hexShift(def.color, 50)), 0.9);
+        this.buildingGfx.fillTriangle(cx + dv.x * 10, cy + dv.y * 10, cx - dv.y * 8, cy + dv.x * 8, cx + dv.y * 8, cy - dv.x * 8);
+      } else if (def.category === 'seller') {
+        const inDir = b.rot;
+        const dv = dirVector(inDir);
+        const mouthX = cx - dv.x * (bw * 0.38);
+        const mouthY = cy - dv.y * (bh * 0.38);
+
+        // Suction Hopper Bracket
+        this.buildingGfx.lineStyle(3, 0x38bdf8, 1);
+        if (inDir === 0 || inDir === 2) {
+          this.buildingGfx.lineBetween(mouthX, cy - bh * 0.38, mouthX, cy + bh * 0.38);
+        } else {
+          this.buildingGfx.lineBetween(cx - bw * 0.38, mouthY, cx + bw * 0.38, mouthY);
+        }
+
+        // Glowing Furnace Core
+        let coreColor = 0xdc2626;
+        if (def.id === 'cryoSmelter') coreColor = 0x0284c7;
+        else if (def.id === 'prismaticSmelter') coreColor = 0xeab308;
+        else if (def.id === 'singularitySmelter') coreColor = 0x581c87;
+        else if (def.id === 'supernovaCrucible') coreColor = 0xea580c;
+
+        this.buildingGfx.fillStyle(coreColor, 1);
+        this.buildingGfx.fillCircle(cx, cy, 14);
+        this.buildingGfx.lineStyle(2, 0xffffff, 0.8);
+        this.buildingGfx.strokeCircle(cx, cy, 14);
+      }
+
+      // Fuel progress bar
+      if (def.requiresFuel && b.fuelTimer > 0) {
+        const maxFuel = def.attributes.runDurationSec || 8;
+        const pct = Math.min(1, b.fuelTimer / maxFuel);
+        this.buildingGfx.fillStyle(0x000000, 0.6);
+        this.buildingGfx.fillRect(bx + 4, by + bh - 8, bw - 8, 4);
+        this.buildingGfx.fillStyle(pct > 0.3 ? 0x22c55e : 0xef4444, 1);
+        this.buildingGfx.fillRect(bx + 4, by + bh - 8, (bw - 8) * pct, 4);
+      }
+    }
+  }
+
+  renderOres() {
+    this.oreGfx.clear();
+    const lifespan = STATE.config.oreGroundLifespan;
+
+    for (const o of STATE.run.ores) {
+      if (o.destroyed) continue;
+
+      let alpha = 1.0;
+      if (o.groundTime && lifespan > 0) {
+        const rem = lifespan - o.groundTime;
+        if (rem < 0.8) alpha = Math.max(0, rem / 0.8);
+      }
+
+      const r = o.size / 2;
+      const isSelected = selectedEntity && selectedEntity.type === 'ore' && selectedEntity.id === o.id;
+
+      // Status glow aura
+      if (o.status) {
+        if (o.status.flaming) {
+          this.oreGfx.fillStyle(0xff6b35, 0.3 * alpha);
+          this.oreGfx.fillCircle(o.x, o.y, r * 1.8);
+        } else if (o.status.radioactive) {
+          this.oreGfx.fillStyle(0x4ade80, 0.3 * alpha);
+          this.oreGfx.fillCircle(o.x, o.y, r * 1.6);
+        } else if (o.status.sparkling) {
+          this.oreGfx.fillStyle(0xfde047, 0.35 * alpha);
+          this.oreGfx.fillCircle(o.x, o.y, r * 1.7);
+        }
+      }
+
+      // Ore shape
+      const oreCol = hexToNumber(o.color || '#ffb03b');
+      this.oreGfx.fillStyle(oreCol, alpha);
+
+      if (o.shape === 'diamond') {
+        this.oreGfx.beginPath();
+        this.oreGfx.moveTo(o.x, o.y - r * 1.3);
+        this.oreGfx.lineTo(o.x + r * 1.3, o.y);
+        this.oreGfx.lineTo(o.x, o.y + r * 1.3);
+        this.oreGfx.lineTo(o.x - r * 1.3, o.y);
+        this.oreGfx.closePath();
+        this.oreGfx.fillPath();
+      } else if (o.shape === 'square') {
+        this.oreGfx.fillRect(o.x - r, o.y - r, r * 2, r * 2);
+      } else {
+        this.oreGfx.fillCircle(o.x, o.y, r);
+      }
+
+      // Highlight glint & outline
+      this.oreGfx.lineStyle(1.5, isSelected ? 0xe8a030 : 0x000000, 0.6 * alpha);
+      if (o.shape === 'diamond') {
+        this.oreGfx.strokePath();
+      } else if (o.shape === 'square') {
+        this.oreGfx.strokeRect(o.x - r, o.y - r, r * 2, r * 2);
+      } else {
+        this.oreGfx.strokeCircle(o.x, o.y, r);
+      }
+
+      // Top-left glint
+      this.oreGfx.fillStyle(0xffffff, 0.4 * alpha);
+      this.oreGfx.fillCircle(o.x - r * 0.3, o.y - r * 0.3, Math.max(1.5, r * 0.25));
+    }
+  }
+
+  renderPreviews() {
+    this.previewGfx.clear();
+    const cs = STATE.config.grid.cellSize;
+
+    if (mode === 'placing' && placingState) {
+      const def = STATE.defs.buildingDefs[placingState.defId];
+      if (!def) return;
+      const worldPoint = this.cameras.main.getWorldPoint(mouseScreen.x, mouseScreen.y);
+      const fp = getFootprint(def, placingState.rot);
+      const raw = worldToCell(worldPoint.x, worldPoint.y);
+      const origin = clampedOrigin(fp.w, fp.h, raw.col, raw.row);
+
+      const px = origin.col * cs, py = origin.row * cs;
+      const pw = fp.w * cs, ph = fp.h * cs;
+
+      // Ghost Box
+      this.previewGfx.fillStyle(hexToNumber(def.color || '#38bdf8'), 0.35);
+      this.previewGfx.fillRect(px, py, pw, ph);
+      this.previewGfx.lineStyle(2, 0xffffff, 0.8);
+      this.previewGfx.strokeRect(px, py, pw, ph);
+
+      // Port markers
+      for (const p of fp.ports) {
+        const portX = (origin.col + p.dx + 0.5) * cs;
+        const portY = (origin.row + p.dy + 0.5) * cs;
+        this.previewGfx.fillStyle(hexToNumber(p.color || '#ffcf5c'), 0.8);
+        this.previewGfx.fillCircle(portX, portY, 8);
+        this.previewGfx.lineStyle(2, 0xffffff, 0.9);
+        this.previewGfx.strokeCircle(portX, portY, 8);
+      }
+
+      // Multi-tile drag preview
+      if (isBeltDragging && beltDragStart) {
+        const curCell = worldToCell(worldPoint.x, worldPoint.y);
+        const dc = curCell.col - beltDragStart.col;
+        const dr = curCell.row - beltDragStart.row;
+        const steps = Math.max(Math.abs(dc), Math.abs(dr));
+        const isHorizontal = Math.abs(dc) >= Math.abs(dr);
+        const stepC = isHorizontal ? (dc > 0 ? 1 : -1) : 0;
+        const stepR = !isHorizontal ? (dr > 0 ? 1 : -1) : 0;
+
+        let c = beltDragStart.col, r = beltDragStart.row;
+        for (let i = 0; i <= steps; i++) {
+          this.previewGfx.fillStyle(0xe8a030, 0.3);
+          this.previewGfx.fillRect(c * cs, r * cs, cs, cs);
+          this.previewGfx.lineStyle(1.5, 0xe8a030, 0.7);
+          this.previewGfx.strokeRect(c * cs, r * cs, cs, cs);
+          c += stepC; r += stepR;
+        }
+      }
+    }
+  }
+
+  renderEffects(dt) {
+    this.effectsGfx.clear();
+
+    // Explosion Rings
+    for (let i = explosions.length - 1; i >= 0; i--) {
+      const exp = explosions[i];
+      exp.currentRadius += 140 * dt;
+      exp.alpha -= 2.2 * dt;
+      if (exp.alpha <= 0 || exp.currentRadius >= exp.maxRadius) {
+        explosions.splice(i, 1);
+        continue;
+      }
+      this.effectsGfx.lineStyle(3, 0xff4757, exp.alpha);
+      this.effectsGfx.strokeCircle(exp.x, exp.y, exp.currentRadius);
+    }
+
+    // Ore Burst Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.life -= dt;
+      if (p.life <= 0) {
+        particles.splice(i, 1);
+        continue;
+      }
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      const alpha = Math.max(0, p.life / p.maxLife);
+      this.effectsGfx.fillStyle(hexToNumber(p.color || '#e8a030'), alpha);
+      this.effectsGfx.fillCircle(p.x, p.y, p.size || 3);
+    }
   }
 }
 
-const CATEGORY_ICONS = {
-  extractor: (cx, cy, s, col) => {
-    ctx.strokeStyle = col; ctx.lineWidth = s * 0.08;
-    ctx.beginPath();
-    ctx.moveTo(cx - s*0.3, cy); ctx.lineTo(cx + s*0.3, cy);
-    ctx.moveTo(cx + s*0.3, cy); ctx.lineTo(cx + s*0.1, cy - s*0.2);
-    ctx.moveTo(cx + s*0.3, cy); ctx.lineTo(cx + s*0.1, cy + s*0.2);
-    ctx.moveTo(cx, cy - s*0.35); ctx.lineTo(cx, cy + s*0.35);
-    ctx.stroke();
-  },
-  upgrader: (cx, cy, s, col) => {
-    ctx.strokeStyle = col; ctx.lineWidth = s * 0.08;
-    ctx.beginPath();
-    ctx.moveTo(cx - s*0.25, cy + s*0.2); ctx.lineTo(cx, cy - s*0.25); ctx.lineTo(cx + s*0.25, cy + s*0.2);
-    ctx.stroke();
-  },
-  seller: (cx, cy, s, col) => {
-    ctx.strokeStyle = col; ctx.lineWidth = s * 0.08;
-    ctx.beginPath(); ctx.arc(cx, cy, s * 0.3, 0, Math.PI * 2); ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(cx - s*0.15, cy); ctx.lineTo(cx + s*0.15, cy);
-    ctx.moveTo(cx, cy - s*0.15); ctx.lineTo(cx, cy + s*0.15);
-    ctx.stroke();
-  }
-};
-
-const SPRITE_RENDERERS = {
-  extractor: (ctx, x, y, w, h, def, zoom, rot) => {
-    ctx.save();
-    const cx = x + w/2, cy = y + h/2;
-    const r = Math.min(w, h) * 0.28;
-    const lighter = hexShift(def.color, 50);
-
-    // Ejection nozzle pointing toward output direction
-    const fp = getFootprint(def, rot);
-    const outPort = fp.ports.find(p => p.kind === 'output');
-    if (outPort) {
-      const portDir = rot;
-      const dv = dirVector(portDir);
-      const nozzleX = cx + dv.x * (w * 0.42);
-      const nozzleY = cy + dv.y * (h * 0.42);
-
-      // Draw ejection nozzle chute
-      ctx.fillStyle = '#1e293b';
-      ctx.strokeStyle = '#e8a030';
-      ctx.lineWidth = Math.max(1.5, 2 * zoom);
-      ctx.beginPath();
-      ctx.arc(nozzleX, nozzleY, Math.min(w, h) * 0.16, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      // Pulsing ejector chevron
-      const pTick = (performance.now() / 300) % 1;
-      ctx.strokeStyle = '#ffcf5c';
-      ctx.lineWidth = 2 * zoom;
-      ctx.save();
-      ctx.translate(nozzleX + dv.x * (pTick * 8 * zoom), nozzleY + dv.y * (pTick * 8 * zoom));
-      ctx.rotate(portDir * Math.PI / 2);
-      ctx.beginPath();
-      ctx.moveTo(-4 * zoom, -4 * zoom); ctx.lineTo(4 * zoom, 0); ctx.lineTo(-4 * zoom, 4 * zoom);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    // Drill core
-    ctx.strokeStyle = lighter;
-    ctx.lineWidth = Math.max(1.2, Math.min(w, h) * 0.05);
-
-    if (def.id === 'coalExtractor') {
-      ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillRect(x + w - w*0.3, y + h*0.1, w*0.18, h*0.4);
-      ctx.fillRect(x + w - w*0.26, y + h*0.04, w*0.08, h*0.12);
-    } else if (def.id === 'thermalExtractor') {
-      ctx.fillStyle = '#f97316';
-      ctx.beginPath();
-      ctx.moveTo(cx, cy - r*0.8);
-      ctx.quadraticCurveTo(cx + r*0.8, cy + r*0.8, cx, cy + r*0.8);
-      ctx.quadraticCurveTo(cx - r*0.8, cy + r*0.8, cx, cy - r*0.8);
-      ctx.fill();
-    } else if (def.id === 'uraniumMine') {
-      ctx.strokeStyle = '#4ade80';
-      ctx.lineWidth = Math.min(w, h) * 0.08;
-      for (let i=0; i<3; i++) {
-        ctx.beginPath();
-        ctx.arc(cx, cy, r*0.8, i * Math.PI*2/3 + 0.2, (i+1) * Math.PI*2/3 - 0.2);
-        ctx.stroke();
-      }
-      ctx.fillStyle = '#4ade80';
-      ctx.beginPath(); ctx.arc(cx, cy, r*0.3, 0, Math.PI*2); ctx.fill();
-      ctx.strokeStyle = lighter;
-    }
-
-    ctx.beginPath();
-    ctx.moveTo(cx - r, cy - r); ctx.lineTo(cx + r, cy + r);
-    ctx.moveTo(cx - r, cy + r); ctx.lineTo(cx + r, cy - r);
-    ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx, cy, r*0.4, 0, Math.PI*2); ctx.stroke();
-
-    ctx.restore();
-  },
-  upgrader: (ctx, x, y, w, h, def, zoom, rot) => {
-    ctx.save();
-    const cx = x + w/2, cy = y + h/2;
-    const lighter = hexShift(def.color, 50);
-    const flowDir = rot;
-
-    // Upgrader Entrance Bracket (Intake - Cyan)
-    const dv = dirVector(flowDir);
-    const inX = cx - dv.x * (w * 0.42);
-    const inY = cy - dv.y * (h * 0.42);
-    ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = Math.max(1.5, 2.5 * zoom);
-    ctx.beginPath();
-    if (flowDir === 0 || flowDir === 2) {
-      ctx.moveTo(inX, cy - h * 0.35); ctx.lineTo(inX, cy + h * 0.35);
-    } else {
-      ctx.moveTo(cx - w * 0.35, inY); ctx.lineTo(cx + w * 0.35, inY);
-    }
-    ctx.stroke();
-
-    // Upgrader Exit Bracket (Output - Amber)
-    const outX = cx + dv.x * (w * 0.42);
-    const outY = cy + dv.y * (h * 0.42);
-    ctx.strokeStyle = '#e8a030';
-    ctx.beginPath();
-    if (flowDir === 0 || flowDir === 2) {
-      ctx.moveTo(outX, cy - h * 0.35); ctx.lineTo(outX, cy + h * 0.35);
-    } else {
-      ctx.moveTo(cx - w * 0.35, outY); ctx.lineTo(cx + w * 0.35, outY);
-    }
-    ctx.stroke();
-
-    // Animated Flow Arrows through the machine
-    const uTick = (performance.now() / 350) % 1;
-    ctx.strokeStyle = lighter;
-    ctx.lineWidth = Math.max(1.5, 2 * zoom);
-    for (let k = -1; k <= 1; k++) {
-      const step = ((k + uTick + 2) % 3) - 1;
-      const ax = cx + dv.x * step * (w * 0.3);
-      const ay = cy + dv.y * step * (h * 0.3);
-      ctx.save();
-      ctx.translate(ax, ay);
-      ctx.rotate(flowDir * Math.PI / 2);
-      ctx.beginPath();
-      ctx.moveTo(-5 * zoom, -5 * zoom); ctx.lineTo(5 * zoom, 0); ctx.lineTo(-5 * zoom, 5 * zoom);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    if (def.id === 'freonSprayer') {
-      ctx.strokeStyle = '#67e8f9'; ctx.lineWidth = Math.max(1, w*0.05);
-      const asize = Math.min(w, h) * 0.25;
-      for (let i=0; i<6; i++) {
-        ctx.beginPath(); ctx.moveTo(cx, cy);
-        ctx.lineTo(cx + Math.cos(i*Math.PI/3) * asize, cy + Math.sin(i*Math.PI/3) * asize);
-        ctx.stroke();
-      }
-    } else if (def.id === 'pyroRefiner') {
-      ctx.fillStyle = '#ef4444';
-      ctx.beginPath();
-      ctx.arc(cx, cy, Math.min(w, h) * 0.2, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    ctx.restore();
-  },
-  seller: (ctx, x, y, w, h, def, zoom, rot) => {
-    ctx.save();
-    const cx = x + w/2, cy = y + h/2;
-    const lighter = hexShift(def.color, 50);
-
-    // Intake Hopper Mouth with inward-pointing vacuum chevrons
-    const inDir = rot;
-    const dv = dirVector(inDir);
-    const mouthX = cx - dv.x * (w * 0.38);
-    const mouthY = cy - dv.y * (h * 0.38);
-
-    // Vacuum hopper bracket
-    ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = Math.max(1.5, 3 * zoom);
-    ctx.beginPath();
-    if (inDir === 0 || inDir === 2) {
-      ctx.moveTo(mouthX, cy - h * 0.38); ctx.lineTo(mouthX, cy + h * 0.38);
-    } else {
-      ctx.moveTo(cx - w * 0.38, mouthY); ctx.lineTo(cx + w * 0.38, mouthY);
-    }
-    ctx.stroke();
-
-    // Inward vacuum pulsing chevrons into core
-    const vTick = (performance.now() / 300) % 1;
-    const vPos = ((1 - vTick) - 0.5) * (w * 0.4);
-    ctx.save();
-    ctx.translate(cx + dv.x * vPos, cy + dv.y * vPos);
-    ctx.rotate(inDir * Math.PI / 2);
-    ctx.strokeStyle = '#fbbf24';
-    ctx.lineWidth = Math.max(1.5, 2 * zoom);
-    ctx.beginPath();
-    ctx.moveTo(-4 * zoom, -5 * zoom); ctx.lineTo(5 * zoom, 0); ctx.lineTo(-4 * zoom, 5 * zoom);
-    ctx.stroke();
-    ctx.restore();
-
-    // Furnace Core
-    if (def.id === 'cryoSmelter') {
-      ctx.fillStyle = '#0284c7';
-      ctx.beginPath(); ctx.arc(cx, cy, Math.min(w, h) * 0.24, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#67e8f9'; ctx.stroke();
-    } else if (def.id === 'pyroSmelter') {
-      ctx.fillStyle = '#dc2626';
-      ctx.beginPath(); ctx.arc(cx, cy, Math.min(w, h) * 0.24, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#f59e0b'; ctx.stroke();
-    } else if (def.id === 'prismaticSmelter') {
-      ctx.fillStyle = '#eab308';
-      ctx.beginPath(); ctx.arc(cx, cy, Math.min(w, h) * 0.24, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#fef08a'; ctx.stroke();
-    } else if (def.id === 'singularitySmelter') {
-      // Swirling black hole
-      ctx.fillStyle = '#000';
-      ctx.beginPath(); ctx.arc(cx, cy, Math.min(w, h) * 0.28, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#a855f7';
-      ctx.lineWidth = 2 * zoom;
-      ctx.stroke();
-    } else if (def.id === 'supernovaCrucible') {
-      ctx.fillStyle = '#ea580c';
-      ctx.beginPath(); ctx.arc(cx, cy, Math.min(w, h) * 0.28, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#fed7aa'; ctx.lineWidth = 3 * zoom; ctx.stroke();
-    } else {
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.beginPath(); ctx.arc(cx, cy, Math.min(w, h) * 0.22, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = lighter; ctx.stroke();
-    }
-
-    ctx.restore();
-  }
-};
-
-function drawBuildings() {
-  const cs = STATE.config.grid.cellSize;
-  const zoom = STATE.camera.zoom;
-
-  for (const b of STATE.run.buildings) {
-    const def = STATE.defs.buildingDefs[b.defId];
-    if (!def) continue;
-    if (def.category === 'belt') continue; // Belts rendered by drawBeltPaths
-    const fp = getFootprint(def, b.rot);
-    const p1 = worldToScreen(b.col * cs, b.row * cs);
-    const p2 = worldToScreen((b.col + fp.w) * cs, (b.row + fp.h) * cs);
-    const w = p2.x - p1.x, h = p2.y - p1.y;
-    const isSelected = selectedEntity && selectedEntity.type === 'building' && selectedEntity.id === b.id;
-    const isMoving = movingState && movingState.buildingId === b.id;
-
-    ctx.save();
-    if (isMoving) { ctx.globalAlpha = 0.45; }
-    if (isSelected) drawSelectionGlowAndGizmo(p1, p2, b.rot);
-
-    // Base fill with gradient for depth
-    const grad = ctx.createLinearGradient(p1.x, p1.y, p1.x, p2.y);
-    const baseCol = hexToRgba(def.color, 1);
-    const lightCol = hexShift(def.color, 30);
-    const darkCol  = hexShift(def.color, -30);
-    grad.addColorStop(0, lightCol);
-    grad.addColorStop(0.5, baseCol);
-    grad.addColorStop(1, darkCol);
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    roundRect(ctx, p1.x, p1.y, w, h, Math.min(4 * zoom, 6));
-    ctx.fill();
-
-    // Inner highlight stripe at top
-    ctx.fillStyle = 'rgba(255,255,255,0.1)';
-    ctx.fillRect(p1.x + 2, p1.y + 2, w - 4, Math.min(h * 0.25, 8));
-
-    // Border
-    ctx.strokeStyle = isSelected ? '#e8a030' : hexToRgba(def.color, 0.7);
-    ctx.lineWidth = isSelected ? 2 * zoom : 1.2 * zoom;
-    ctx.beginPath();
-    roundRect(ctx, p1.x, p1.y, w, h, Math.min(3 * zoom, 4));
-    ctx.stroke();
-
-    const renderer = SPRITE_RENDERERS[def.id] || SPRITE_RENDERERS[def.category];
-    if (renderer) renderer(ctx, p1.x, p1.y, w, h, def, zoom, b.rot, b);
-
-    // Category icon when zoomed in
-    if (zoom > 0.55 && w > 20) {
-      const cx = (p1.x + p2.x) / 2, cy = (p1.y + p2.y) / 2;
-      const iconSize = Math.min(w, h) * 0.38;
-      ctx.globalAlpha = (isMoving ? 0.45 : 1) * 0.55;
-      const iconFn = CATEGORY_ICONS[def.category];
-      if (iconFn) iconFn(cx, cy, iconSize, 'rgba(255,255,255,0.8)');
-    }
-
-    // Fuel timer progress bar
-    if (def.requiresFuel && zoom > 0.45) {
-      const maxFuel = def.attributes.runDurationSec || 8;
-      const fuelPct = Math.min(1, (b.fuelTimer || 0) / maxFuel);
-      if (fuelPct > 0) {
-        const barH = Math.max(3, 4 * zoom);
-        ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        ctx.fillRect(p1.x, p2.y - barH, w, barH);
-        ctx.fillStyle = fuelPct > 0.3 ? '#22c55e' : '#ef4444';
-        ctx.fillRect(p1.x, p2.y - barH, w * fuelPct, barH);
-      }
-    }
-
-    ctx.globalAlpha = isMoving ? 0.45 : 1;
-    drawPorts(fp, b.col, b.row);
-
-    // Name label
-    if (zoom > 0.5 && w > 30) {
-      ctx.globalAlpha = isMoving ? 0.45 : 0.9;
-      const fontSize = Math.max(8, Math.min(11, 10 * zoom));
-      ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      ctx.font = `700 ${fontSize}px Inter,system-ui,sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.shadowColor = 'rgba(0,0,0,0.8)';
-      ctx.shadowBlur = 3;
-      let label = def.name;
-      while (ctx.measureText(label).width > w - 8 && label.length > 4) label = label.slice(0, -1);
-      if (label !== def.name) label += '…';
-      ctx.fillText(label, p1.x + w/2, p2.y + fontSize + 2);
-      ctx.shadowBlur = 0;
-    }
-    ctx.restore();
-  }
-}
-
-function drawOres() {
-  const lifespan = STATE.config.oreGroundLifespan;
-  const zoom = STATE.camera.zoom;
-
-  for (const o of STATE.run.ores) {
-    const s = worldToScreen(o.x, o.y);
-    const r = (o.size / 2) * zoom;
-    if (r < 1) continue;
-    const isSelected = selectedEntity && selectedEntity.type === 'ore' && selectedEntity.id === o.id;
-
-    let alpha = 1.0;
-    if (o.groundTime && lifespan > 0) {
-      const remaining = lifespan - o.groundTime;
-      if (remaining < 0.8) alpha = Math.max(0, remaining / 0.8);
-    }
-
-    ctx.save();
-    ctx.globalAlpha = alpha;
-
-    // Status effect glow halos (rendered behind ore)
-    if (o.status) {
-      if (o.status.flaming && r > 3) {
-        ctx.shadowColor = '#ff6b35';
-        ctx.shadowBlur = r * 1.4;
-      } else if (o.status.radioactive && r > 3) {
-        ctx.shadowColor = '#4ade80';
-        ctx.shadowBlur = r * 1.2;
-      } else if (o.status.sparkling && r > 3) {
-        ctx.shadowColor = '#fde047';
-        ctx.shadowBlur = r * 1.0;
-      } else if (o.status.wet > 0 && r > 3) {
-        ctx.shadowColor = '#38bdf8';
-        ctx.shadowBlur = r * 0.8;
-      } else if (o.status.crystalline && r > 3) {
-        ctx.shadowColor = '#a5f3fc';
-        ctx.shadowBlur = r * 1.0;
-      }
-    }
-
-    // Ore body
-    const effectiveR = Math.max(0.5, r * (alpha < 1 ? 0.6 + 0.4 * alpha : 1));
-    ctx.fillStyle = o.color;
-    ctx.beginPath();
-    if (o.shape === 'diamond') {
-      ctx.moveTo(s.x, s.y - effectiveR * 1.35);
-      ctx.lineTo(s.x + effectiveR * 1.35, s.y);
-      ctx.lineTo(s.x, s.y + effectiveR * 1.35);
-      ctx.lineTo(s.x - effectiveR * 1.35, s.y);
-      ctx.closePath();
-    } else if (o.shape === 'square') {
-      ctx.rect(s.x - effectiveR, s.y - effectiveR, effectiveR * 2, effectiveR * 2);
-    } else {
-      ctx.arc(s.x, s.y, effectiveR, 0, Math.PI * 2);
-    }
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    // Highlight glint
-    if (zoom > 0.5 && effectiveR > 4) {
-      ctx.fillStyle = 'rgba(255,255,255,0.28)';
-      ctx.beginPath();
-      ctx.ellipse(s.x - effectiveR * 0.28, s.y - effectiveR * 0.28, effectiveR * 0.28, effectiveR * 0.18, -0.6, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Outline
-    ctx.strokeStyle = isSelected ? '#e8a030' : 'rgba(0,0,0,0.4)';
-    ctx.lineWidth = isSelected ? Math.max(1.5, 2 * zoom) : Math.max(0.5, 0.8 * zoom);
-    ctx.beginPath();
-    if (o.shape === 'diamond') {
-      ctx.moveTo(s.x, s.y - effectiveR * 1.35);
-      ctx.lineTo(s.x + effectiveR * 1.35, s.y);
-      ctx.lineTo(s.x, s.y + effectiveR * 1.35);
-      ctx.lineTo(s.x - effectiveR * 1.35, s.y);
-      ctx.closePath();
-    } else if (o.shape === 'square') {
-      ctx.rect(s.x - effectiveR, s.y - effectiveR, effectiveR * 2, effectiveR * 2);
-    } else {
-      ctx.arc(s.x, s.y, effectiveR, 0, Math.PI * 2);
-    }
-    ctx.stroke();
-
-    // Status indicators (small dots above ore)
-    if (zoom > 0.45 && effectiveR > 5 && o.status) {
-      const indicators = [];
-      if (o.status.flaming)    indicators.push('#ff6b35');
-      if (o.status.radioactive)indicators.push('#4ade80');
-      if (o.status.wet > 0)    indicators.push('#38bdf8');
-      if (o.status.sparkling)  indicators.push('#fde047');
-      if (o.status.crystalline)indicators.push('#a5f3fc');
-      if (o.status.lucky)      indicators.push('#86efac');
-      if (indicators.length > 0) {
-        const dotR = Math.max(2, 2.5 * zoom);
-        const startX = s.x - ((indicators.length - 1) * (dotR * 2.2)) / 2;
-        indicators.forEach((col, i) => {
-          ctx.fillStyle = col;
-          ctx.beginPath();
-          ctx.arc(startX + i * dotR * 2.2, s.y - effectiveR - dotR - 2, dotR, 0, Math.PI * 2);
-          ctx.fill();
-        });
-      }
-    }
-
-    // Value label (only when selected or zoomed very close)
-    if (isSelected && zoom > 0.8) {
-      ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      ctx.font = `700 ${Math.max(8, 9 * zoom)}px Inter,system-ui,sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 3;
-      ctx.fillText(`$${o.value.toLocaleString()}`, s.x, s.y + effectiveR + 12);
-      ctx.shadowBlur = 0;
-    }
-
-    ctx.restore();
-  }
-}
-
-function drawEffects() {
-  ctx.save();
-  for (const exp of explosions) {
-    const s = worldToScreen(exp.x, exp.y);
-    ctx.strokeStyle = `rgba(255, 71, 87, ${exp.alpha})`;
-    ctx.lineWidth = 4 * STATE.camera.zoom;
-    ctx.beginPath(); ctx.arc(s.x, s.y, exp.currentRadius * STATE.camera.zoom, 0, Math.PI * 2); ctx.stroke();
-  }
-
-  for (const p of particles) {
-    const s = worldToScreen(p.x, p.y);
-    ctx.fillStyle = p.color;
-    ctx.beginPath(); ctx.arc(s.x, s.y, (p.size || 3) * STATE.camera.zoom, 0, Math.PI * 2); ctx.fill();
-  }
-  ctx.restore();
-}
+// ===========================================================
+// INITIALIZE PHASER ENGINE
+// ===========================================================
 
 function getLifeLevel(lifetime) {
   if (lifetime < 25000) return 1;
@@ -2682,7 +2209,6 @@ function getLifeLevel(lifetime) {
 }
 
 function updateHUD() {
-  // Update HUD data elements
   const hudCash = document.getElementById('hudCash');
   const hudRate = document.getElementById('hudRate');
   const hudLife = document.getElementById('hudLife');
@@ -2690,12 +2216,10 @@ function updateHUD() {
   const hudBuildings = document.getElementById('hudBuildings');
   const hudOres = document.getElementById('hudOres');
   const hudModeBadge = document.getElementById('hudModeBadge');
-  const hudTips = document.getElementById('hudTips');
 
   const lifetime = STATE.run.lifetimeEarnings || 0;
   const currentLife = getLifeLevel(lifetime);
 
-  // Calculate moving average $/s over last 3 seconds
   const rateSum = salesHistory.reduce((acc, cur) => acc + cur.val, 0);
   const incomeRate = Math.round(rateSum / 3);
 
@@ -2708,9 +2232,7 @@ function updateHUD() {
   const maxOres = STATE.config.maxOres;
   if (hudOres) {
     hudOres.textContent = `${oreCount} / ${maxOres}`;
-    if (hudOres.classList) {
-      hudOres.classList.toggle('warn', oreCount > maxOres * 0.85);
-    }
+    if (hudOres.classList) hudOres.classList.toggle('warn', oreCount > maxOres * 0.85);
   }
 
   if (hudModeBadge) {
@@ -2730,103 +2252,26 @@ function updateHUD() {
       hudModeBadge.className = 'hud-mode-badge';
     }
   }
-
-  if (hudTips) {
-    if (mode === 'placing') {
-      hudTips.textContent = 'Click: Place  |  Drag: Belt Line  |  R: Rotate  |  Esc: Cancel';
-    } else if (mode === 'moving') {
-      hudTips.textContent = 'Click destination  |  R: Rotate  |  Esc: Cancel';
-    } else {
-      hudTips.textContent = 'Drag: Pan  |  Scroll: Zoom  |  E: Shop  |  R: Rotate Hovered  |  Click Gate: Toggle';
-    }
-  }
 }
 
-function hexToRgba(hex, alpha) {
-  if (!hex || hex[0] !== '#') return `rgba(100,100,100,${alpha})`;
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
+const phaserConfig = {
+  type: Phaser.AUTO,
+  parent: 'game-container',
+  width: window.innerWidth,
+  height: window.innerHeight,
+  backgroundColor: '#0a0c0f',
+  scale: {
+    mode: Phaser.Scale.RESIZE,
+    autoCenter: Phaser.Scale.CENTER_BOTH
+  },
+  physics: {
+    default: 'none'
+  },
+  scene: [FactoryScene]
+};
 
-function hexShift(hex, amount) {
-  if (!hex || hex[0] !== '#') return hex;
-  let r = Math.min(255, Math.max(0, parseInt(hex.slice(1, 3), 16) + amount));
-  let g = Math.min(255, Math.max(0, parseInt(hex.slice(3, 5), 16) + amount));
-  let b = Math.min(255, Math.max(0, parseInt(hex.slice(5, 7), 16) + amount));
-  return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
-}
-
-function roundRect(ctx2d, x, y, w, h, r) {
-  if (typeof ctx2d.roundRect === 'function') {
-    ctx2d.roundRect(x, y, w, h, r);
-  } else {
-    r = Math.min(r, w/2, h/2);
-    ctx2d.moveTo(x + r, y);
-    ctx2d.lineTo(x + w - r, y); ctx2d.quadraticCurveTo(x + w, y, x + w, y + r);
-    ctx2d.lineTo(x + w, y + h - r); ctx2d.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-    ctx2d.lineTo(x + r, y + h); ctx2d.quadraticCurveTo(x, y + h, x, y + h - r);
-    ctx2d.lineTo(x, y + r); ctx2d.quadraticCurveTo(x, y, x + r, y);
-    ctx2d.closePath();
-  }
-}
-
-// Belt drag path preview
-function drawBeltDragPreview() {
-  if (!isBeltDragging || !beltDragStart || mode !== 'placing') return;
-  const cs = STATE.config.grid.cellSize;
-  const world = screenToWorld(mouseScreen.x, mouseScreen.y);
-  const endCell = worldToCell(world.x, world.y);
-  const line = getBeltDragPath(beltDragStart, endCell);
-
-  ctx.save();
-  ctx.globalAlpha = 0.5;
-  ctx.fillStyle = placingState ? (STATE.defs.buildingDefs[placingState.defId]?.color || '#7fd0ff') : '#7fd0ff';
-  for (const c of line.cells) {
-    const p1 = worldToScreen(c.col * cs, c.row * cs);
-    const p2 = worldToScreen((c.col + 1) * cs, (c.row + 1) * cs);
-    ctx.fillRect(p1.x + 2, p1.y + 2, p2.x - p1.x - 4, p2.y - p1.y - 4);
-  }
-  // Count label
-  if (line.cells.length > 0 && STATE.camera.zoom > 0.4) {
-    const last = line.cells[line.cells.length - 1];
-    const lp = worldToScreen((last.col + 0.5) * cs, (last.row + 0.5) * cs);
-    ctx.globalAlpha = 0.9;
-    ctx.fillStyle = '#fff';
-    ctx.font = `bold ${Math.max(10, 12 * STATE.camera.zoom)}px Inter,system-ui,sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.fillText(`${line.cells.length}x`, lp.x, lp.y - 10 * STATE.camera.zoom);
-  }
-  ctx.restore();
-}
-
-// Placement flash feedback
-function drawPlacementFlash() {
-  if (!placementFlash) return;
-  const cs = STATE.config.grid.cellSize;
-  placementFlash.timer += 0.06;
-  placementFlash.alpha = Math.max(0, 0.7 - placementFlash.timer * 2.5);
-  if (placementFlash.alpha <= 0) { placementFlash = null; return; }
-
-  const p1 = worldToScreen(placementFlash.col * cs, placementFlash.row * cs);
-  const p2 = worldToScreen((placementFlash.col + placementFlash.w) * cs, (placementFlash.row + placementFlash.h) * cs);
-  ctx.save();
-  ctx.globalAlpha = placementFlash.alpha;
-  ctx.fillStyle = placementFlash.success ? '#22c55e' : '#ef4444';
-  ctx.fillRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
-  ctx.restore();
-}
-
-// Periodic live save
-setInterval(triggerSaveState, 5000);
-
-// Main Animation Loop
-function loop(now) {
-  update(now);
-  // Advance belt animation
-  beltAnimTick = (beltAnimTick + 0.016) % 1;
-  draw();
-  requestAnimationFrame(loop);
-}
-requestAnimationFrame(loop);
+window.addEventListener('DOMContentLoaded', () => {
+  phaserGame = new Phaser.Game(phaserConfig);
+  window.phaserGame = phaserGame;
+  window.canvas = phaserGame.canvas;
+});

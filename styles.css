@@ -195,17 +195,33 @@ html, body {
   color: var(--text-body);
 }
 
-/* === CANVAS === */
-canvas {
-  display: block;
+/* === PHASER GAME CONTAINER & CANVAS === */
+#game-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg-deep);
   cursor: grab;
   touch-action: none;
+  z-index: 1;
+}
+#game-container.dragging        { cursor: grabbing; }
+#game-container.mode-placing,
+#game-container.mode-moving     { cursor: crosshair; }
+#game-container.mode-inspecting { cursor: zoom-in; }
+
+#game-container canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  outline: none;
+  user-select: none;
+  -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
-canvas.dragging       { cursor: grabbing; }
-canvas.mode-placing,
-canvas.mode-moving    { cursor: crosshair; }
-canvas.mode-inspecting{ cursor: zoom-in; }
 
 /* ===========================================================
    HUD — TOP LEFT DATA PANEL
