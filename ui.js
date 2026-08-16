@@ -374,7 +374,7 @@ function renderInventoryGrid() {
 
       const badge = document.createElement('span');
       badge.className = `inv-card-badge rarity-badge-${rarity}`;
-      badge.textContent = `${rarity.toUpperCase()} • ${def.size.w}x${def.size.h}`;
+      badge.textContent = `T${def.tier || 1} • ${rarity.toUpperCase()} • ${def.size.w}x${def.size.h}`;
       titleBox.appendChild(badge);
 
       top.appendChild(titleBox);

@@ -2613,6 +2613,9 @@ function updateHUD() {
   const hudCash = document.getElementById('hudCash');
   const hudRate = document.getElementById('hudRate');
   const hudLife = document.getElementById('hudLife');
+  const hudTier = document.getElementById('hudTier');
+  const hudNextGoal = document.getElementById('hudNextGoal');
+  const hudTierBar = document.getElementById('hudTierBar');
   const hudLifetime = document.getElementById('hudLifetime');
   const hudBuildings = document.getElementById('hudBuildings');
   const hudOres = document.getElementById('hudOres');
@@ -2624,9 +2627,37 @@ function updateHUD() {
   const rateSum = salesHistory.reduce((acc, cur) => acc + cur.val, 0);
   const incomeRate = Math.round(rateSum / 3);
 
+  // Era Tier milestones
+  let tierName = 'Tier 1: Starter Industrial';
+  let prevFloor = 0;
+  let nextCeil = 50000;
+
+  if (lifetime >= 10000000000) {
+    tierName = 'Tier 4: Cosmic Singularity (Rebirth Ready!)';
+    prevFloor = 1000000000;
+    nextCeil = 10000000000;
+  } else if (lifetime >= 1000000000) {
+    tierName = 'Tier 4: Cosmic Singularity';
+    prevFloor = 1000000000;
+    nextCeil = 10000000000;
+  } else if (lifetime >= 10000000) {
+    tierName = 'Tier 3: Nuclear & Sub-Atomic';
+    prevFloor = 10000000;
+    nextCeil = 1000000000;
+  } else if (lifetime >= 50000) {
+    tierName = 'Tier 2: Chemical & Thermal';
+    prevFloor = 50000;
+    nextCeil = 10000000;
+  }
+
+  const tierProgress = Math.min(100, Math.max(0, ((lifetime - prevFloor) / (nextCeil - prevFloor)) * 100));
+
   if (hudCash) hudCash.textContent = `$${(STATE.run.money || 0).toLocaleString()}`;
   if (hudRate) hudRate.textContent = `+$${incomeRate.toLocaleString()} / s`;
   if (hudLife) hudLife.textContent = `Life ${currentLife}`;
+  if (hudTier) hudTier.textContent = tierName;
+  if (hudNextGoal) hudNextGoal.textContent = `$${lifetime.toLocaleString()} / $${nextCeil.toLocaleString()} (${tierProgress.toFixed(1)}%)`;
+  if (hudTierBar) hudTierBar.style.width = `${tierProgress}%`;
   if (hudLifetime) hudLifetime.textContent = `$${lifetime.toLocaleString()}`;
   if (hudBuildings) hudBuildings.textContent = STATE.run.buildings.length;
   const oreCount = STATE.run.ores.length;
