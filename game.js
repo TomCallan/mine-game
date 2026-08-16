@@ -1102,6 +1102,42 @@ function updateOrePhysics(dt) {
       blend = 1 - Math.exp(-cfg.groundFriction * dt);
     }
 
+    // Side-Placed Beam Upgraders (e.g. Tesla Induction Beam, Laser Scanner placed adjacent to belts)
+    for (const b of STATE.run.buildings) {
+      const bDef = STATE.defs.buildingDefs[b.defId];
+      if (!bDef || !bDef.isSideBeam) continue;
+
+      const dv = dirVector(b.rot);
+      const targetCol = b.col + dv.x;
+      const targetRow = b.row + dv.y;
+      const targetCenterX = (targetCol + 0.5) * cs;
+      const targetCenterY = (targetRow + 0.5) * cs;
+
+      const dx = targetCenterX - ore.x;
+      const dy = targetCenterY - ore.y;
+      if (dx * dx + dy * dy < (cs * 0.58) * (cs * 0.58)) {
+        ore.upgraderBuildingUses = ore.upgraderBuildingUses || {};
+        const currentUses = ore.upgraderBuildingUses[b.id] || 0;
+        const maxAllowed = bDef.maxUses || 6;
+
+        if (ore.lastUpgraderBuildingId !== b.id && currentUses < maxAllowed) {
+          ore.lastUpgraderBuildingId = b.id;
+          ore.upgraderBuildingUses[b.id] = currentUses + 1;
+
+          if (bDef.appliesSparkling) ore.status.sparkling = true;
+          if (bDef.appliesCrystalline) ore.status.crystalline = true;
+          if (bDef.multiplier) {
+            ore.value = Math.round(ore.value * bDef.multiplier);
+            ore.upgraded = true;
+          }
+
+          if (sceneInstance && sceneInstance.spawnPlacementBurst) {
+            sceneInstance.spawnPlacementBurst(ore.x, ore.y, bDef.color || '#38bdf8');
+          }
+        }
+      }
+    }
+
     // Singularity Gravitational Pull
     for (const b of STATE.run.buildings) {
       const bDef = STATE.defs.buildingDefs[b.defId];
@@ -1870,6 +1906,21 @@ class FactoryScene extends Phaser.Scene {
       this.cameras.main.setSize(gameSize.width, gameSize.height);
     });
 
+    // Load external data.json
+    if (typeof loadGameData === 'function') {
+      loadGameData().then(data => {
+        if (data) {
+          if (data.config) Object.assign(STATE.config, data.config);
+          if (data.itemDefs) Object.assign(STATE.defs.itemDefs, data.itemDefs);
+          if (data.buildingDefs) Object.assign(STATE.defs.buildingDefs, data.buildingDefs);
+          if (data.relicDefs) Object.assign(STATE.defs.relicDefs, data.relicDefs);
+          if (data.cratesConfig && typeof CRATES_CONFIG !== 'undefined') Object.assign(CRATES_CONFIG, data.cratesConfig);
+          if (typeof renderHotbar === 'function') renderHotbar();
+          if (typeof renderInventoryGrid === 'function') renderInventoryGrid();
+        }
+      });
+    }
+
     // Load initial save
     loadSavedState();
   }
@@ -2139,32 +2190,73 @@ class FactoryScene extends Phaser.Scene {
         this.buildingGfx.lineBetween(cx - 12, cy + 12, cx + 12, cy - 12);
         this.buildingGfx.strokeCircle(cx, cy, 6);
       } else if (def.category === 'upgrader') {
-        const flowDir = b.rot;
-        const dv = dirVector(flowDir);
+        if (def.isSideBeam) {
+          const dv = dirVector(b.rot);
+          const emitterX = cx + dv.x * (bw * 0.42);
+          const emitterY = cy + dv.y * (bh * 0.42);
 
-        // Cyan intake frame [
-        const inX = cx - dv.x * (bw * 0.4);
-        const inY = cy - dv.y * (bh * 0.4);
-        this.buildingGfx.lineStyle(3, 0x38bdf8, 1);
-        if (flowDir === 0 || flowDir === 2) {
-          this.buildingGfx.lineBetween(inX, cy - bh * 0.35, inX, cy + bh * 0.35);
+          // Turret base
+          this.buildingGfx.fillStyle(0x0f172a, 1);
+          this.buildingGfx.fillCircle(cx, cy, 18);
+          this.buildingGfx.lineStyle(2, 0xe8a030, 1);
+          this.buildingGfx.strokeCircle(cx, cy, 18);
+
+          // Pulsing Core
+          const isLaser = def.id === 'laserScanner';
+          const coreColor = isLaser ? 0xa855f7 : 0x06b6d4;
+          const pulse = Math.sin(time / 150) * 2;
+          this.buildingGfx.fillStyle(coreColor, 1);
+          this.buildingGfx.fillCircle(cx, cy, 10 + pulse);
+          this.buildingGfx.lineStyle(2, 0xffffff, 0.9);
+          this.buildingGfx.strokeCircle(cx, cy, 10 + pulse);
+
+          // Emitter nozzle
+          this.buildingGfx.fillStyle(0x1e293b, 1);
+          this.buildingGfx.fillCircle(emitterX, emitterY, 8);
+          this.buildingGfx.lineStyle(2, 0xffcf5c, 1);
+          this.buildingGfx.strokeCircle(emitterX, emitterY, 8);
+
+          // Projecting Scanning Laser Beam onto adjacent conveyor
+          const beamTargetX = cx + dv.x * cs;
+          const beamTargetY = cy + dv.y * cs;
+          const beamColor = isLaser ? 0xc084fc : 0x38bdf8;
+
+          this.buildingGfx.lineStyle(6, beamColor, 0.35 + Math.sin(time / 100) * 0.15);
+          this.buildingGfx.lineBetween(emitterX, emitterY, beamTargetX, beamTargetY);
+          this.buildingGfx.lineStyle(2, 0xffffff, 0.9);
+          this.buildingGfx.lineBetween(emitterX, emitterY, beamTargetX, beamTargetY);
+
+          // Impact scan circle on adjacent conveyor
+          this.buildingGfx.lineStyle(2, isLaser ? 0xe879f9 : 0x67e8f9, 0.85);
+          this.buildingGfx.strokeCircle(beamTargetX, beamTargetY, 12 + Math.sin(time / 120) * 3);
         } else {
-          this.buildingGfx.lineBetween(cx - bw * 0.35, inY, cx + bw * 0.35, inY);
-        }
+          const flowDir = b.rot;
+          const dv = dirVector(flowDir);
 
-        // Amber output frame ]
-        const outX = cx + dv.x * (bw * 0.4);
-        const outY = cy + dv.y * (bh * 0.4);
-        this.buildingGfx.lineStyle(3, 0xe8a030, 1);
-        if (flowDir === 0 || flowDir === 2) {
-          this.buildingGfx.lineBetween(outX, cy - bh * 0.35, outX, cy + bh * 0.35);
-        } else {
-          this.buildingGfx.lineBetween(cx - bw * 0.35, outY, cx + bw * 0.35, outY);
-        }
+          // Cyan intake frame [
+          const inX = cx - dv.x * (bw * 0.4);
+          const inY = cy - dv.y * (bh * 0.4);
+          this.buildingGfx.lineStyle(3, 0x38bdf8, 1);
+          if (flowDir === 0 || flowDir === 2) {
+            this.buildingGfx.lineBetween(inX, cy - bh * 0.35, inX, cy + bh * 0.35);
+          } else {
+            this.buildingGfx.lineBetween(cx - bw * 0.35, inY, cx + bw * 0.35, inY);
+          }
 
-        // Throughput arrow
-        this.buildingGfx.fillStyle(hexToNumber(hexShift(def.color, 50)), 0.9);
-        this.buildingGfx.fillTriangle(cx + dv.x * 10, cy + dv.y * 10, cx - dv.y * 8, cy + dv.x * 8, cx + dv.y * 8, cy - dv.x * 8);
+          // Amber output frame ]
+          const outX = cx + dv.x * (bw * 0.4);
+          const outY = cy + dv.y * (bh * 0.4);
+          this.buildingGfx.lineStyle(3, 0xe8a030, 1);
+          if (flowDir === 0 || flowDir === 2) {
+            this.buildingGfx.lineBetween(outX, cy - bh * 0.35, outX, cy + bh * 0.35);
+          } else {
+            this.buildingGfx.lineBetween(cx - bw * 0.35, outY, cx + bw * 0.35, outY);
+          }
+
+          // Throughput arrow
+          this.buildingGfx.fillStyle(hexToNumber(hexShift(def.color, 50)), 0.9);
+          this.buildingGfx.fillTriangle(cx + dv.x * 10, cy + dv.y * 10, cx - dv.y * 8, cy + dv.x * 8, cx + dv.y * 8, cy - dv.x * 8);
+        }
       } else if (def.category === 'seller') {
         const inDir = b.rot;
         const dv = dirVector(inDir);
@@ -2350,32 +2442,61 @@ class FactoryScene extends Phaser.Scene {
         const outTargetY = nozzleY + dv.y * 20;
         drawGhostChevron(outTargetX, outTargetY, rot, 24, 0xffcf5c, 1.0);
       } else if (def.category === 'upgrader') {
-        const flowDir = rot;
-        const dv = dirVector(flowDir);
+        if (def.isSideBeam) {
+          const dv = dirVector(rot);
+          const emitterX = cx + dv.x * (pw * 0.42);
+          const emitterY = cy + dv.y * (ph * 0.42);
+          const beamTargetX = cx + dv.x * cs;
+          const beamTargetY = cy + dv.y * cs;
 
-        // Cyan intake bracket [
-        const inX = cx - dv.x * (pw * 0.42);
-        const inY = cy - dv.y * (ph * 0.42);
-        this.previewGfx.lineStyle(3.5, 0x38bdf8, 1);
-        if (flowDir === 0 || flowDir === 2) {
-          this.previewGfx.lineBetween(inX, cy - ph * 0.38, inX, cy + ph * 0.38);
+          // Turret ring
+          this.previewGfx.fillStyle(0x0f172a, 1);
+          this.previewGfx.fillCircle(cx, cy, 16);
+          this.previewGfx.lineStyle(2.5, 0xe8a030, 1);
+          this.previewGfx.strokeCircle(cx, cy, 16);
+
+          // Emitter dish
+          this.previewGfx.fillStyle(0x38bdf8, 1);
+          this.previewGfx.fillCircle(emitterX, emitterY, 8);
+
+          // Projected scanning beam line onto adjacent tile
+          this.previewGfx.lineStyle(4, 0x38bdf8, 0.6);
+          this.previewGfx.lineBetween(emitterX, emitterY, beamTargetX, beamTargetY);
+          this.previewGfx.lineStyle(2, 0xffffff, 1);
+          this.previewGfx.lineBetween(emitterX, emitterY, beamTargetX, beamTargetY);
+
+          // Target conveyor scan zone
+          this.previewGfx.lineStyle(2, 0x38bdf8, 0.9);
+          this.previewGfx.strokeCircle(beamTargetX, beamTargetY, 16);
+          drawGhostChevron(beamTargetX, beamTargetY, rot, 20, 0x38bdf8, 1.0);
         } else {
-          this.previewGfx.lineBetween(cx - pw * 0.38, inY, cx + pw * 0.38, inY);
-        }
+          const flowDir = rot;
+          const dv = dirVector(flowDir);
 
-        // Amber output bracket ]
-        const outX = cx + dv.x * (pw * 0.42);
-        const outY = cy + dv.y * (ph * 0.42);
-        this.previewGfx.lineStyle(3.5, 0xe8a030, 1);
-        if (flowDir === 0 || flowDir === 2) {
-          this.previewGfx.lineBetween(outX, cy - ph * 0.38, outX, cy + ph * 0.38);
-        } else {
-          this.previewGfx.lineBetween(cx - pw * 0.38, outY, cx + pw * 0.38, outY);
-        }
+          // Cyan intake bracket [
+          const inX = cx - dv.x * (pw * 0.42);
+          const inY = cy - dv.y * (ph * 0.42);
+          this.previewGfx.lineStyle(3.5, 0x38bdf8, 1);
+          if (flowDir === 0 || flowDir === 2) {
+            this.previewGfx.lineBetween(inX, cy - ph * 0.38, inX, cy + ph * 0.38);
+          } else {
+            this.previewGfx.lineBetween(cx - pw * 0.38, inY, cx + pw * 0.38, inY);
+          }
 
-        // Center forward throughput flow arrows
-        drawGhostChevron(cx - dv.x * 12, cy - dv.y * 12, flowDir, 20, 0x38bdf8, 0.9);
-        drawGhostChevron(cx + dv.x * 12, cy + dv.y * 12, flowDir, 20, 0xe8a030, 1.0);
+          // Amber output bracket ]
+          const outX = cx + dv.x * (pw * 0.42);
+          const outY = cy + dv.y * (ph * 0.42);
+          this.previewGfx.lineStyle(3.5, 0xe8a030, 1);
+          if (flowDir === 0 || flowDir === 2) {
+            this.previewGfx.lineBetween(outX, cy - ph * 0.38, outX, cy + ph * 0.38);
+          } else {
+            this.previewGfx.lineBetween(cx - pw * 0.38, outY, cx + pw * 0.38, outY);
+          }
+
+          // Center forward throughput flow arrows
+          drawGhostChevron(cx - dv.x * 12, cy - dv.y * 12, flowDir, 20, 0x38bdf8, 0.9);
+          drawGhostChevron(cx + dv.x * 12, cy + dv.y * 12, flowDir, 20, 0xe8a030, 1.0);
+        }
       } else if (def.category === 'seller') {
         const inDir = rot;
         const dv = dirVector(inDir);

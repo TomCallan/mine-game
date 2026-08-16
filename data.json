@@ -1,0 +1,438 @@
+{
+  "config": {
+    "grid": { "cols": 24, "rows": 24, "cellSize": 64 },
+    "maxOres": 300,
+    "beltAcceleration": 3,
+    "groundFriction": 2.5,
+    "oreGroundLifespan": 3,
+    "prestigeThresholdLifetime": 10000000000,
+    "prestigeKeyLogBase": 10,
+    "inventoryBaseCapacity": 40,
+    "crateDuplicateShardValue": {
+      "regular": 1,
+      "golden": 4,
+      "exotic": 15,
+      "prestige": 50
+    }
+  },
+  "itemDefs": {
+    "ore": { "id": "ore", "name": "Standard Ore", "color": "#ffb03b", "size": 14, "baseValue": 5, "shape": "circle" },
+    "megaOre": { "id": "megaOre", "name": "Mega Ore", "color": "#ff4757", "size": 22, "baseValue": 25, "shape": "diamond" },
+    "magmaOre": { "id": "magmaOre", "name": "Magma Ore", "color": "#ff4757", "size": 18, "baseValue": 50, "shape": "diamond", "defaultStatus": { "flaming": true } },
+    "uraniumOre": { "id": "uraniumOre", "name": "Uranium Ore", "color": "#2ecc71", "size": 16, "baseValue": 150, "shape": "circle", "defaultStatus": { "radioactive": true } },
+    "coalOre": { "id": "coalOre", "name": "Coal Fuel Ore", "color": "#334155", "size": 16, "baseValue": 15, "shape": "square", "isFuel": true },
+    "superDiamondOre": { "id": "superDiamondOre", "name": "Super Diamond Ore", "color": "#38bdf8", "size": 24, "baseValue": 300, "shape": "diamond", "defaultStatus": { "sparkling": true } },
+    "crystalOre": { "id": "crystalOre", "name": "Crystal Ore", "color": "#a855f7", "size": 16, "baseValue": 200, "shape": "diamond", "defaultStatus": { "sparkling": true, "crystalline": true } },
+    "antimatterPellet": { "id": "antimatterPellet", "name": "Antimatter Pellet", "color": "#ec4899", "size": 20, "baseValue": 1500, "shape": "diamond" },
+    "timeCrystalOre": { "id": "timeCrystalOre", "name": "Time Crystal Ore", "color": "#06b6d4", "size": 18, "baseValue": 800, "shape": "diamond", "defaultStatus": { "timeAged": true } },
+    "glowAlgaeOre": { "id": "glowAlgaeOre", "name": "Glow Algae Ore", "color": "#10b981", "size": 14, "baseValue": 120, "shape": "circle", "defaultStatus": { "wet": 10 } },
+    "voidShardOre": { "id": "voidShardOre", "name": "Void Shard Ore", "color": "#312e81", "size": 22, "baseValue": 12000, "shape": "diamond", "defaultStatus": { "nullified": true } }
+  },
+  "buildingDefs": {
+    "extractor": {
+      "id": "extractor", "name": "Standard Extractor", "category": "extractor", "rarity": "common", "cost": 100, "priceGrowth": 1.10,
+      "unlockMethod": "shop", "size": { "w": 3, "h": 1 }, "layer": "machine", "color": "#3d6a8f", "speed": 40,
+      "tags": ["dropper", "starter"], "attributes": { "spawnRateMs": 1000 },
+      "ports": [{ "dx": 3, "dy": 0, "kind": "output", "color": "#ffcf5c", "dropSide": null }],
+      "produces": { "item": "ore", "rate": 1000 }
+    },
+    "coalExtractor": {
+      "id": "coalExtractor", "name": "Coal Mine (Fuel)", "category": "extractor", "rarity": "common", "cost": 450, "priceGrowth": 1.10,
+      "unlockMethod": "shop", "size": { "w": 3, "h": 1 }, "layer": "machine", "color": "#1e293b", "speed": 40,
+      "tags": ["dropper", "fuel_provider"], "attributes": { "fuelType": "coal" },
+      "ports": [{ "dx": 3, "dy": 0, "kind": "output", "color": "#475569", "dropSide": null }],
+      "produces": { "item": "coalOre", "rate": 1200 }
+    },
+    "megaExtractor": {
+      "id": "megaExtractor", "name": "2x2 Mega Extractor", "category": "extractor", "rarity": "rare", "cost": 4500, "priceGrowth": 1.12,
+      "unlockMethod": "shop", "size": { "w": 2, "h": 2 }, "layer": "machine", "color": "#2b7873", "speed": 40,
+      "tags": ["dropper", "heavy_machinery"], "attributes": { "spawnRateMs": 1500 },
+      "ports": [{ "dx": 2, "dy": 0.5, "kind": "output", "color": "#ff4757", "dropSide": null }],
+      "produces": { "item": "megaOre", "rate": 1500 }
+    },
+    "volcanoDropper": {
+      "id": "volcanoDropper", "name": "Volcano Mine", "category": "extractor", "rarity": "epic", "cost": 18000, "priceGrowth": 1.13,
+      "unlockMethod": "shop", "size": { "w": 3, "h": 1 }, "layer": "machine", "color": "#881337", "speed": 40,
+      "tags": ["dropper", "flaming"], "attributes": { "temperature": 1200 },
+      "ports": [{ "dx": 3, "dy": 0, "kind": "output", "color": "#ff4757", "dropSide": null }],
+      "produces": { "item": "magmaOre", "rate": 1200 }
+    },
+    "thermalExtractor": {
+      "id": "thermalExtractor", "name": "Fueled Thermal Mine", "category": "extractor", "rarity": "epic", "cost": 85000, "priceGrowth": 1.14,
+      "unlockMethod": "shop", "size": { "w": 3, "h": 2 }, "layer": "machine", "color": "#c2410c", "speed": 40,
+      "tags": ["dropper", "fuel_consuming"], "attributes": { "fuelRequired": "coal", "runDurationSec": 8 },
+      "requiresFuel": true,
+      "ports": [
+        { "dx": 0, "dy": 0.5, "kind": "input", "color": "#334155", "dropSide": null },
+        { "dx": 3, "dy": 0.5, "kind": "output", "color": "#38bdf8", "dropSide": null }
+      ],
+      "produces": { "item": "superDiamondOre", "rate": 800 }
+    },
+    "uraniumMine": {
+      "id": "uraniumMine", "name": "Uranium Centrifuge", "category": "extractor", "rarity": "exotic", "cost": 350000, "priceGrowth": 1.15,
+      "unlockMethod": "prestigeCrate", "crateOnly": true, "size": { "w": 2, "h": 2 }, "layer": "machine", "color": "#14532d", "speed": 40,
+      "tags": ["dropper", "radioactive"], "attributes": { "radiationSv": 50 },
+      "ports": [{ "dx": 2, "dy": 0.5, "kind": "output", "color": "#2ecc71", "dropSide": null }],
+      "produces": { "item": "uraniumOre", "rate": 1400 }
+    },
+    "geodeDriller": {
+      "id": "geodeDriller", "name": "Crystalline Geode Driller", "category": "extractor", "rarity": "legendary", "cost": 2500000, "priceGrowth": 1.16,
+      "unlockMethod": "goldenCrate", "crateOnly": true, "size": { "w": 2, "h": 2 }, "layer": "machine", "color": "#7e22ce", "speed": 40,
+      "tags": ["dropper", "crystal"], "attributes": { "resonance": 99 },
+      "ports": [{ "dx": 2, "dy": 0.5, "kind": "output", "color": "#a855f7", "dropSide": null }],
+      "produces": { "item": "crystalOre", "rate": 1000 }
+    },
+    "antimatterSiphon": {
+      "id": "antimatterSiphon", "name": "Antimatter Siphon", "category": "extractor", "rarity": "mythic", "cost": 45000000, "priceGrowth": 1.18,
+      "unlockMethod": "exoticCrate", "crateOnly": true, "size": { "w": 3, "h": 3 }, "layer": "machine", "color": "#be185d", "speed": 40,
+      "tags": ["dropper", "antimatter"], "attributes": { "containment": 100 },
+      "ports": [{ "dx": 3, "dy": 1, "kind": "output", "color": "#ec4899", "dropSide": null }],
+      "produces": { "item": "antimatterPellet", "rate": 1800 }
+    },
+    "temporalFluxBorer": {
+      "id": "temporalFluxBorer", "name": "Temporal Flux Borer", "category": "extractor", "rarity": "legendary", "cost": 8000000, "priceGrowth": 1.17,
+      "unlockMethod": "prestigeCrate", "crateOnly": true, "size": { "w": 2, "h": 1 }, "layer": "machine", "color": "#0e7490", "speed": 40,
+      "tags": ["dropper", "temporal"], "attributes": { "timeWarp": true },
+      "ports": [{ "dx": 2, "dy": 0, "kind": "output", "color": "#06b6d4", "dropSide": null }],
+      "produces": { "item": "timeCrystalOre", "rate": 1200 }
+    },
+    "algaeVat": {
+      "id": "algaeVat", "name": "Bioluminescent Algae Vat", "category": "extractor", "rarity": "rare", "cost": 12000, "priceGrowth": 1.12,
+      "unlockMethod": "shop", "size": { "w": 2, "h": 2 }, "layer": "machine", "color": "#047857", "speed": 40,
+      "tags": ["dropper", "wet"], "attributes": { "moisture": 100 },
+      "ports": [{ "dx": 2, "dy": 0.5, "kind": "output", "color": "#10b981", "dropSide": null }],
+      "produces": { "item": "glowAlgaeOre", "rate": 1000 }
+    },
+    "voidHarvester": {
+      "id": "voidHarvester", "name": "Cosmic Void Harvester", "category": "extractor", "rarity": "mythic", "cost": 150000000, "priceGrowth": 1.20,
+      "unlockMethod": "prestigeCrate", "crateOnly": true, "size": { "w": 3, "h": 2 }, "layer": "machine", "color": "#1e1b4b", "speed": 40,
+      "tags": ["dropper", "void"], "attributes": { "singularity": true },
+      "ports": [{ "dx": 3, "dy": 0.5, "kind": "output", "color": "#312e81", "dropSide": null }],
+      "produces": { "item": "voidShardOre", "rate": 2500 }
+    },
+
+    "belt": {
+      "id": "belt", "name": "Standard Conveyor", "category": "belt", "rarity": "common", "cost": 25, "priceGrowth": 1.05,
+      "unlockMethod": "shop", "size": { "w": 1, "h": 1 }, "layer": "belt", "color": "#4a5568", "speed": 90,
+      "tags": ["transport"], "attributes": {},
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#7fd0ff", "dropSide": 0 }]
+    },
+    "halfBelt": {
+      "id": "halfBelt", "name": "0.5x1 Narrow Belt", "category": "belt", "rarity": "common", "cost": 20, "priceGrowth": 1.05,
+      "unlockMethod": "shop", "size": { "w": 0.5, "h": 1 }, "layer": "belt", "color": "#475569", "speed": 90,
+      "tags": ["transport", "narrow"], "attributes": {}, "isHalfBelt": true,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#7fd0ff", "dropSide": 0 }]
+    },
+    "fastBelt": {
+      "id": "fastBelt", "name": "2x Fast Conveyor", "category": "belt", "rarity": "uncommon", "cost": 150, "priceGrowth": 1.08,
+      "unlockMethod": "shop", "size": { "w": 1, "h": 1 }, "layer": "belt", "color": "#2563eb", "speed": 180,
+      "tags": ["transport", "speed"], "attributes": {},
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#7fd0ff", "dropSide": 0 }]
+    },
+    "ultraBelt": {
+      "id": "ultraBelt", "name": "Overclocked Mag-Belt", "category": "belt", "rarity": "rare", "cost": 850, "priceGrowth": 1.10,
+      "unlockMethod": "shop", "size": { "w": 1, "h": 1 }, "layer": "belt", "color": "#d97706", "speed": 320,
+      "tags": ["transport", "speed"], "attributes": {},
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#fbbf24", "dropSide": 0 }]
+    },
+    "switchGate": {
+      "id": "switchGate", "name": "Diverter Switch Gate", "category": "belt", "rarity": "uncommon", "cost": 350, "priceGrowth": 1.08,
+      "unlockMethod": "shop", "size": { "w": 1, "h": 1 }, "layer": "belt", "color": "#0891b2", "speed": 120,
+      "tags": ["transport", "logic", "gate"], "attributes": {}, "isSwitchGate": true,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#e8a030", "dropSide": 0 }]
+    },
+    "loopGate": {
+      "id": "loopGate", "name": "Loop Counter Gate", "category": "belt", "rarity": "rare", "cost": 1200, "priceGrowth": 1.10,
+      "unlockMethod": "shop", "size": { "w": 1, "h": 1 }, "layer": "belt", "color": "#059669", "speed": 120,
+      "tags": ["transport", "logic", "loop"], "attributes": {}, "isLoopGate": true,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#34d399", "dropSide": 0 }]
+    },
+    "filterSorter": {
+      "id": "filterSorter", "name": "Smart Status Sorter", "category": "belt", "rarity": "rare", "cost": 2500, "priceGrowth": 1.12,
+      "unlockMethod": "shop", "size": { "w": 1, "h": 1 }, "layer": "belt", "color": "#b45309", "speed": 120,
+      "tags": ["transport", "logic", "filter"], "attributes": {}, "isFilterSorter": true,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#f59e0b", "dropSide": 0 }]
+    },
+    "crossoverBelt": {
+      "id": "crossoverBelt", "name": "Conveyor Cross-Overpass", "category": "belt", "rarity": "uncommon", "cost": 450, "priceGrowth": 1.08,
+      "unlockMethod": "shop", "size": { "w": 1, "h": 1 }, "layer": "belt", "color": "#334155", "speed": 120,
+      "tags": ["transport", "utility", "cross"], "attributes": {}, "isCrossover": true,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#94a3b8", "dropSide": 0 }]
+    },
+    "splitter": {
+      "id": "splitter", "name": "Dual Splitter", "category": "belt", "rarity": "uncommon", "cost": 300, "priceGrowth": 1.08,
+      "unlockMethod": "shop", "size": { "w": 1, "h": 1 }, "layer": "belt", "color": "#6d28d9", "speed": 90,
+      "tags": ["transport", "splitter"], "attributes": {}, "isSplitter": true,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#c084fc", "dropSide": 0 }]
+    },
+    "tripleSplitter": {
+      "id": "tripleSplitter", "name": "3-Way Splitter", "category": "belt", "rarity": "rare", "cost": 1800, "priceGrowth": 1.10,
+      "unlockMethod": "shop", "size": { "w": 1, "h": 1 }, "layer": "belt", "color": "#7c3aed", "speed": 120,
+      "tags": ["transport", "splitter"], "attributes": {}, "isSplitter3": true,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#c084fc", "dropSide": 0 }]
+    },
+    "merger": {
+      "id": "merger", "name": "Conveyor Merger", "category": "belt", "rarity": "uncommon", "cost": 300, "priceGrowth": 1.08,
+      "unlockMethod": "shop", "size": { "w": 1, "h": 1 }, "layer": "belt", "color": "#4338ca", "speed": 90,
+      "tags": ["transport", "merger"], "attributes": {}, "isMerger": true,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#818cf8", "dropSide": 0 }]
+    },
+    "heavyMerger": {
+      "id": "heavyMerger", "name": "3-Way Heavy Merger", "category": "belt", "rarity": "rare", "cost": 2200, "priceGrowth": 1.10,
+      "unlockMethod": "shop", "size": { "w": 1, "h": 1 }, "layer": "belt", "color": "#3730a3", "speed": 200,
+      "tags": ["transport", "merger"], "attributes": {}, "isMerger": true,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#818cf8", "dropSide": 0 }]
+    },
+    "magLevRail": {
+      "id": "magLevRail", "name": "Mag-Lev Express Rail", "category": "belt", "rarity": "legendary", "cost": 1500000, "priceGrowth": 1.15,
+      "unlockMethod": "goldenCrate", "crateOnly": true, "size": { "w": 1, "h": 1 }, "layer": "belt", "color": "#0ea5e9", "speed": 450,
+      "tags": ["transport", "maglev"], "attributes": {},
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#38bdf8", "dropSide": 0 }]
+    },
+    "phaseShiftBelt": {
+      "id": "phaseShiftBelt", "name": "Phase Shift Belt", "category": "belt", "rarity": "exotic", "cost": 450000, "priceGrowth": 1.14,
+      "unlockMethod": "exoticCrate", "crateOnly": true, "size": { "w": 1, "h": 1 }, "layer": "belt", "color": "#ec4899", "speed": 120,
+      "tags": ["transport", "phase"], "attributes": {}, "phasePassable": true,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#f472b6", "dropSide": 0 }]
+    },
+    "gravityInverter": {
+      "id": "gravityInverter", "name": "Graviton Inverter Rail", "category": "belt", "rarity": "legendary", "cost": 1200000, "priceGrowth": 1.15,
+      "unlockMethod": "goldenCrate", "crateOnly": true, "size": { "w": 1, "h": 1 }, "layer": "belt", "color": "#8b5cf6", "speed": 150,
+      "tags": ["transport", "gravity"], "attributes": {}, "invertGravity": true,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#a78bfa", "dropSide": 0 }]
+    },
+    "cryoStorageBelt": {
+      "id": "cryoStorageBelt", "name": "Cryo-Buffer Conveyor", "category": "belt", "rarity": "rare", "cost": 25000, "priceGrowth": 1.12,
+      "unlockMethod": "goldenCrate", "crateOnly": true, "size": { "w": 1, "h": 1 }, "layer": "belt", "color": "#06b6d4", "speed": 40,
+      "tags": ["transport", "cryo"], "attributes": {}, "cryoPreserve": true,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#67e8f9", "dropSide": 0 }]
+    },
+    "quantumLink": {
+      "id": "quantumLink", "name": "Quantum Link Terminal", "category": "belt", "rarity": "mythic", "cost": 25000000, "priceGrowth": 1.18,
+      "unlockMethod": "prestigeCrate", "crateOnly": true, "size": { "w": 1, "h": 1 }, "layer": "belt", "color": "#10b981", "speed": 600,
+      "tags": ["transport", "teleport"], "attributes": {}, "isTeleport": true,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#34d399", "dropSide": 0 }]
+    },
+
+    "upgrader1x1": {
+      "id": "upgrader1x1", "name": "Basic Refiner (2.0x)", "category": "upgrader", "rarity": "common", "cost": 200, "priceGrowth": 1.10,
+      "unlockMethod": "shop", "size": { "w": 1, "h": 1 }, "layer": "machine", "color": "#059669", "speed": 60,
+      "tags": ["upgrader", "multiplier"], "attributes": {}, "multiplier": 2.0, "maxUses": 5,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#34d399", "dropSide": 0 }]
+    },
+    "upgraderHalf": {
+      "id": "upgraderHalf", "name": "0.5x1 Micro Refiner (1.5x)", "category": "upgrader", "rarity": "common", "cost": 150, "priceGrowth": 1.10,
+      "unlockMethod": "shop", "size": { "w": 0.5, "h": 1 }, "layer": "machine", "color": "#10b981", "speed": 60,
+      "tags": ["upgrader", "narrow"], "attributes": {}, "multiplier": 1.5, "maxUses": 5, "isHalf": true,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#34d399", "dropSide": 0 }]
+    },
+    "upgrader2x1": {
+      "id": "upgrader2x1", "name": "2x1 Dual-Lane Refiner (3.0x)", "category": "upgrader", "rarity": "rare", "cost": 3500, "priceGrowth": 1.12,
+      "unlockMethod": "shop", "size": { "w": 2, "h": 1 }, "layer": "machine", "color": "#047857", "speed": 60,
+      "tags": ["upgrader", "multiplier"], "attributes": {}, "multiplier": 3.0, "maxUses": 5,
+      "ports": [
+        { "dx": 0, "dy": 0, "kind": "conveyor", "color": "#34d399", "dropSide": 0 },
+        { "dx": 1, "dy": 0, "kind": "conveyor", "color": "#34d399", "dropSide": 0 }
+      ]
+    },
+    "freonSprayer": {
+      "id": "freonSprayer", "name": "Freon Cooling Chamber", "category": "upgrader", "rarity": "rare", "cost": 8500, "priceGrowth": 1.12,
+      "unlockMethod": "shop", "size": { "w": 1, "h": 1 }, "layer": "machine", "color": "#0284c7", "speed": 60,
+      "tags": ["upgrader", "extinguisher"], "attributes": {}, "multiplier": 1.8, "appliesWet": 8, "extinguishes": true, "maxUses": 5,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#38bdf8", "dropSide": 0 }]
+    },
+    "pyroRefiner": {
+      "id": "pyroRefiner", "name": "Pyro Superheater (3.5x)", "category": "upgrader", "rarity": "epic", "cost": 22000, "priceGrowth": 1.13,
+      "unlockMethod": "shop", "size": { "w": 1, "h": 1 }, "layer": "machine", "color": "#b91c1c", "speed": 60,
+      "tags": ["upgrader", "flaming"], "attributes": {}, "multiplier": 3.5, "appliesFlaming": true, "maxUses": 5,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#f87171", "dropSide": 0 }]
+    },
+    "leadDecontaminator": {
+      "id": "leadDecontaminator", "name": "Lead Radiation Scrubber", "category": "upgrader", "rarity": "epic", "cost": 45000, "priceGrowth": 1.14,
+      "unlockMethod": "shop", "size": { "w": 1, "h": 1 }, "layer": "machine", "color": "#475569", "speed": 60,
+      "tags": ["upgrader", "decontamination"], "attributes": {}, "multiplier": 2.5, "removesRadioactive": true, "maxUses": 5,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#94a3b8", "dropSide": 0 }]
+    },
+    "teslaBeam": {
+      "id": "teslaBeam", "name": "Tesla Induction Beam (Side-Mounted)", "category": "upgrader", "rarity": "rare", "cost": 12500, "priceGrowth": 1.12,
+      "unlockMethod": "shop", "size": { "w": 1, "h": 1 }, "layer": "machine", "color": "#0284c7", "speed": 60,
+      "tags": ["upgrader", "side_beam", "electric"], "attributes": { "beamLength": 1 }, "multiplier": 3.2, "appliesSparkling": true, "isSideBeam": true, "maxUses": 6,
+      "ports": []
+    },
+    "laserScanner": {
+      "id": "laserScanner", "name": "Precision Laser Scanner (Side-Mounted)", "category": "upgrader", "rarity": "epic", "cost": 48000, "priceGrowth": 1.14,
+      "unlockMethod": "shop", "size": { "w": 1, "h": 1 }, "layer": "machine", "color": "#7c3aed", "speed": 60,
+      "tags": ["upgrader", "side_beam", "laser"], "attributes": { "beamLength": 1 }, "multiplier": 4.0, "appliesCrystalline": true, "isSideBeam": true, "maxUses": 6,
+      "ports": []
+    },
+    "quantumLooper": {
+      "id": "quantumLooper", "name": "Quantum Loop Collider (1.8x/loop)", "category": "upgrader", "rarity": "exotic", "cost": 750000, "priceGrowth": 1.14,
+      "unlockMethod": "shop", "size": { "w": 2, "h": 2 }, "layer": "machine", "color": "#6366f1", "speed": 80,
+      "tags": ["upgrader", "loop"], "attributes": {}, "multiplier": 1.8, "maxUses": 20,
+      "ports": [
+        { "dx": 0, "dy": 0.5, "kind": "conveyor", "color": "#818cf8", "dropSide": 0 },
+        { "dx": 1, "dy": 0.5, "kind": "conveyor", "color": "#818cf8", "dropSide": 0 }
+      ]
+    },
+    "stellarSparkler": {
+      "id": "stellarSparkler", "name": "Stellar Sparkler Infuser", "category": "upgrader", "rarity": "legendary", "cost": 650000, "priceGrowth": 1.15,
+      "unlockMethod": "goldenCrate", "crateOnly": true, "size": { "w": 1, "h": 1 }, "layer": "machine", "color": "#ca8a04", "speed": 60,
+      "tags": ["upgrader", "sparkling"], "attributes": {}, "appliesSparkling": true, "multiplier": 2.5, "maxUses": 6,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#facc15", "dropSide": 0 }]
+    },
+    "upgraderPlasma": {
+      "id": "upgraderPlasma", "name": "Plasma Injector (+$500)", "category": "upgrader", "rarity": "epic", "cost": 60000, "priceGrowth": 1.14,
+      "unlockMethod": "shop", "size": { "w": 1, "h": 1 }, "layer": "machine", "color": "#7c3aed", "speed": 60,
+      "tags": ["upgrader", "flat_add"], "attributes": {}, "flatAdd": 500, "maxUses": 10,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#a78bfa", "dropSide": 0 }]
+    },
+    "oreCrystallizer": {
+      "id": "oreCrystallizer", "name": "Ore Crystallizer (2.2x)", "category": "upgrader", "rarity": "legendary", "cost": 1800000, "priceGrowth": 1.15,
+      "unlockMethod": "goldenCrate", "crateOnly": true, "size": { "w": 2, "h": 1 }, "layer": "machine", "color": "#9333ea", "speed": 60,
+      "tags": ["upgrader", "crystallizer"], "attributes": {}, "multiplier": 2.2, "appliesCrystalline": true, "maxUses": 6,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#c084fc", "dropSide": 0 }]
+    },
+    "probabilityAmp": {
+      "id": "probabilityAmp", "name": "Quantum Probability Amp", "category": "upgrader", "rarity": "exotic", "cost": 750000, "priceGrowth": 1.14,
+      "unlockMethod": "exoticCrate", "crateOnly": true, "size": { "w": 1, "h": 1 }, "layer": "machine", "color": "#16a34a", "speed": 60,
+      "tags": ["upgrader", "lucky"], "attributes": {}, "multiplier": 1.8, "appliesLucky": true, "maxUses": 6,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#4ade80", "dropSide": 0 }]
+    },
+    "entropyStabilizer": {
+      "id": "entropyStabilizer", "name": "Entropy Stabilizer (3.0x)", "category": "upgrader", "rarity": "exotic", "cost": 3200000, "priceGrowth": 1.16,
+      "unlockMethod": "exoticCrate", "crateOnly": true, "size": { "w": 2, "h": 1 }, "layer": "machine", "color": "#0284c7", "speed": 60,
+      "tags": ["upgrader", "cleanse"], "attributes": {}, "multiplier": 3.0, "nullifiesBadStatuses": true, "maxUses": 6,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#38bdf8", "dropSide": 0 }]
+    },
+    "resonanceHarmonizer": {
+      "id": "resonanceHarmonizer", "name": "Resonance Harmonizer (4.5x)", "category": "upgrader", "rarity": "legendary", "cost": 12000000, "priceGrowth": 1.16,
+      "unlockMethod": "goldenCrate", "crateOnly": true, "size": { "w": 2, "h": 2 }, "layer": "machine", "color": "#e11d48", "speed": 60,
+      "tags": ["upgrader", "synergy"], "attributes": {}, "multiplier": 4.5, "sparklingSynergy": true, "maxUses": 6,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#fb7185", "dropSide": 0 }]
+    },
+    "matterReplicator": {
+      "id": "matterReplicator", "name": "Matter Replicator", "category": "upgrader", "rarity": "mythic", "cost": 65000000, "priceGrowth": 1.18,
+      "unlockMethod": "prestigeCrate", "crateOnly": true, "size": { "w": 2, "h": 1 }, "layer": "machine", "color": "#4f46e5", "speed": 60,
+      "tags": ["upgrader", "replicator"], "attributes": {}, "duplicatesOre": true, "multiplier": 1.5, "maxUses": 3,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#818cf8", "dropSide": 0 }]
+    },
+    "oreTransmuter": {
+      "id": "oreTransmuter", "name": "Ore Transmuter", "category": "upgrader", "rarity": "legendary", "cost": 18000000, "priceGrowth": 1.17,
+      "unlockMethod": "goldenCrate", "crateOnly": true, "size": { "w": 2, "h": 2 }, "layer": "machine", "color": "#ea580c", "speed": 60,
+      "tags": ["upgrader", "transmute"], "attributes": {}, "transmutesOre": true, "multiplier": 2.5, "maxUses": 4,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#fb923c", "dropSide": 0 }]
+    },
+    "shardOfLife": {
+      "id": "shardOfLife", "name": "Shard of Life (6.0x)", "category": "upgrader", "rarity": "mythic", "cost": 200000000, "priceGrowth": 1.20,
+      "unlockMethod": "prestigeCrate", "crateOnly": true, "size": { "w": 2, "h": 2 }, "layer": "machine", "color": "#15803d", "speed": 60,
+      "tags": ["upgrader", "mythic"], "attributes": {}, "multiplier": 6.0, "empowersAdjacent": true, "maxUses": 8,
+      "ports": [{ "dx": 0, "dy": 0, "kind": "conveyor", "color": "#22c55e", "dropSide": 0 }]
+    },
+
+    "seller": {
+      "id": "seller", "name": "Standard Furnace (1.0x)", "category": "seller", "rarity": "common", "cost": 100, "priceGrowth": 1.10,
+      "unlockMethod": "shop", "size": { "w": 2, "h": 2 }, "layer": "machine", "color": "#991b1b", "speed": 40,
+      "tags": ["seller"], "attributes": {}, "consumes": true,
+      "ports": [{ "dx": 0, "dy": 0.5, "kind": "input", "color": "#ffcf5c", "dropSide": null }]
+    },
+    "blastSmelter": {
+      "id": "blastSmelter", "name": "Industrial Blast Smelter (2.0x)", "category": "seller", "rarity": "uncommon", "cost": 1200, "priceGrowth": 1.10,
+      "unlockMethod": "shop", "size": { "w": 2, "h": 2 }, "layer": "machine", "color": "#b91c1c", "speed": 40,
+      "tags": ["seller", "multiplier"], "attributes": {}, "consumes": true, "sellerBonus": 2.0,
+      "ports": [{ "dx": 0, "dy": 0.5, "kind": "input", "color": "#f87171", "dropSide": null }]
+    },
+    "cryoSmelter": {
+      "id": "cryoSmelter", "name": "Cryo-Quench Smelter (3.0x Wet)", "category": "seller", "rarity": "rare", "cost": 15000, "priceGrowth": 1.12,
+      "unlockMethod": "shop", "size": { "w": 2, "h": 2 }, "layer": "machine", "color": "#0369a1", "speed": 40,
+      "tags": ["seller", "cryo"], "attributes": {}, "consumes": true, "sellerBonus": 1.5, "wetBonus": 3.0, "flamePenalty": 0.5,
+      "ports": [{ "dx": 0, "dy": 0.5, "kind": "input", "color": "#38bdf8", "dropSide": null }]
+    },
+    "pyroSmelter": {
+      "id": "pyroSmelter", "name": "Thermobaric Smelter (4.0x Fire)", "category": "seller", "rarity": "rare", "cost": 28000, "priceGrowth": 1.13,
+      "unlockMethod": "shop", "size": { "w": 2, "h": 2 }, "layer": "machine", "color": "#c2410c", "speed": 40,
+      "tags": ["seller", "flame"], "attributes": {}, "consumes": true, "sellerBonus": 1.5, "flameBonus": 4.0, "wetDestroys": true,
+      "ports": [{ "dx": 0, "dy": 0.5, "kind": "input", "color": "#fb923c", "dropSide": null }]
+    },
+    "dimensionalVault": {
+      "id": "dimensionalVault", "name": "Dimensional Vault (3.5x)", "category": "seller", "rarity": "rare", "cost": 45000, "priceGrowth": 1.13,
+      "unlockMethod": "shop", "size": { "w": 2, "h": 2 }, "layer": "machine", "color": "#4338ca", "speed": 40,
+      "tags": ["seller", "batch"], "attributes": {}, "consumes": true, "sellerBonus": 3.5,
+      "ports": [{ "dx": 0, "dy": 0.5, "kind": "input", "color": "#818cf8", "dropSide": null }]
+    },
+    "catalyticConverter": {
+      "id": "catalyticConverter", "name": "Catalytic Converter (4.0x Rad)", "category": "seller", "rarity": "epic", "cost": 180000, "priceGrowth": 1.14,
+      "unlockMethod": "shop", "size": { "w": 2, "h": 2 }, "layer": "machine", "color": "#15803d", "speed": 40,
+      "tags": ["seller", "radioactive"], "attributes": {}, "consumes": true, "sellerBonus": 2.5, "radioactiveBonus": 4.0,
+      "ports": [{ "dx": 0, "dy": 0.5, "kind": "input", "color": "#4ade80", "dropSide": null }]
+    },
+    "prismaticSmelter": {
+      "id": "prismaticSmelter", "name": "Prismatic Gem Smelter (5.5x)", "category": "seller", "rarity": "legendary", "cost": 4500000, "priceGrowth": 1.15,
+      "unlockMethod": "goldenCrate", "crateOnly": true, "size": { "w": 2, "h": 2 }, "layer": "machine", "color": "#a16207", "speed": 40,
+      "tags": ["seller", "sparkling"], "attributes": {}, "consumes": true, "sellerBonus": 3.0, "sparklingBonus": 5.5,
+      "ports": [{ "dx": 0, "dy": 0.5, "kind": "input", "color": "#fde047", "dropSide": null }]
+    },
+    "singularitySmelter": {
+      "id": "singularitySmelter", "name": "Singularity Smelter (7.0x)", "category": "seller", "rarity": "mythic", "cost": 35000000, "priceGrowth": 1.18,
+      "unlockMethod": "exoticCrate", "crateOnly": true, "size": { "w": 3, "h": 3 }, "layer": "machine", "color": "#581c87", "speed": 40,
+      "tags": ["seller", "singularity"], "attributes": {}, "consumes": true, "sellerBonus": 7.0, "vacuumRadius": 1.5,
+      "ports": [{ "dx": 0, "dy": 1, "kind": "input", "color": "#c084fc", "dropSide": null }]
+    },
+    "soulForge": {
+      "id": "soulForge", "name": "Soul Forge (8.0x High Risk)", "category": "seller", "rarity": "mythic", "cost": 95000000, "priceGrowth": 1.20,
+      "unlockMethod": "prestigeCrate", "crateOnly": true, "size": { "w": 3, "h": 3 }, "layer": "machine", "color": "#450a0a", "speed": 40,
+      "tags": ["seller", "high_risk"], "attributes": {}, "consumes": true, "sellerBonus": 8.0, "penaltyRisk": 0.10,
+      "ports": [{ "dx": 0, "dy": 1, "kind": "input", "color": "#ef4444", "dropSide": null }]
+    },
+    "supernovaCrucible": {
+      "id": "supernovaCrucible", "name": "Supernova Fusion Crucible (12.0x)", "category": "seller", "rarity": "mythic", "cost": 500000000, "priceGrowth": 1.22,
+      "unlockMethod": "prestigeCrate", "crateOnly": true, "size": { "w": 3, "h": 3 }, "layer": "machine", "color": "#7c2d12", "speed": 40,
+      "tags": ["seller", "supernova"], "attributes": {}, "consumes": true, "sellerBonus": 5.0, "supernovaBonus": 12.0, "minSupernovaValue": 10000,
+      "ports": [{ "dx": 0, "dy": 1, "kind": "input", "color": "#fdba74", "dropSide": null }]
+    }
+  },
+  "relicDefs": {
+    "starterBelts": { "id": "starterBelts", "name": "Industrial Logistics Permit", "desc": "Start every prestige run with +8 Fast Belts in your inventory.", "rarity": "uncommon" },
+    "sellerPermit": { "id": "sellerPermit", "name": "Master Smelter License", "desc": "Start every run with a Blast Smelter pre-unlocked.", "rarity": "rare" },
+    "oreCompressor": { "id": "oreCompressor", "name": "Graviton Ore Compactor", "desc": "+25% base value to all ores spawned by extractors.", "rarity": "epic" },
+    "quantumOverclock": { "id": "quantumOverclock", "name": "Quantum Overclock Matrix", "desc": "+50% conveyor belt travel speed across your entire factory.", "rarity": "legendary" },
+    "singularityHeart": { "id": "singularityHeart", "name": "Heart of the Singularity", "desc": "All smelters gain +2.0x permanent sale bonus multiplier.", "rarity": "mythic" }
+  },
+  "cratesConfig": {
+    "regular": {
+      "name": "Regular Crate", "cost": 250,
+      "pool": [
+        { "id": "fastBelt", "weight": 40 },
+        { "id": "upgrader1x1", "weight": 30 },
+        { "id": "blastSmelter", "weight": 20 },
+        { "id": "megaExtractor", "weight": 10 }
+      ]
+    },
+    "golden": {
+      "name": "Golden Crate", "cost": 1000,
+      "pool": [
+        { "id": "teslaBeam", "weight": 20, "permanent": true },
+        { "id": "stellarSparkler", "weight": 20, "permanent": true },
+        { "id": "oreCrystallizer", "weight": 20, "permanent": true },
+        { "id": "geodeDriller", "weight": 20, "permanent": true },
+        { "id": "magLevRail", "weight": 20, "permanent": true }
+      ]
+    },
+    "exotic": {
+      "name": "Exotic Crate", "cost": 5000,
+      "pool": [
+        { "id": "laserScanner", "weight": 25, "permanent": true },
+        { "id": "singularitySmelter", "weight": 25, "permanent": true },
+        { "id": "antimatterSiphon", "weight": 25, "permanent": true },
+        { "id": "entropyStabilizer", "weight": 25, "permanent": true }
+      ]
+    },
+    "prestige": {
+      "name": "Prestige Crate", "costKeys": 1,
+      "pool": [
+        { "id": "shardOfLife", "weight": 35, "permanent": true },
+        { "id": "supernovaCrucible", "weight": 35, "permanent": true },
+        { "id": "voidHarvester", "weight": 30, "permanent": true }
+      ]
+    }
+  }
+}
