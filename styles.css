@@ -500,19 +500,22 @@ html, body {
 }
 
 /* ===========================================================
-   INVENTORY / SHOP MODAL
+   MODALS (INVENTORY, SHOP, CREATOR, CRATES, SAVES, PRESTIGE)
    =========================================================== */
-#inventoryModal, #customCreatorModal, #crateModal {
+#inventoryModal, #customCreatorModal, #crateModal, #savesModal, #prestigeModal {
   position: fixed;
   inset: 0;
-  background: rgba(10, 12, 15, 0.9);
+  background: rgba(10, 12, 15, 0.92);
+  backdrop-filter: blur(8px);
   display: none;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 1000;
   padding: 16px;
 }
-#inventoryModal.open, #customCreatorModal.open, #crateModal.open { display: flex; }
+#inventoryModal.open, #customCreatorModal.open, #crateModal.open, #savesModal.open, #prestigeModal.open {
+  display: flex !important;
+}
 
 .inv-wrapper {
   width: 960px;

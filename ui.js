@@ -575,7 +575,16 @@ function renderInventoryGrid() {
   }
 }
 
-function openInventoryModal() {
+function openInventoryModal(tab = null) {
+  closeCrateModal();
+  closePrestigeModal();
+  closeSavesModal();
+  if (tab) {
+    currentMainTab = tab;
+    document.querySelectorAll('#invMainTabs .inv-main-tab').forEach(t => {
+      t.classList.toggle('active', t.getAttribute('data-tab') === tab);
+    });
+  }
   document.getElementById('inventoryModal')?.classList.add('open');
   renderInventoryGrid();
 }
@@ -586,37 +595,57 @@ function closeInventoryModal() {
 
 // Prestige Modal Logic
 function openPrestigeModal() {
+  closeInventoryModal();
+  closeCrateModal();
+  closeSavesModal();
   const modal = document.getElementById('prestigeModal');
   if (!modal) return;
 
   const earnings = STATE.run.lifetimeEarnings || 0;
   const payout = calculatePrestigePayout(earnings);
 
-  document.getElementById('pModalEarnings').textContent = `$${earnings.toLocaleString()}`;
-  document.getElementById('pModalPoints').textContent = `+${payout.pointsGained}`;
-  document.getElementById('pModalKeys').textContent = `+${payout.keysGained}`;
+  const earningsEl = document.getElementById('pModalEarnings');
+  const pointsEl = document.getElementById('pModalPoints');
+  const keysEl = document.getElementById('pModalKeys');
+  if (earningsEl) earningsEl.textContent = `$${earnings.toLocaleString()}`;
+  if (pointsEl) pointsEl.textContent = `+${payout.pointsGained}`;
+  if (keysEl) keysEl.textContent = `+${payout.keysGained}`;
 
   const confirmBtn = document.getElementById('btnConfirmPrestige');
   if (confirmBtn) {
     confirmBtn.disabled = !payout.canPrestige;
+    confirmBtn.textContent = payout.canPrestige ? 'CONFIRM FACTORY RESET & PRESTIGE' : 'EARNINGS BELOW $10B THRESHOLD';
   }
 
-  modal.style.display = 'flex';
+  modal.classList.add('open');
 }
 
 function closePrestigeModal() {
-  const modal = document.getElementById('prestigeModal');
-  if (modal) modal.style.display = 'none';
+  document.getElementById('prestigeModal')?.classList.remove('open');
 }
 
 // Crate Shop Modal & Roulette Animation
 function openCrateModal() {
   closeInventoryModal();
+  closePrestigeModal();
+  closeSavesModal();
   document.getElementById('crateModal')?.classList.add('open');
 }
 
 function closeCrateModal() {
   document.getElementById('crateModal')?.classList.remove('open');
+}
+
+function openSavesModal() {
+  closeInventoryModal();
+  closeCrateModal();
+  closePrestigeModal();
+  document.getElementById('savesModal')?.classList.add('open');
+  renderSaveSlots();
+}
+
+function closeSavesModal() {
+  document.getElementById('savesModal')?.classList.remove('open');
 }
 
 function buyAndOpenCrateUI(crateTier) {
@@ -1167,18 +1196,23 @@ function initHotbarAndInventory() {
   initMobileToolbarListeners();
   if (typeof loadSavedState === 'function') loadSavedState();
 
-  // Tab Listeners for Main Tabs
-  document.querySelectorAll('#invMainTabs .inv-main-tab').forEach(tabBtn => {
-    tabBtn.addEventListener('click', (e) => {
+  // Tab Listeners for Main Tabs (Shop, Inventory, Relics, Prestige)
+  const mainTabsContainer = document.getElementById('invMainTabs');
+  if (mainTabsContainer) {
+    mainTabsContainer.addEventListener('click', (e) => {
+      const btn = e.target.closest('.inv-main-tab');
+      if (!btn) return;
       document.querySelectorAll('#invMainTabs .inv-main-tab').forEach(t => t.classList.remove('active'));
-      e.target.classList.add('active');
-      currentMainTab = e.target.getAttribute('data-tab');
+      btn.classList.add('active');
+      currentMainTab = btn.getAttribute('data-tab') || 'shop';
       renderInventoryGrid();
     });
-  });
+  }
 
-  document.getElementById('openInvBtn')?.addEventListener('click', openInventoryModal);
+  document.getElementById('openInvBtn')?.addEventListener('click', () => openInventoryModal('shop'));
   document.getElementById('closeInvBtn')?.addEventListener('click', closeInventoryModal);
+  document.getElementById('openSavesBtn')?.addEventListener('click', openSavesModal);
+  document.getElementById('closeSavesBtn')?.addEventListener('click', closeSavesModal);
   document.getElementById('openCrateBtn')?.addEventListener('click', openCrateModal);
   document.getElementById('closeCrateBtn')?.addEventListener('click', closeCrateModal);
   document.getElementById('openPrestigeBtn')?.addEventListener('click', openPrestigeModal);
@@ -1201,14 +1235,18 @@ function initHotbarAndInventory() {
 
   document.getElementById('invSearchInput')?.addEventListener('input', renderInventoryGrid);
 
-  document.querySelectorAll('#invTabs .inv-tab').forEach(tab => {
-    tab.addEventListener('click', (e) => {
+  // Category Sub-tabs (All, Extractors, Conveyors, Upgraders, Sellers)
+  const categoryTabsContainer = document.getElementById('invTabs');
+  if (categoryTabsContainer) {
+    categoryTabsContainer.addEventListener('click', (e) => {
+      const btn = e.target.closest('.inv-tab');
+      if (!btn) return;
       document.querySelectorAll('#invTabs .inv-tab').forEach(t => t.classList.remove('active'));
-      e.target.classList.add('active');
-      currentCategory = e.target.getAttribute('data-category');
+      btn.classList.add('active');
+      currentCategory = btn.getAttribute('data-category') || 'all';
       renderInventoryGrid();
     });
-  });
+  }
 
   // Inspector close
   document.getElementById('inspectorClose')?.addEventListener('click', () => {
