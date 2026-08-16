@@ -1607,9 +1607,10 @@ function drawGrid() {
   const cs = grid.cellSize;
   const zoom = STATE.camera.zoom;
 
-  // Only draw grid lines when zoomed in enough
-  if (zoom > 0.3) {
-    ctx.strokeStyle = `rgba(255,255,255,${Math.min(0.07, 0.07 * zoom)})`;
+  // Fine grid — only when zoomed in
+  if (zoom > 0.35) {
+    const alpha = Math.min(0.055, 0.055 * (zoom / 0.5));
+    ctx.strokeStyle = `rgba(74, 143, 168, ${alpha})`;
     ctx.lineWidth = 0.5;
     ctx.beginPath();
     for (let col = 0; col <= grid.cols; col++) {
@@ -1623,8 +1624,8 @@ function drawGrid() {
     ctx.stroke();
   }
 
-  // Chunked grid lines at every 4 cells for orientation
-  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  // Major grid every 4 cells
+  ctx.strokeStyle = 'rgba(74, 143, 168, 0.06)';
   ctx.lineWidth = 1;
   ctx.beginPath();
   for (let col = 0; col <= grid.cols; col += 4) {
@@ -1638,10 +1639,12 @@ function drawGrid() {
   ctx.stroke();
 
   // World boundary
-  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+  ctx.strokeStyle = 'rgba(232, 160, 48, 0.35)';
   ctx.lineWidth = 1.5;
+  ctx.setLineDash([8, 4]);
   const p1 = worldToScreen(0, 0), p2 = worldToScreen(grid.cols * cs, grid.rows * cs);
   ctx.strokeRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
+  ctx.setLineDash([]);
 }
 
 function currentGhost() {
@@ -1840,10 +1843,10 @@ function drawBuildings() {
     ctx.fillRect(p1.x + 2, p1.y + 2, w - 4, Math.min(h * 0.25, 8));
 
     // Border
-    ctx.strokeStyle = isSelected ? '#7fd0ff' : hexToRgba(def.color, 0.7);
-    ctx.lineWidth = isSelected ? 2.5 * zoom : 1.5 * zoom;
+    ctx.strokeStyle = isSelected ? '#e8a030' : hexToRgba(def.color, 0.7);
+    ctx.lineWidth = isSelected ? 2 * zoom : 1.2 * zoom;
     ctx.beginPath();
-    roundRect(ctx, p1.x, p1.y, w, h, Math.min(4 * zoom, 6));
+    roundRect(ctx, p1.x, p1.y, w, h, Math.min(3 * zoom, 4));
     ctx.stroke();
 
     // Category icon when zoomed in
@@ -1908,8 +1911,8 @@ function drawBuildings() {
     ctx.fillStyle = hexToRgba(def.color, 0.35);
     ctx.fillRect(p1.x, p1.y, w, h);
 
-    ctx.strokeStyle = isSelected ? '#7fd0ff' : hexToRgba(def.color, 0.5);
-    ctx.lineWidth = isSelected ? 2.5 * zoom : 1 * zoom;
+    ctx.strokeStyle = isSelected ? '#e8a030' : hexToRgba(def.color, 0.5);
+    ctx.lineWidth = isSelected ? 2 * zoom : 0.8 * zoom;
     ctx.strokeRect(p1.x, p1.y, w, h);
 
     ctx.globalAlpha = isMoving ? 0.45 : 1;
@@ -1984,8 +1987,8 @@ function drawOres() {
     }
 
     // Outline
-    ctx.strokeStyle = isSelected ? '#7fd0ff' : 'rgba(0,0,0,0.4)';
-    ctx.lineWidth = isSelected ? Math.max(2, 2.5 * zoom) : Math.max(0.5, 1 * zoom);
+    ctx.strokeStyle = isSelected ? '#e8a030' : 'rgba(0,0,0,0.4)';
+    ctx.lineWidth = isSelected ? Math.max(1.5, 2 * zoom) : Math.max(0.5, 0.8 * zoom);
     ctx.beginPath();
     if (o.shape === 'diamond') {
       ctx.moveTo(s.x, s.y - effectiveR * 1.35);
