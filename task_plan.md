@@ -36,13 +36,20 @@ Phase 1: Game Economy, Progression & Synergy Design
 - [x] Verify save slots, crates roulette, prestige rebirth reset, and building mechanics.
 - *Status:* complete
 
-### Phase 5: Verification & Playtesting <!-- id: 4 -->
-- [x] Validate all JavaScript syntax (`node -c game.js; node -c ui.js; node -c data.js; node -c server.js`).
-- [x] Playtest loop paths, side-mounted beams, multi-tier machines, and prestige triggers.
-- [x] Commit and push changes to git.
+### Phase 6: Multi-Tile Upgrader Traversal Requirement <!-- id: 5 -->
+- [x] Track ore distance traveled along machine flow vector inside multi-tile upgraders.
+- [x] Ensure ore only receives the upgrade after traversing full machine length (`>= length * 0.85`) towards the exit.
+- *Status:* complete
+
+### Phase 7: World-Spawning Collectible Crates Overhaul <!-- id: 6 -->
+- [x] Transition crates from pay-to-buy store items to free world-spawning mystery gifts.
+- [x] Add automatic periodic crate spawning on random grid tiles (every 20–35s).
+- [x] Render animated bobbing crate sprites with vertical beacon beams in Phaser.
+- [x] Implement click-to-open interaction with particle burst and reward modal/toast.
+- [x] Update shop unlocks and UI so all progression blueprints are purchasable or found.
 - *Status:* complete
 
 ## Errors Encountered
 | Error | Attempt | Resolution |
 |-------|---------|------------|
-| None | 0 | Clean design and data synchronization |
+| None | 0 | Clean multi-tile traversal physics and world crate spawner |

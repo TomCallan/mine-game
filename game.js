@@ -814,7 +814,20 @@ function handleClickAction(worldX, worldY) {
   } else if (mode === 'inspecting') {
     selectEntityAt(worldX, worldY);
   } else if (mode === 'idle') {
-    // Interactive In-World Machine Toggling
+    // 1. Check if clicked a spawned World Crate!
+    if (STATE.run.spawnedCrates && STATE.run.spawnedCrates.length > 0) {
+      for (let i = STATE.run.spawnedCrates.length - 1; i >= 0; i--) {
+        const crate = STATE.run.spawnedCrates[i];
+        const dx = crate.x - worldX;
+        const dy = crate.y - worldY;
+        if (dx * dx + dy * dy < 32 * 32) {
+          openWorldCrate(crate);
+          return;
+        }
+      }
+    }
+
+    // 2. Interactive In-World Machine Toggling
     const cell = worldToCell(worldX, worldY);
     const b = findBuildingAtCell(cell.col, cell.row);
     if (b) {
@@ -989,13 +1002,23 @@ function updateOrePhysics(dt) {
         continue;
       }
 
-      // Upgrader processing with maxUses limit allowing loops on the same machine
-      if (def.category === 'upgrader') {
+      // Upgrader processing with multi-tile full-length traversal requirement & loop stacking
+      if (def.category === 'upgrader' && !def.isSideBeam) {
         ore.upgraderBuildingUses = ore.upgraderBuildingUses || {};
+        ore.buildingTraversals = ore.buildingTraversals || {};
+
+        // Accumulate distance traveled inside this specific building
+        const speed = Math.sqrt(ore.vx * ore.vx + ore.vy * ore.vy);
+        ore.buildingTraversals[b.id] = (ore.buildingTraversals[b.id] || 0) + (speed > 10 ? speed * dt : 70 * dt);
+
+        const fp = getFootprint(def, b.rot);
+        const lengthInCells = (b.rot % 2 === 0 ? fp.w : fp.h);
+        const reqTraversal = Math.max(15, (lengthInCells - 0.3) * cs);
         const currentUses = ore.upgraderBuildingUses[b.id] || 0;
         const maxAllowed = def.maxUses || 5;
 
-        if (ore.lastUpgraderBuildingId !== b.id && currentUses < maxAllowed) {
+        // Only trigger upgrade once the ore has traversed through the entire length of the machine
+        if (ore.lastUpgraderBuildingId !== b.id && ore.buildingTraversals[b.id] >= reqTraversal && currentUses < maxAllowed) {
           ore.lastUpgraderBuildingId = b.id;
           ore.upgraderBuildingUses[b.id] = currentUses + 1;
 
@@ -1030,6 +1053,10 @@ function updateOrePhysics(dt) {
             ore.upgraded = true;
           }
 
+          if (sceneInstance && sceneInstance.spawnPlacementBurst) {
+            sceneInstance.spawnPlacementBurst(ore.x, ore.y, def.color || '#38bdf8');
+          }
+
           if (def.duplicatesOre && !ore.status.duplicated && STATE.run.ores.length < STATE.config.maxOres) {
             ore.status.duplicated = true;
             STATE.run.ores.push({
@@ -1043,12 +1070,14 @@ function updateOrePhysics(dt) {
               value: ore.value,
               energy: ore.energy,
               status: { ...ore.status, duplicated: true },
-              upgraderBuildingUses: { ...ore.upgraderBuildingUses }
+              upgraderBuildingUses: { ...ore.upgraderBuildingUses },
+              buildingTraversals: {}
             });
           }
         }
       } else if (ore.lastUpgraderBuildingId) {
         ore.lastUpgraderBuildingId = null;
+        if (ore.buildingTraversals) ore.buildingTraversals = {};
       }
 
       // Conveyor & Gate Routing
@@ -1631,7 +1660,7 @@ const CRATES_CONFIG = {
 };
 
 function openCrate(tier) {
-  const crate = CRATES_CONFIG[tier];
+  const crate = CRATES_CONFIG[tier] || CRATES_CONFIG.regular;
   if (!crate) return null;
 
   const totalWeight = crate.pool.reduce((acc, cur) => acc + cur.weight, 0);
@@ -1644,29 +1673,60 @@ function openCrate(tier) {
   }
 
   addToInventory(chosen.id, 1, !!chosen.permanent);
-  STATE.stats.cratesOpened++;
+  STATE.stats.cratesOpened = (STATE.stats.cratesOpened || 0) + 1;
   triggerSaveState();
   return { id: chosen.id, permanent: !!chosen.permanent };
 }
 
-function buyAndOpenCrate(tier) {
-  const crate = CRATES_CONFIG[tier];
-  if (!crate) return null;
+function openWorldCrate(crate) {
+  if (!crate) return;
+  const tier = crate.tier || 'regular';
+  const cfg = CRATES_CONFIG[tier] || CRATES_CONFIG.regular;
 
-  if (crate.costKeys) {
-    if ((STATE.meta.prestigeKeys || 0) < crate.costKeys) {
-      showToast('Not enough Prestige Keys!', 'warn');
-      return null;
-    }
-    STATE.meta.prestigeKeys -= crate.costKeys;
-  } else if (crate.cost) {
-    if (STATE.run.money < crate.cost) {
-      showToast('Insufficient funds to purchase crate!', 'warn');
-      return null;
-    }
-    STATE.run.money -= crate.cost;
+  // 1. Remove from world
+  STATE.run.spawnedCrates = (STATE.run.spawnedCrates || []).filter(c => c.id !== crate.id);
+
+  // 2. Spawn celebratory particle explosion
+  if (sceneInstance && sceneInstance.spawnPlacementBurst) {
+    const tierColors = { regular: '#94a3b8', golden: '#f59e0b', exotic: '#a855f7', prestige: '#38bdf8' };
+    sceneInstance.spawnPlacementBurst(crate.x, crate.y, tierColors[tier] || '#f59e0b');
   }
 
+  // 3. Roll item reward from pool
+  const totalWeight = cfg.pool.reduce((acc, cur) => acc + cur.weight, 0);
+  let roll = Math.random() * totalWeight;
+  let chosen = cfg.pool[0];
+  for (const item of cfg.pool) {
+    if (roll < item.weight) { chosen = item; break; }
+    roll -= item.weight;
+  }
+
+  const def = STATE.defs.buildingDefs[chosen.id];
+  const itemName = def ? def.name : chosen.id;
+
+  // Add item & unlock blueprint
+  addToInventory(chosen.id, 1, !!chosen.permanent);
+
+  // Cash bonus scaling with tier and Life level
+  const life = getLifeLevel(STATE.run.lifetimeEarnings || 0);
+  const baseCash = { regular: 500, golden: 5000, exotic: 50000, prestige: 500000 }[tier] || 500;
+  const cashBonus = Math.round(baseCash * Math.max(1, life * 0.8));
+  STATE.run.money += cashBonus;
+  STATE.run.lifetimeEarnings += cashBonus;
+
+  if (tier === 'prestige') {
+    STATE.meta.prestigeKeys = (STATE.meta.prestigeKeys || 0) + 1;
+  }
+
+  STATE.stats.cratesOpened = (STATE.stats.cratesOpened || 0) + 1;
+
+  showToast(`🎁 UNBOXED ${cfg.name}! Received ${itemName} + $${cashBonus.toLocaleString()}!`, 'success');
+  if (typeof renderHotbar === 'function') renderHotbar();
+  if (typeof renderInventoryGrid === 'function') renderInventoryGrid();
+  triggerSaveState();
+}
+
+function buyAndOpenCrate(tier) {
   return openCrate(tier);
 }
 
@@ -1796,9 +1856,12 @@ class FactoryScene extends Phaser.Scene {
     this.gridGfx = this.add.graphics();
     this.beltGfx = this.add.graphics();
     this.buildingGfx = this.add.graphics();
+    this.crateGfx = this.add.graphics();
     this.oreGfx = this.add.graphics();
     this.previewGfx = this.add.graphics();
     this.effectsGfx = this.add.graphics();
+
+    this.nextCrateSpawnTime = performance.now() + 10000;
 
     // 3. Floating Text Group
     this.floatingTexts = [];
@@ -2023,18 +2086,125 @@ class FactoryScene extends Phaser.Scene {
       updateOrePhysics(dt * STATE.run.timeScale);
       resolveOreCollisions();
       processConsumption();
+      this.updateWorldCrates(time, dt);
     }
 
     // 2. Render Layers
     this.renderGrid();
     this.renderBelts(time);
     this.renderBuildings(time);
+    this.renderCrates(time);
     this.renderOres();
     this.renderPreviews();
     this.renderEffects(dt);
 
     // 3. Sync UI HUD
     updateHUD();
+  }
+
+  updateWorldCrates(time, dt) {
+    if (!STATE.run.spawnedCrates) STATE.run.spawnedCrates = [];
+    if (!this.nextCrateSpawnTime) this.nextCrateSpawnTime = time + 10000;
+
+    if (time >= this.nextCrateSpawnTime) {
+      this.nextCrateSpawnTime = time + Phaser.Math.Between(20000, 35000);
+
+      if (STATE.run.spawnedCrates.length < 6) {
+        const grid = STATE.config.grid;
+        const cs = grid.cellSize;
+
+        for (let attempt = 0; attempt < 25; attempt++) {
+          const col = Phaser.Math.Between(1, grid.cols - 2);
+          const row = Phaser.Math.Between(1, grid.rows - 2);
+
+          const occupied = findBuildingAtCell(col, row);
+          const alreadyHasCrate = STATE.run.spawnedCrates.some(c => c.col === col && c.row === row);
+
+          if (!occupied && !alreadyHasCrate) {
+            const roll = Math.random();
+            let tier = 'regular';
+            if (roll < 0.05) tier = 'prestige';
+            else if (roll < 0.20) tier = 'exotic';
+            else if (roll < 0.45) tier = 'golden';
+
+            const tierNames = { regular: 'Regular Crate', golden: 'Golden Crate', exotic: 'Exotic Crate', prestige: 'Prestige Crate' };
+            const newCrate = {
+              id: genId('crate'),
+              tier,
+              name: tierNames[tier],
+              col, row,
+              x: (col + 0.5) * cs,
+              y: (row + 0.5) * cs,
+              bobOffset: Math.random() * Math.PI * 2,
+              spawnTime: time
+            };
+
+            STATE.run.spawnedCrates.push(newCrate);
+            showToast(`📦 A ${newCrate.name} has landed in your factory! Click it to open!`, 'info');
+            this.spawnPlacementBurst(newCrate.x, newCrate.y, tier === 'golden' ? '#f59e0b' : (tier === 'exotic' ? '#a855f7' : (tier === 'prestige' ? '#38bdf8' : '#94a3b8')));
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  renderCrates(time) {
+    this.crateGfx.clear();
+    const crates = STATE.run.spawnedCrates || [];
+
+    for (const crate of crates) {
+      const tier = crate.tier || 'regular';
+      let tierColor = 0x94a3b8;
+      let beaconColor = 0x94a3b8;
+      if (tier === 'golden') { tierColor = 0xf59e0b; beaconColor = 0xfbbf24; }
+      else if (tier === 'exotic') { tierColor = 0xa855f7; beaconColor = 0xc084fc; }
+      else if (tier === 'prestige') { tierColor = 0x0284c7; beaconColor = 0x38bdf8; }
+
+      const bobY = crate.y - 10 + Math.sin(time / 220 + crate.bobOffset) * 5;
+
+      // 1. Shimmering Vertical Beacon Beam
+      const beaconAlpha = 0.22 + Math.sin(time / 180 + crate.bobOffset) * 0.08;
+      this.crateGfx.fillStyle(beaconColor, beaconAlpha);
+      this.crateGfx.fillRect(crate.x - 10, crate.y - 140, 20, 140);
+      this.crateGfx.fillStyle(0xffffff, beaconAlpha * 0.8);
+      this.crateGfx.fillRect(crate.x - 3, crate.y - 140, 6, 140);
+
+      // 2. Ground Pulse Ring & Shadow
+      this.crateGfx.fillStyle(0x000000, 0.4);
+      this.crateGfx.fillCircle(crate.x, crate.y + 6, 14);
+      this.crateGfx.lineStyle(2, beaconColor, 0.6 + Math.sin(time / 140) * 0.3);
+      this.crateGfx.strokeCircle(crate.x, crate.y + 6, 16 + Math.sin(time / 140) * 3);
+
+      // 3. 3D Crate Box Body
+      const bw = 24, bh = 22;
+      this.crateGfx.fillStyle(0x111827, 1);
+      this.crateGfx.fillRoundedRect(crate.x - bw/2, bobY - bh/2, bw, bh, 3);
+
+      // Metallic Tier Border & Rivets
+      this.crateGfx.lineStyle(2, tierColor, 1);
+      this.crateGfx.strokeRoundedRect(crate.x - bw/2, bobY - bh/2, bw, bh, 3);
+
+      // Crate Corner Brackets
+      this.crateGfx.fillStyle(tierColor, 1);
+      this.crateGfx.fillRect(crate.x - bw/2 + 2, bobY - bh/2 + 2, 4, 4);
+      this.crateGfx.fillRect(crate.x + bw/2 - 6, bobY - bh/2 + 2, 4, 4);
+      this.crateGfx.fillRect(crate.x - bw/2 + 2, bobY + bh/2 - 6, 4, 4);
+      this.crateGfx.fillRect(crate.x + bw/2 - 6, bobY + bh/2 - 6, 4, 4);
+
+      // Center Glowing Lock Emblem
+      this.crateGfx.fillStyle(beaconColor, 1);
+      this.crateGfx.fillCircle(crate.x, bobY, 4);
+      this.crateGfx.lineStyle(1.5, 0xffffff, 0.9);
+      this.crateGfx.strokeCircle(crate.x, bobY, 4);
+
+      // Hovering sparkles
+      const sparkAngle = time / 300 + crate.bobOffset;
+      const sparkX = crate.x + Math.cos(sparkAngle) * 16;
+      const sparkY = bobY + Math.sin(sparkAngle) * 10;
+      this.crateGfx.fillStyle(0xffffff, 0.85);
+      this.crateGfx.fillCircle(sparkX, sparkY, 2);
+    }
   }
 
   renderGrid() {
